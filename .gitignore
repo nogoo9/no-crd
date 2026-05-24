@@ -56,3 +56,6 @@ skills-lock.json
 
 # scratchpad
 scratch/
+
+# VitePress generated API docs
+docs/api/
