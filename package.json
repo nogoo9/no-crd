@@ -78,10 +78,12 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.13",
 		"@types/bun": "latest",
+		"mermaid": "^11.15.0",
 		"typedoc": "^0.28.19",
 		"typedoc-plugin-markdown": "^4.11.0",
 		"typedoc-vitepress-theme": "^1.1.2",
 		"typescript": "^5.6.0",
-		"vitepress": "^1.6.4"
+		"vitepress": "^1.6.4",
+		"vitepress-plugin-mermaid": "^2.0.17"
 	}
 }
