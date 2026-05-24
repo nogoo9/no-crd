@@ -209,7 +209,6 @@ export async function resetMcpServer(
  */
 export async function handleWebRequest(
 	req: Request,
-	// biome-ignore lint/suspicious/noExplicitAny: any is required to support Bun server interface across other runtimes
 	serverInstance?: any,
 ): Promise<Response> {
 	if (req.method === "OPTIONS")
@@ -287,7 +286,6 @@ export async function handleWebRequest(
 		}
 		res.headers.set("X-Accel-Buffering", "no");
 
-		// biome-ignore lint/suspicious/noExplicitAny: Headers.entries is not in ES2022 lib
 		for (const [k, v] of (res.headers as any).entries()) {
 			logger.debug("Header: {key}: {value}", { key: k, value: v });
 		}
@@ -353,7 +351,6 @@ export async function handleWebRequest(
 export async function startHttpServer(): Promise<void> {
 	globalIsStateless = process.env.STATELESS === "true";
 	const isBun = typeof Bun !== "undefined";
-	// biome-ignore lint/suspicious/noExplicitAny: Deno global object is dynamically accessed
 	const isDeno = typeof (globalThis as any).Deno !== "undefined";
 
 	const TLS_CERT_PATH = process.env.TLS_CERT;
@@ -407,7 +404,6 @@ export async function startHttpServer(): Promise<void> {
 		});
 	} else if (isDeno) {
 		// Deno runtime
-		// biome-ignore lint/suspicious/noExplicitAny: Deno global object is dynamically accessed
 		const DenoGlobal = (globalThis as any).Deno;
 		const serveOptions: any = {
 			port: PORT,

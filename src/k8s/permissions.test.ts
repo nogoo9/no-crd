@@ -4,7 +4,6 @@ import { initK8sContext } from "./client.js";
 import { checkPermission, evaluatePermissions } from "./permissions.js";
 
 const mockCreateSelfSubjectAccessReview = mock();
-// biome-ignore lint/suspicious/noExplicitAny: Mock API needs generic properties
 const mockAuthApi = {
 	createSelfSubjectAccessReview: mockCreateSelfSubjectAccessReview,
 } as any;
@@ -37,7 +36,6 @@ users:
     token: test-token
 `);
 		originalMakeApiClient = testKc.makeApiClient;
-		// biome-ignore lint/suspicious/noExplicitAny: override internal method for testing
 		testKc.makeApiClient = (apiClass: any) => {
 			if (apiClass === k8s.AuthorizationV1Api) {
 				return mockAuthApi;

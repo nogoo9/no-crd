@@ -194,7 +194,6 @@ export function initK8sContext(customKc?: k8s.KubeConfig): K8sContext {
 					cluster: cluster.name,
 				},
 			);
-			// biome-ignore lint/suspicious/noExplicitAny: bypass read-only property in loaded KubeConfig
 			(cluster as any).skipTLSVerify = true;
 		}
 		logger.info("Kubernetes context initialized. Server: {server}", {

@@ -37,7 +37,6 @@ type LogLevel = (typeof validLevels)[number];
 function getLogLevel(): LogLevel {
 	const raw = (process?.env?.LOG_LEVEL ?? "info").toLowerCase();
 	if (raw === "warn") return "warning";
-	// biome-ignore lint/suspicious/noExplicitAny: allow check on string literal
 	if (validLevels.includes(raw as any)) {
 		return raw as LogLevel;
 	}
