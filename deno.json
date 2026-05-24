@@ -1,0 +1,32 @@
+{
+	"imports": {
+		"~/": "./src/",
+		"assert": "node:assert",
+		"async_hooks": "node:async_hooks",
+		"buffer": "node:buffer",
+		"child_process": "node:child_process",
+		"constants": "node:constants",
+		"crypto": "node:crypto",
+		"dns": "node:dns",
+		"events": "node:events",
+		"fs": "node:fs",
+		"http": "node:http",
+		"http2": "node:http2",
+		"https": "node:https",
+		"net": "node:net",
+		"os": "node:os",
+		"path": "node:path",
+		"punycode": "node:punycode",
+		"querystring": "node:querystring",
+		"readline": "node:readline",
+		"stream": "node:stream",
+		"string_decoder": "node:string_decoder",
+		"tls": "node:tls",
+		"tty": "node:tty",
+		"url": "node:url",
+		"util": "node:util",
+		"vm": "node:vm",
+		"worker_threads": "node:worker_threads",
+		"zlib": "node:zlib"
+	}
+}

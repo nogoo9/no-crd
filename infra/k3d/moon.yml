@@ -1,0 +1,20 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'bash'
+layer: 'tool'
+
+tasks:
+  bootstrap:
+    command: './bootstrap.sh'
+    options:
+      runInCI: false
+
+  start:
+    command: 'k3d cluster start nogoo-dev'
+    options:
+      runInCI: false
+
+  teardown:
+    command: './teardown.sh'
+    options:
+      runInCI: false

@@ -1,0 +1,37 @@
+{
+	"mcpServers": {
+		"nogoo9-no-crd-k3d-http": {
+			"serverUrl": "http://localhost:8080/mcp"
+		},
+		"nogoo9-no-crd-local-bun": {
+			"command": "bun",
+			"args": ["run", "src/index.ts"],
+			"env": {
+				"TRANSPORT": "stdio",
+				"NODE_TLS_REJECT_UNAUTHORIZED": "0"
+			}
+		},
+		"nogoo9-no-crd-local-deno": {
+			"command": "deno",
+			"args": [
+				"run",
+				"--allow-all",
+				"--unstable-sloppy-imports",
+				"--unsafely-ignore-certificate-errors",
+				"src/index.ts"
+			],
+			"env": {
+				"TRANSPORT": "stdio",
+				"NODE_TLS_REJECT_UNAUTHORIZED": "0"
+			}
+		},
+		"nogoo9-no-crd-local-node": {
+			"command": "node",
+			"args": ["dist/index.js"],
+			"env": {
+				"TRANSPORT": "stdio",
+				"NODE_TLS_REJECT_UNAUTHORIZED": "0"
+			}
+		}
+	}
+}

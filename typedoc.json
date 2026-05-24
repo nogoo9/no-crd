@@ -1,0 +1,13 @@
+{
+	"entryPoints": [
+		"src/index.ts",
+		"src/server.ts",
+		"src/cli.ts",
+		"src/k8s/index.ts",
+		"src/mcp/server.ts"
+	],
+	"out": "docs/api",
+	"plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
+	"docsRoot": "docs",
+	"readme": "none"
+}

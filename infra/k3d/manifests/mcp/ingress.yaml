@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nogoo-mcp
+  namespace: nogoo9
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: nogoo-mcp
+                port:
+                  number: 3000

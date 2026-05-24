@@ -1,0 +1,9 @@
+$schema: 'https://moonrepo.dev/schemas/workspace.json'
+
+projects:
+  mcp: '.'
+  k3d: 'infra/k3d'
+
+vcs:
+  client: 'git'
+  defaultBranch: 'main'

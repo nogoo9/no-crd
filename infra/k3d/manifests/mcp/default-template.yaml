@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-agent-workspace
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "Default agent workspace with S3 folder sync"
+    nogoo9/tag: "default"
+    nogoo9/required-context: "AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_ENDPOINT_URL,S3_BUCKET,S3_FOLDER"
+    nogoo9/init-image: "nogoo9-registry.localhost:5001/amazon/aws-cli:latest"
+    nogoo9/init-command: "aws s3 mb s3://$S3_BUCKET --endpoint-url $AWS_ENDPOINT_URL 2>/dev/null || true && aws s3 sync s3://$S3_BUCKET/$S3_FOLDER /workspace --endpoint-url $AWS_ENDPOINT_URL"
+    nogoo9/pre-stop-command: "aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER --endpoint-url $AWS_ENDPOINT_URL"
+    nogoo9/pre-stop-sidecar-image: "nogoo9-registry.localhost:5001/amazon/aws-cli:latest"
+    nogoo9/default-grace-period: "10"
+data:
+  spec: |
+    {
+      "containers": [{
+        "name": "agent",
+        "image": "nogoo9-registry.localhost:5001/bun:latest",
+        "command": ["/bin/sh", "-c", "bun -e \"Bun.serve({ port: 5678, fetch(req) { const text = process.env.ECHO_TEXT || 'hello'; console.log(new Date().toISOString() + ' Request received'); return new Response(text); } }); console.log('Listening on :5678');\" > /workspace/echo.log 2>&1"],
+        "volumeMounts": [{"name": "workspace", "mountPath": "/workspace"}]
+      }],
+      "volumes": [{"name": "workspace", "emptyDir": {}}]
+    }

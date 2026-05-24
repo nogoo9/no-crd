@@ -1,0 +1,58 @@
+{
+	"name": "@nogoo9/no-crd",
+	"version": "0.1.0",
+	"license": "Apache-2.0",
+	"type": "module",
+	"bin": {
+		"nocrd9": "dist/cli.js"
+	},
+	"exports": {
+		".": {
+			"bun": "./src/index.ts",
+			"deno": "./src/index.ts",
+			"node": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"dev": "bun run src/index.ts",
+		"dev:bun": "bun run src/index.ts",
+		"dev:deno": "deno run --allow-all src/index.ts",
+		"dev:node": "npx tsx src/index.ts",
+		"run:bun": "bun dist/index.js",
+		"run:deno": "deno run --allow-all dist/index.js",
+		"run:node": "node dist/index.js",
+		"build": "bun build src/index.ts --outfile dist/index.js --target node --minify && bun build src/cli.ts --outfile dist/cli.js --target node --minify && bun run scripts/build-ui.ts",
+		"setup": "bun run src/cli.ts",
+		"lint": "biome check .",
+		"format": "biome check --write --unsafe .",
+		"check": "biome check --write --unsafe .",
+		"typecheck": "tsc --noEmit",
+		"inspect": "bun run build && TRANSPORT=stdio bunx @modelcontextprotocol/inspector bun run dist/index.js",
+		"test": "bun test src/**/*.test.ts src/*.test.ts",
+		"test:lifecycle": "bun run scripts/test-lifecycle.ts",
+		"test:mcp-cli": "bun run scripts/test-mcp-cli.ts",
+		"test:antigravity": "bun run scripts/run-antigravity-test.ts",
+		"update:permissions": "bun run scripts/update-permissions-docs.ts",
+		"build:docs": "bun run update:permissions && typedoc",
+		"docs:dev": "bun run build:docs && vitepress dev docs --port 5183",
+		"docs:build": "bun run build:docs && vitepress build docs"
+	},
+	"dependencies": {
+		"@kubernetes/client-node": "^1.4.0",
+		"@logtape/logtape": "^0.8.2",
+		"@modelcontextprotocol/ext-apps": "^1.7.0",
+		"@modelcontextprotocol/sdk": "^1.29.0",
+		"jsonpath-plus": "^10.4.0",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.13",
+		"@types/bun": "latest",
+		"typedoc": "^0.28.19",
+		"typedoc-plugin-markdown": "^4.11.0",
+		"typedoc-vitepress-theme": "^1.1.2",
+		"typescript": "^5.6.0",
+		"vitepress": "^1.6.4"
+	}
+}

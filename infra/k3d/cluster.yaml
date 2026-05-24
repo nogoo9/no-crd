@@ -1,0 +1,17 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: nogoo-dev
+servers: 1
+kubeAPI:
+  host: "127.0.0.1"
+  hostPort: "6550"
+ports:
+  - port: "8080:80"
+    nodeFilters:
+      - loadbalancer
+registries:
+  create:
+    name: nogoo9-registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5001"

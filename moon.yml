@@ -1,0 +1,88 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'typescript'
+layer: 'application'
+
+tasks:
+  dev:
+    command: 'bun run src/index.ts'
+    env:
+      TRANSPORT: http
+    options:
+      runInCI: false
+      persistent: true
+
+  dev-stdio:
+    command: 'bun run src/index.ts'
+    env:
+      TRANSPORT: stdio
+    options:
+      runInCI: false
+      persistent: true
+
+  docs-dev:
+    command: 'bun run docs:dev'
+    options:
+      runInCI: false
+      persistent: true
+
+  inspect:
+    command: 'bunx @modelcontextprotocol/inspector bun run dist/index.js'
+    env:
+      TRANSPORT: stdio
+    deps:
+      - 'build'
+    options:
+      runInCI: false
+
+  build:
+    command: 'bun build src/index.ts --outfile dist/index.js --target bun --minify'
+    inputs:
+      - 'src/**/*'
+      - 'package.json'
+    outputs:
+      - 'dist/index.js'
+
+  typecheck:
+    command: 'bun x tsc --noEmit'
+    inputs:
+      - 'src/**/*'
+      - 'tsconfig.json'
+
+  test:
+    command: 'bun test src/**/*.test.ts src/*.test.ts'
+    inputs:
+      - 'src/**/*'
+      - '**/*.test.ts'
+
+  test-lifecycle:
+    command: 'bun run scripts/test-lifecycle.ts'
+    options:
+      runInCI: false
+      cache: false
+
+  test-antigravity:
+    command: 'bun run scripts/run-antigravity-test.ts'
+    options:
+      runInCI: false
+      cache: false
+
+  docker-build:
+    command: 'sh -c "docker build -f $MOON_PROJECT_ROOT/Dockerfile -t nogoo9/kube-mcp:latest $MOON_WORKSPACE_ROOT"'
+    options:
+      runInCI: false
+
+  deploy:
+    command: 'sh -c "docker build -f $MOON_PROJECT_ROOT/Dockerfile -t nogoo9-registry.localhost:5001/kube-mcp:latest $MOON_WORKSPACE_ROOT && docker push nogoo9-registry.localhost:5001/kube-mcp:latest && kubectl apply -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ && kubectl -n nogoo9 rollout restart deployment/nogoo-mcp"'
+    options:
+      runInCI: false
+
+  deploy-wsl:
+    command: 'sh -c "docker build -f $MOON_PROJECT_ROOT/Dockerfile -t nogoo9-registry.localhost:5001/kube-mcp:latest $MOON_WORKSPACE_ROOT && docker tag nogoo9-registry.localhost:5001/kube-mcp:latest localhost:5001/kube-mcp:latest && docker push localhost:5001/kube-mcp:latest && kubectl apply -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ && kubectl -n nogoo9 rollout restart deployment/nogoo-mcp"'
+    options:
+      runInCI: false
+
+  undeploy:
+    command: 'kubectl delete -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ --ignore-not-found'
+    options:
+      runInCI: false

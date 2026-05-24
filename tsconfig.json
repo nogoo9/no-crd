@@ -1,0 +1,18 @@
+{
+	"extends": "./tsconfig.options.json",
+	"compilerOptions": {
+		"outDir": "dist",
+		"rootDir": "src",
+		"lib": ["ES2022"],
+		"types": ["bun"],
+		"paths": {
+			"~/*": ["./src/*"],
+			"zod": ["./node_modules/.bun/zod@4.4.3/node_modules/zod/index.d.ts"],
+			"zod/v4/core": [
+				"./node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/index.d.ts"
+			],
+			"zod/v3": ["./node_modules/.bun/zod@4.4.3/node_modules/zod/v3/index.d.ts"]
+		}
+	},
+	"include": ["src"]
+}

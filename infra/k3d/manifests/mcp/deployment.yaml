@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nogoo-mcp
+  namespace: nogoo9
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nogoo-mcp
+  template:
+    metadata:
+      labels:
+        app: nogoo-mcp
+    spec:
+      serviceAccountName: nogoo-mcp
+      containers:
+        - name: mcp
+          image: nogoo9-registry.localhost:5001/kube-mcp:latest
+          imagePullPolicy: Always
+          env:
+            - name: TRANSPORT
+              value: http
+            - name: PORT
+              value: "3000"
+            - name: NAMESPACE
+              value: nogoo9
+            - name: MODE
+              value: cluster
+            - name: STATELESS
+              value: "true"
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -1,0 +1,16 @@
+FROM alpine:latest
+
+# Install runtime dependencies
+RUN apk add --no-cache curl tar bash
+
+# Copy the mock CLI helper script to be used as fallback
+COPY scripts/mock-cli.sh /usr/local/bin/antigravity.mock
+
+# Download CLI from antigravity.google. If it fails or returns HTML/SPA, fall back to mock CLI.
+RUN curl -sSL https://antigravity.google/downloads/cli -o /usr/local/bin/antigravity || true
+RUN if [ ! -f /usr/local/bin/antigravity ] || grep -q "<!doctype html>" /usr/local/bin/antigravity || grep -q "<html" /usr/local/bin/antigravity; then \
+      echo "Remote CLI not found (returned HTML). Using pre-baked mock CLI."; \
+      cp /usr/local/bin/antigravity.mock /usr/local/bin/antigravity; \
+    fi && chmod +x /usr/local/bin/antigravity
+
+WORKDIR /workspace

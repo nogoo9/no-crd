@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rustfs
+  namespace: nogoo9
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rustfs
+  template:
+    metadata:
+      labels:
+        app: rustfs
+    spec:
+      containers:
+        - name: rustfs
+          image: nogoo9-registry.localhost:5001/rustfs:latest
+          args: ["server", "--address", ":8080", "/data"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: RUSTFS_ACCESS_KEY
+              value: "test-access-key"
+            - name: RUSTFS_SECRET_KEY
+              value: "test-secret-key"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs
+  namespace: nogoo9
+spec:
+  selector:
+    app: rustfs
+  ports:
+    - port: 80
+      targetPort: 8080
