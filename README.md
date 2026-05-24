@@ -2,10 +2,10 @@
 
 > **Agent-Driven, On-Demand Pod Orchestration in Kubernetes — Without Custom Resource Definitions.**
 
-[![npm version](https://img.shields.io/npm/v/@nogoo9/no-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
-[![npm downloads](https://img.shields.io/npm/dm/@nogoo9/no-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
+[![npm version](https://img.shields.io/npm/v/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
+[![npm downloads](https://img.shields.io/npm/dm/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
 [![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg?style=flat-square)](https://nogoo9.github.io/no-crd/)
-[![License](https://img.shields.io/npm/l/@nogoo9/no-crd.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE)
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Server-orange.svg?style=flat-square)](https://modelcontextprotocol.io)
 [![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.11-black?logo=bun&style=flat-square)](https://bun.sh)
 [![Deno](https://img.shields.io/badge/Deno-compatible-blue?logo=deno&style=flat-square)](https://deno.land)
