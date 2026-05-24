@@ -4,7 +4,7 @@
 
 > **provisionServiceAccount**(`coreApi`, `ns`, `workspaceId`, `roleArn`): `Promise`\<`string`\>
 
-Defined in: src/k8s/pods.ts:43
+Defined in: [src/k8s/pods.ts:43](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/pods.ts#L43)
 
 Provisions a Kubernetes ServiceAccount in the target namespace and annotates it
 with an AWS IAM Role ARN for EKS service account role mapping.

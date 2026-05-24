@@ -4,7 +4,7 @@
 
 > **makeApiClient**\<`T`\>(`kc`, `apiClientType`): `T`
 
-Defined in: [src/k8s/client.ts:139](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/client.ts#L139)
+Defined in: [src/k8s/client.ts:139](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/client.ts#L139)
 
 Creates an instance of a Kubernetes API client for a given configuration.
 Automatically delegates to custom `makeApiClient` setups if a mock/stub KubeConfig is passed.

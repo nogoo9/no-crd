@@ -3,7 +3,7 @@ import { App } from "@modelcontextprotocol/ext-apps";
 
 // Initialize the MCP App client bridge
 const app = new App(
-	{ name: "nogoo9-pod-manager", version: "0.1.0" },
+	{ name: "nogoo9-pod-manager", version: "0.1.1" },
 	{ tools: {} },
 );
 
@@ -580,7 +580,7 @@ async function initHttpFallback(): Promise<boolean> {
 				params: {
 					protocolVersion: mcpVersion,
 					capabilities: {},
-					clientInfo: { name: "nogoo9-ui-fallback", version: "0.1.0" },
+					clientInfo: { name: "nogoo9-ui-fallback", version: "0.1.1" },
 				},
 				id: 1,
 			};

@@ -4,7 +4,7 @@
 
 > **applySpawnerAnnotations**(`spec`, `annotations`, `context?`): `object`
 
-Defined in: src/k8s/annotations.ts:12
+Defined in: [src/k8s/annotations.ts:12](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/annotations.ts#L12)
 
 Evaluates spawner-specific annotations and applies the corresponding mutations
 to the Pod spec (such as injecting initContainers, lifecycle hooks, and env vars).

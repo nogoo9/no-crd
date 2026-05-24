@@ -4,7 +4,7 @@
 
 > `const` **LABELS**: `object`
 
-Defined in: src/k8s/config.ts:18
+Defined in: [src/k8s/config.ts:18](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/config.ts#L18)
 
 Standard annotation/label keys used to tag managed pod workloads.
 

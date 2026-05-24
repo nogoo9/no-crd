@@ -4,4 +4,4 @@
 
 > `const` **ResourceQuantity**: `ZodRecord`\<`ZodString`, `ZodString`\>
 
-Defined in: [src/k8s/schemas.ts:55](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/schemas.ts#L55)
+Defined in: [src/k8s/schemas.ts:55](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/schemas.ts#L55)

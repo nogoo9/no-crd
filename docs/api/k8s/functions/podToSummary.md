@@ -4,7 +4,7 @@
 
 > **podToSummary**(`pod`): `object`
 
-Defined in: src/k8s/pods.ts:14
+Defined in: [src/k8s/pods.ts:14](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/pods.ts#L14)
 
 Maps a full raw Kubernetes V1Pod structure to a simplified metadata and status summary.
 

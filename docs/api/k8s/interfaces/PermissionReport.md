@@ -2,7 +2,7 @@
 
 # Interface: PermissionReport
 
-Defined in: [src/k8s/permissions.ts:34](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/permissions.ts#L34)
+Defined in: [src/k8s/permissions.ts:34](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/permissions.ts#L34)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [src/k8s/permissions.ts:34](https://github.com/nogoo9/no-crd/blob/1d
 
 > **configuredFlags**: `object`
 
-Defined in: [src/k8s/permissions.ts:35](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/permissions.ts#L35)
+Defined in: [src/k8s/permissions.ts:35](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/permissions.ts#L35)
 
 #### mode
 
@@ -26,7 +26,7 @@ Defined in: [src/k8s/permissions.ts:35](https://github.com/nogoo9/no-crd/blob/1d
 
 > **disabledTools**: `string`[]
 
-Defined in: [src/k8s/permissions.ts:41](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/permissions.ts#L41)
+Defined in: [src/k8s/permissions.ts:41](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/permissions.ts#L41)
 
 ***
 
@@ -34,7 +34,7 @@ Defined in: [src/k8s/permissions.ts:41](https://github.com/nogoo9/no-crd/blob/1d
 
 > **enabledTools**: `string`[]
 
-Defined in: [src/k8s/permissions.ts:40](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/permissions.ts#L40)
+Defined in: [src/k8s/permissions.ts:40](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/permissions.ts#L40)
 
 ***
 
@@ -42,4 +42,4 @@ Defined in: [src/k8s/permissions.ts:40](https://github.com/nogoo9/no-crd/blob/1d
 
 > **permissions**: `Record`\<`string`, `Record`\<`string`, `boolean`\>\>
 
-Defined in: [src/k8s/permissions.ts:39](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/permissions.ts#L39)
+Defined in: [src/k8s/permissions.ts:39](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/permissions.ts#L39)

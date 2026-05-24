@@ -2,7 +2,7 @@
 
 # Interface: CustomToolResult\<T\>
 
-Defined in: src/k8s/errors.ts:7
+Defined in: [src/k8s/errors.ts:7](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/errors.ts#L7)
 
 ## Extends
 
@@ -56,7 +56,7 @@ If specified, the caller is requesting out-of-band progress notifications for th
 
 > **code**: `number`
 
-Defined in: src/k8s/errors.ts:12
+Defined in: [src/k8s/errors.ts:12](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/errors.ts#L12)
 
 ***
 
@@ -64,7 +64,7 @@ Defined in: src/k8s/errors.ts:12
 
 > **content**: `object`[]
 
-Defined in: src/k8s/errors.ts:10
+Defined in: [src/k8s/errors.ts:10](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/errors.ts#L10)
 
 #### text
 
@@ -84,7 +84,7 @@ Defined in: src/k8s/errors.ts:10
 
 > **isError**: `true`
 
-Defined in: src/k8s/errors.ts:11
+Defined in: [src/k8s/errors.ts:11](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/errors.ts#L11)
 
 #### Overrides
 
@@ -96,7 +96,7 @@ Defined in: src/k8s/errors.ts:11
 
 > **message**: `string`
 
-Defined in: src/k8s/errors.ts:13
+Defined in: [src/k8s/errors.ts:13](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/errors.ts#L13)
 
 ***
 
@@ -104,7 +104,7 @@ Defined in: src/k8s/errors.ts:13
 
 > `optional` **structuredContent?**: `T`
 
-Defined in: src/k8s/errors.ts:14
+Defined in: [src/k8s/errors.ts:14](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/errors.ts#L14)
 
 #### Overrides
 

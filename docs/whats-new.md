@@ -2,6 +2,12 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+
+## What's New in v0.1.1
+
+- **NPM Publishing Improvements:** Updated `package.json` with standard publishing metadata fields (`homepage`, `repository`, `bugs`, `publishConfig`, `keywords`, and `files`) to ensure clean distribution.
+- **Documentation Portal Linkage:** Embedded direct links to the published GitHub Pages documentation site in the README and project badges.
+
 ---
 
 ## What's New in v0.1.0 (Initial Release)

@@ -1,7 +1,36 @@
 {
 	"name": "@nogoo9/no-crd",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"license": "Apache-2.0",
+	"description": "Agent-driven, on-demand pod orchestration in Kubernetes (k8s/k3s) without Custom Resource Definitions (CRDs)",
+	"author": "nogoo9",
+	"homepage": "https://nogoo9.github.io/no-crd/",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nogoo9/no-crd.git"
+	},
+	"bugs": {
+		"url": "https://github.com/nogoo9/no-crd/issues"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"kubernetes",
+		"k8s",
+		"k3s",
+		"sandbox",
+		"spawner",
+		"pod-orchestration"
+	],
+	"files": [
+		"dist",
+		"src",
+		"deno.json",
+		"mcp_servers.json"
+	],
 	"type": "module",
 	"bin": {
 		"nocrd9": "dist/cli.js"

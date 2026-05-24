@@ -4,7 +4,7 @@
 
 > **initK8sContext**(`customKc?`): [`K8sContext`](../interfaces/K8sContext.md)
 
-Defined in: [src/k8s/client.ts:176](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/client.ts#L176)
+Defined in: [src/k8s/client.ts:176](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/client.ts#L176)
 
 Initializes and packages the active Kubernetes context (KubeConfig and default API client).
 Performs setup tasks like reading local kubeconfig or configuring Node TLS bypass.

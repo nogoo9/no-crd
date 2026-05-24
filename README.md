@@ -4,6 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@nogoo9/no-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
 [![npm downloads](https://img.shields.io/npm/dm/@nogoo9/no-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
+[![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg?style=flat-square)](https://nogoo9.github.io/no-crd/)
 [![License](https://img.shields.io/npm/l/@nogoo9/no-crd.svg?style=flat-square)](LICENSE)
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Server-orange.svg?style=flat-square)](https://modelcontextprotocol.io)
 [![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.11-black?logo=bun&style=flat-square)](https://bun.sh)
@@ -13,6 +14,8 @@
 `@nogoo9/no-crd` is a lightweight, cross-runtime Model Context Protocol (MCP) server that empowers AI agents and APIs to dynamically spawn, route to, and manage ephemeral containerized sandboxes on standard Kubernetes (k8s/k3s) clusters — **without requiring Custom Resource Definitions (CRDs)**, cluster-level operators, or elevated RBAC permissions. 
 
 It provides JupyterHub-like dynamic pod lifecycle management but is completely agnostic to actual workloads and supports multi-runtime execution under **Bun**, **Deno**, and **Node.js**.
+
+📚 **For detailed guides, API reference, and configuration options, visit the [Documentation Website](https://nogoo9.github.io/no-crd/).**
 
 ---
 

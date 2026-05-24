@@ -4,7 +4,7 @@
 
 > **evaluatePermissions**(`k8sContext`, `namespace`, `mode`, `forceRefresh?`): `Promise`\<[`PermissionReport`](../interfaces/PermissionReport.md)\>
 
-Defined in: [src/k8s/permissions.ts:119](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/k8s/permissions.ts#L119)
+Defined in: [src/k8s/permissions.ts:119](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/k8s/permissions.ts#L119)
 
 Evaluates the required permissions for all registered MCP tools and constructs a PermissionReport.
 Under `"namespaced"` mode, some checks (such as namespace listing) are adjusted/bypassed.

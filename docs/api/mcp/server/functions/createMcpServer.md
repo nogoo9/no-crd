@@ -4,7 +4,7 @@
 
 > **createMcpServer**(`k8sContext`): `Promise`\<`McpServer`\>
 
-Defined in: [src/mcp/server.ts:24](https://github.com/nogoo9/no-crd/blob/1dbe20e20afc27f23800f31d83e85e04215781e1/src/mcp/server.ts#L24)
+Defined in: [src/mcp/server.ts:24](https://github.com/nogoo9/no-crd/blob/27a667fb9b3640e40f7ff22643ce29f64bc426b8/src/mcp/server.ts#L24)
 
 Creates and configures a fresh instance of the Model Context Protocol (MCP) server.
 Instantiates the SDK server, runs RBAC diagnostics on Kubernetes, and conditionally
