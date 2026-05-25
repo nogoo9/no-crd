@@ -19,11 +19,16 @@ const UI_ENABLED = process.env.UI_ENABLED !== "false";
  * @param distDir Path to the directory where static build assets are located.
  * @returns Serialized HTML application payload.
  */
-export function loadUiHtml(distDir: string): string {
+export function loadUiHtml(distDir: string, basePrefix = ""): string {
 	const htmlPath = join(distDir, "ui", "index.html");
 	try {
 		logger.debug("Loading UI HTML index page from {htmlPath}", { htmlPath });
-		return readFileSync(htmlPath, "utf-8");
+		let html = readFileSync(htmlPath, "utf-8");
+		if (basePrefix) {
+			const scriptTag = `<script>window.__NOCR_BASE_URL__ = ${JSON.stringify(basePrefix)};</script>`;
+			html = html.replace("<head>", `<head>${scriptTag}`);
+		}
+		return html;
 	} catch (err) {
 		logger.warn("Could not load UI HTML asset: {error}", { error: err });
 		return `<!DOCTYPE html><html><body><p>UI not built. Run: moon run web:build</p></body></html>`;

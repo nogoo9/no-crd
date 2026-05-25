@@ -3,7 +3,7 @@ import { App } from "@modelcontextprotocol/ext-apps";
 
 // Initialize the MCP App client bridge
 const app = new App(
-	{ name: "nogoo9-pod-manager", version: "0.1.1" },
+	{ name: "nogoo9-pod-manager", version: "0.2.0" },
 	{ tools: {} },
 );
 
@@ -29,6 +29,9 @@ let templates: Array<{
 	tag: string;
 	requiredContext?: string[];
 }> = [];
+
+// Authentication & token state
+let activeToken = "";
 
 // Log viewer state
 let activeLogPod: string | null = null;
@@ -69,12 +72,158 @@ const contextVariablesContainer = document.getElementById(
 );
 const contextInputs = document.getElementById("context-inputs");
 
+// Token Modal Elements
+const _userBadgeBtn = document.getElementById("user-badge-btn");
+const userBadgeName = document.getElementById("user-badge-name");
+const _tokenModal = document.getElementById("token-modal");
+const _tokenForm = document.getElementById("token-form");
+const jwtTokenInput = document.getElementById(
+	"jwt-token-input",
+) as HTMLTextAreaElement;
+const _closeTokenBtn = document.getElementById("close-token-btn");
+const _clearTokenBtn = document.getElementById("clear-token-btn");
+
+// Template Spec Modal Elements
+const tmplSpecModal = document.getElementById("tmpl-spec-modal");
+const tmplSpecTitle = document.getElementById("tmpl-spec-title");
+const tmplSpecSubtitle = document.getElementById("tmpl-spec-subtitle");
+const tmplSpecContent = document.getElementById("tmpl-spec-content");
+const closeTmplSpecBtn = document.getElementById("close-tmpl-spec-btn");
+const closeTmplSpecFooterBtn = document.getElementById(
+	"close-tmpl-spec-footer-btn",
+);
+
+// Create Template Modal Elements
+const createTmplBtn = document.getElementById("create-tmpl-btn");
+const createTmplModal = document.getElementById("create-tmpl-modal");
+const createTmplForm = document.getElementById("create-tmpl-form");
+const closeCreateTmplBtn = document.getElementById("close-create-tmpl-btn");
+const cancelCreateTmplBtn = document.getElementById("cancel-create-tmpl-btn");
+
+const createTmplNameInput = document.getElementById(
+	"create-tmpl-name",
+) as HTMLInputElement;
+const createTmplDescInput = document.getElementById(
+	"create-tmpl-desc",
+) as HTMLInputElement;
+const createTmplTagInput = document.getElementById(
+	"create-tmpl-tag",
+) as HTMLInputElement;
+const createTmplSpecInput = document.getElementById(
+	"create-tmpl-spec",
+) as HTMLTextAreaElement;
+
+// Toast Container
+const toastContainer = document.getElementById("toast-container");
+
+// Toast Notification System
+function showToast(message: string, type: "success" | "error" = "success") {
+	if (!toastContainer) return;
+	const toast = document.createElement("div");
+	toast.className = `toast-item p-4 rounded-xl border flex items-start gap-3 shadow-lg transition duration-300 ${
+		type === "success"
+			? "bg-slate-900/95 border-emerald-500/30 text-slate-100"
+			: "bg-slate-900/95 border-rose-500/30 text-slate-100"
+	}`;
+
+	const icon =
+		type === "success"
+			? `<span class="p-1 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0">
+				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+				</svg>
+		   </span>`
+			: `<span class="p-1 bg-rose-500/10 text-rose-400 rounded-lg shrink-0">
+				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+				</svg>
+		   </span>`;
+
+	toast.innerHTML = `
+		${icon}
+		<div class="flex-1">
+			<p class="text-sm font-semibold">${type === "success" ? "Success" : "Error"}</p>
+			<p class="text-xs text-slate-400 mt-0.5 leading-relaxed">${message}</p>
+		</div>
+	`;
+
+	toastContainer.appendChild(toast);
+
+	// Remove toast after 4 seconds
+	setTimeout(() => {
+		toast.classList.add("toast-out");
+		toast.addEventListener("animationend", () => {
+			toast.remove();
+		});
+	}, 4000);
+}
+
+// JWT Token Decoder
+function decodeJwt(t: string): any {
+	try {
+		const parts = t.split(".");
+		if (parts.length !== 3) return null;
+		const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+		const json = decodeURIComponent(
+			atob(base64)
+				.split("")
+				.map((c) => {
+					return `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`;
+				})
+				.join(""),
+		);
+		return JSON.parse(json);
+	} catch (_e) {
+		return null;
+	}
+}
+
+// Token State Management
+function initToken() {
+	const urlParams = new URLSearchParams(window.location.search);
+	let token = urlParams.get("token");
+	if (token) {
+		localStorage.setItem("nocr_token", token);
+		// Clean the token parameter from URL to keep address bar clean
+		const cleanUrl = window.location.pathname + window.location.hash;
+		window.history.replaceState({}, document.title, cleanUrl);
+	} else {
+		token = localStorage.getItem("nocr_token");
+	}
+
+	if (token) {
+		activeToken = token;
+		if (jwtTokenInput) jwtTokenInput.value = token;
+		updateUserBadge(token);
+	} else {
+		updateUserBadge("");
+	}
+}
+
+function updateUserBadge(token: string) {
+	if (!userBadgeName) return;
+	if (token) {
+		const payload = decodeJwt(token);
+		if (payload) {
+			const sub = payload.sub || payload.identity || payload.name || "User";
+			userBadgeName.textContent = String(sub);
+			return;
+		}
+	}
+	userBadgeName.textContent = "Anonymous";
+}
+
+function getJwtPayload() {
+	return activeToken ? decodeJwt(activeToken) : undefined;
+}
+
 // Error display helper
 function showError(msg: string) {
 	if (errorBanner && errorMessage) {
 		errorMessage.textContent = msg;
 		errorBanner.classList.remove("hidden");
 	}
+	showToast(msg, "error");
 }
 
 function clearError() {
@@ -106,7 +255,7 @@ async function refreshAll() {
 		// 2. Fetch workspaces
 		const wsRes = await app.callServerTool({
 			name: "list_workspaces",
-			arguments: { namespace: currentNamespace },
+			arguments: { namespace: currentNamespace, jwtPayload: getJwtPayload() },
 		});
 		if (wsRes && !wsRes.isError && wsRes.structuredContent) {
 			workspaces = (wsRes.structuredContent as any).workspaces || [];
@@ -186,6 +335,22 @@ function renderWorkspaces() {
 				statusClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
 			}
 
+			let openLinkHtml = "";
+			if (ws.status === "Running") {
+				const tokenQuery = activeToken
+					? `?token=${encodeURIComponent(activeToken)}`
+					: "";
+				const workspaceUrl = `${basePath}/route/${ws.id}/${tokenQuery}`;
+				openLinkHtml = `
+					<a href="${workspaceUrl}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold rounded-lg transition active:scale-95 shadow-md shadow-indigo-600/10 cursor-pointer">
+						<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+						</svg>
+						Open Workspace
+					</a>
+				`;
+			}
+
 			return `
       <div class="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition hover:bg-slate-900/20">
         <div class="flex items-center gap-3">
@@ -207,6 +372,7 @@ function renderWorkspaces() {
             ${pulseDot}
             ${ws.status}
           </span>
+          ${openLinkHtml}
           <button data-ws-id="${ws.id}" class="stop-ws-btn inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-rose-950/40 border border-slate-700 hover:border-rose-500/30 text-slate-300 hover:text-rose-400 text-xs font-semibold rounded-lg transition active:scale-95 cursor-pointer">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -331,7 +497,14 @@ function renderTemplates() {
           <p class="text-xs text-slate-400 mt-1 leading-normal">${tmpl.description || "No description provided."}</p>
         </div>
         
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
+          <button data-tmpl-name="${tmpl.name}" class="view-spec-btn px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition active:scale-95 flex items-center gap-1 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            View Spec
+          </button>
           <button data-tmpl-name="${tmpl.name}" class="spawn-ws-modal-btn px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition active:scale-95 flex items-center gap-1 cursor-pointer">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -353,6 +526,15 @@ function renderTemplates() {
 			if (name) openSpawnModal(name);
 		});
 	});
+
+	document.querySelectorAll(".view-spec-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", async (e: Event) => {
+			const name = (e.currentTarget as HTMLButtonElement).getAttribute(
+				"data-tmpl-name",
+			);
+			if (name) await openTmplSpecModal(name);
+		});
+	});
 }
 
 // Tool invocation: stop_workspace
@@ -361,12 +543,19 @@ async function stopWorkspace(id: string) {
 	try {
 		const res = await app.callServerTool({
 			name: "stop_workspace",
-			arguments: { id, namespace: currentNamespace },
+			arguments: {
+				id,
+				namespace: currentNamespace,
+				jwtPayload: getJwtPayload(),
+			},
 		});
 		if (res.isError) {
-			showError(
+			showToast(
 				`Failed to stop workspace: ${(res.content?.[0] as any)?.text || "Unknown error"}`,
+				"error",
 			);
+		} else {
+			showToast(`Workspace "${id}" stopping...`, "success");
 		}
 	} catch (err) {
 		showError(`Error calling stop_workspace: ${err}`);
@@ -383,9 +572,12 @@ async function deletePod(name: string) {
 			arguments: { name, namespace: currentNamespace },
 		});
 		if (res.isError) {
-			showError(
+			showToast(
 				`Failed to delete pod: ${(res.content?.[0] as any)?.text || "Unknown error"}`,
+				"error",
 			);
+		} else {
+			showToast(`Pod "${name}" deleted successfully`, "success");
 		}
 	} catch (err) {
 		showError(`Error calling delete_pod: ${err}`);
@@ -470,7 +662,7 @@ async function openSpawnModal(tmplName: string) {
 					"w-full bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl px-4 py-2 text-xs font-mono text-white outline-none transition";
 				input.placeholder = `Value for ${key}`;
 
-				// Pre-populate some useful defaults for local MinIO stack
+				// Pre-populate defaults for common local/testing services
 				if (key === "AWS_ENDPOINT_URL") {
 					input.value = "http://localhost:9000";
 				} else if (key === "S3_BUCKET") {
@@ -532,17 +724,130 @@ if (spawnForm) {
 					templateRef: tmplName,
 					namespace: currentNamespace,
 					context,
+					jwtPayload: getJwtPayload(),
 				},
 			});
 			if (res.isError) {
-				showError(
+				showToast(
 					`Failed to spawn workspace: ${(res.content?.[0] as any)?.text || "Unknown error"}`,
+					"error",
 				);
+			} else {
+				showToast(`Workspace "${wsId}" spawned successfully`, "success");
 			}
 		} catch (err) {
 			showError(`Error spawning workspace: ${err}`);
 		}
 
+		await refreshAll();
+	});
+}
+
+// Template Spec Modal functions
+async function openTmplSpecModal(tmplName: string) {
+	if (tmplSpecTitle) tmplSpecTitle.textContent = `${tmplName} Specification`;
+	if (tmplSpecSubtitle) tmplSpecSubtitle.textContent = `ConfigMap: ${tmplName}`;
+	if (tmplSpecContent)
+		tmplSpecContent.textContent = "Fetching template specification...";
+	if (tmplSpecModal) tmplSpecModal.classList.remove("hidden");
+
+	try {
+		const res = await app.callServerTool({
+			name: "get_template",
+			arguments: { name: tmplName, namespace: currentNamespace },
+		});
+		if (res.isError) {
+			if (tmplSpecContent)
+				tmplSpecContent.textContent = `Error: ${(res.content?.[0] as any)?.text || "Could not fetch spec"}`;
+		} else {
+			const spec = (res.structuredContent as any)?.spec || {};
+			if (tmplSpecContent)
+				tmplSpecContent.textContent = JSON.stringify(spec, null, 2);
+		}
+	} catch (err) {
+		if (tmplSpecContent) tmplSpecContent.textContent = `Error: ${err}`;
+	}
+}
+
+function closeTmplSpecModal() {
+	if (tmplSpecModal) tmplSpecModal.classList.add("hidden");
+}
+
+if (closeTmplSpecBtn)
+	closeTmplSpecBtn.addEventListener("click", closeTmplSpecModal);
+if (closeTmplSpecFooterBtn)
+	closeTmplSpecFooterBtn.addEventListener("click", closeTmplSpecModal);
+
+// Create Template Modal functions
+function closeCreateTmplModal() {
+	if (createTmplModal) createTmplModal.classList.add("hidden");
+}
+
+if (createTmplBtn) {
+	createTmplBtn.addEventListener("click", () => {
+		if (createTmplNameInput) createTmplNameInput.value = "";
+		if (createTmplDescInput) createTmplDescInput.value = "";
+		if (createTmplTagInput) createTmplTagInput.value = "";
+		if (createTmplSpecInput) {
+			createTmplSpecInput.value = `{
+  "containers": [
+    {
+      "name": "workspace",
+      "image": "node:20-alpine",
+      "command": ["sleep", "infinity"]
+    }
+  ]
+}`;
+		}
+		if (createTmplModal) createTmplModal.classList.remove("hidden");
+	});
+}
+
+if (closeCreateTmplBtn)
+	closeCreateTmplBtn.addEventListener("click", closeCreateTmplModal);
+if (cancelCreateTmplBtn)
+	cancelCreateTmplBtn.addEventListener("click", closeCreateTmplModal);
+
+if (createTmplForm) {
+	createTmplForm.addEventListener("submit", async (e: Event) => {
+		e.preventDefault();
+		const name = createTmplNameInput.value.trim();
+		const description = createTmplDescInput.value.trim();
+		const tag = createTmplTagInput.value.trim();
+		const specRaw = createTmplSpecInput.value.trim();
+
+		let spec: any;
+		try {
+			spec = JSON.parse(specRaw);
+		} catch (err) {
+			showToast(`Invalid JSON in pod specification: ${err}`, "error");
+			return;
+		}
+
+		closeCreateTmplModal();
+
+		try {
+			const res = await app.callServerTool({
+				name: "create_template",
+				arguments: {
+					name,
+					namespace: currentNamespace,
+					description,
+					tag,
+					spec,
+				},
+			});
+			if (res.isError) {
+				showToast(
+					`Failed to create template: ${(res.content?.[0] as any)?.text || "Unknown error"}`,
+					"error",
+				);
+			} else {
+				showToast(`Template "${name}" created successfully`, "success");
+			}
+		} catch (err) {
+			showToast(`Error creating template: ${err}`, "error");
+		}
 		await refreshAll();
 	});
 }
@@ -560,11 +865,12 @@ if (cancelSpawnBtn) cancelSpawnBtn.addEventListener("click", closeSpawnModal);
 // Fallback HTTP Transport Client (when opened outside an MCP App Host iframe)
 let _fallbackMode = false;
 let httpSessionId: string | null = null;
-let mcpEndpointUrl = "/mcp";
+const basePath = (window as any).__NOCR_BASE_URL__ || "";
+let mcpEndpointUrl = `${basePath}/mcp`;
 const mcpVersion = "2024-11-05";
 
 async function initHttpFallback(): Promise<boolean> {
-	const endpointsToTry = ["/mcp", "http://localhost:3000/mcp"];
+	const endpointsToTry = [`${basePath}/mcp`, "http://localhost:3000/mcp"];
 
 	// If the current origin is not localhost:3000, prioritize absolute local server URL
 	if (window.location.origin !== "http://localhost:3000") {
@@ -580,16 +886,20 @@ async function initHttpFallback(): Promise<boolean> {
 				params: {
 					protocolVersion: mcpVersion,
 					capabilities: {},
-					clientInfo: { name: "nogoo9-ui-fallback", version: "0.1.1" },
+					clientInfo: { name: "nogoo9-ui-fallback", version: "0.2.0" },
 				},
 				id: 1,
 			};
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
+			};
+			if (activeToken) {
+				headers.Authorization = `Bearer ${activeToken}`;
+			}
 			const resp = await fetch(endpoint, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Accept: "application/json, text/event-stream",
-				},
+				headers,
 				body: JSON.stringify(initPayload),
 			});
 			if (resp.ok) {
@@ -629,6 +939,9 @@ async function callServerToolFallback(name: string, args: any): Promise<any> {
 	};
 	if (httpSessionId) {
 		headers["mcp-session-id"] = httpSessionId;
+	}
+	if (activeToken) {
+		headers.Authorization = `Bearer ${activeToken}`;
 	}
 
 	const resp = await fetch(mcpEndpointUrl, {
@@ -686,6 +999,9 @@ app.ontoolresult = (params) => {
 		refreshAll();
 	}
 };
+
+// Initialize authentication and settings listeners
+initToken();
 
 // Start connection handshake and retrieve stats
 app

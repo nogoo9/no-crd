@@ -1,5 +1,9 @@
 # @nogoo9/no-crd
 
+<p align="center">
+  <img src="docs/public/logo.png" alt="nogoo9 logo" width="200" height="200" />
+</p>
+
 > **Agent-Driven, On-Demand Pod Orchestration in Kubernetes — Without Custom Resource Definitions.**
 
 [![npm version](https://img.shields.io/npm/v/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
@@ -24,8 +28,9 @@ It provides JupyterHub-like dynamic pod lifecycle management but is completely a
 - **No CRDs Required:** Runs directly against core Kubernetes resources (Pods, ConfigMaps, ServiceAccounts). Highly portable, secure, and compatible with restricted/managed environments (EKS, GKE, K3s).
 - **Agent Sandbox Spawner:** Specialized spawner tools that automate workspace provisioning with context validation, init containers, IAM roles, pre-stop hooks, and lifecycle sync.
 - **ConfigMap-Based Templates:** Store, version, and load reusable pod templates stored as standard Kubernetes ConfigMaps.
-- **Multi-Transport & Multi-Runtime:** Supports SSE/HTTP and Stdio communication modes. Runs seamlessly on Node.js, Bun, or Deno.
-- **Embedded Web UI App:** Exposes an interactive React/web-based Pod Manager interface via the Model Context Protocol application extensions.
+- **Isomorphic Multi-Runtime SDK:** Imports seamlessly as a composable programmatic SDK or MCP server running under Node.js, Bun, or Deno.
+- **Workspace Routing Proxy (Experimental):** Built-in reverse proxy routing that dynamically pipes traffic to running container IPs with secure user token ownership checks.
+- **Embedded Web UI App:** Exposes an interactive React/web-based Pod Manager interface to view workspaces, templates, logs, and manage token details.
 
 ---
 
@@ -92,9 +97,15 @@ The server and command-line utility are configurable using CLI options or enviro
 | `--cors-methods` | `CORS_ALLOWED_METHODS`, `CORS_METHODS` | `GET, POST, OPTIONS` | String | CORS Allowed Methods header. |
 | `--cors-headers` | `CORS_ALLOWED_HEADERS`, `CORS_HEADERS` | `Content-Type, Authorization, mcp-protocol-version` | String | CORS Allowed Headers header. |
 | - | `UI_ENABLED` | `true` | `true`, `false` | Enables the embedded HTML Pod Manager UI resource. |
-| - | `AUTH_ENABLED` | `false` | `true`, `false` | When true, restricts workspace operations to JWT validated identities. |
-| - | `AUTH_SUB_JSONPATH`| `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. |
+| - | `AUTH_ENABLED` | `false` | `true`, `false` | When true, restricts workspace operations to JWT validated identities. (Experimental, likely to change) |
+| - | `AUTH_SUB_JSONPATH`| `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. (Experimental, likely to change) |
 | - | `REGISTRY_URL` | - | URL string | Target container registry URL to query for images (e.g. `http://localhost:5001`). |
+| `--base-url` | `BASE_URL` | - | Path string | Base subpath prefix for hosting behind a reverse proxy (e.g. `/gateway/no-crd`). |
+| `--jwt-secret` | `JWT_SECRET` | - | String | Symmetric HMAC-SHA256 secret for token verification. (Experimental, likely to change) |
+| `--jwt-public-key` | `JWT_PUBLIC_KEY` | - | String | PEM encoded RSA/ECDSA public key for asymmetric token verification. (Experimental, likely to change) |
+| `--jwks-uri` | `JWKS_URI` | - | URL string | Remote JWKS endpoint URL to dynamically retrieve verification keys. (Experimental, likely to change) |
+| `--auth-issuer` | `AUTH_ISSUER` | - | URL string | Identifier URL for the Authorization Server advertised in metadata discovery. (Experimental, likely to change) |
+| `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | `3000` | Number | Default target port inside the workspace pods to proxy traffic to. (Experimental, likely to change) |
 
 ---
 
@@ -451,6 +462,77 @@ The spawner inspects `ConfigMap` metadata annotations (and custom inline annotat
 | `nogoo9/pre-stop-command` | Shell Command | A command run in a Kubernetes `preStop` lifecycle exec hook when the workspace is stopped. |
 | `nogoo9/pre-stop-sidecar-image` | Container Image | Optional. If specified alongside `pre-stop-command`, the pre-stop hook executes in a dedicated sidecar running this image instead of the main container. |
 | `nogoo9/default-grace-period` | Number (seconds) | Overrides the Pod's `terminationGracePeriodSeconds` (defaults to `60` if pre-stop is defined) to ensure cleanup commands have sufficient time to finish. |
+
+
+---
+
+## 📦 Programmatic SDK & API Proxy Services
+
+`@nogoo9/no-crd` provides a complete programmatic SDK and dynamic cluster routing proxy to allow developers to build custom pod orchestrators and route workspace traffic natively.
+
+### 1. Composable Programmatic SDK
+
+You can import `@nogoo9/no-crd` in your Bun, Deno, or Node.js codebase to control pod sandboxes and templates programmatically, bypassing the MCP HTTP server.
+
+```typescript
+import { KubeConfig } from "@kubernetes/client-node";
+import { 
+  initK8sContext, 
+  spawnWorkspace, 
+  stopWorkspace, 
+  listWorkspaces 
+} from "@nogoo9/no-crd";
+
+// 1. Initialize Kubernetes API Context (optionally pass custom configuration)
+const kc = new KubeConfig();
+kc.loadFromDefault();
+const ctx = initK8sContext(kc);
+
+// 2. Spawn a workspace sandbox from a template
+const spawnResult = await spawnWorkspace(ctx, {
+  id: "agent-session-42",
+  templateRef: "nogoo9/default-agent-workspace",
+  context: {
+    "S3_BUCKET": "my-bucket",
+    "S3_FOLDER": "session-42"
+  }
+});
+console.log(`Spawned pod: ${spawnResult.podName}`);
+
+// 3. List active workspaces running in the namespace
+const list = await listWorkspaces(ctx, {
+  namespace: "nogoo9"
+});
+console.log(`Active workspaces count: ${list.workspaces.length}`);
+
+// 4. Terminate the workspace sandbox
+await stopWorkspace(ctx, {
+  id: "agent-session-42"
+});
+```
+
+### 2. Workspace Routing Proxy (Experimental)
+
+> [!WARNING]
+> The workspace routing proxy and JWT authentication engine are experimental and likely to change in the next version.
+
+The server includes a built-in reverse proxy routing service. HTTP requests targeting:
+`http://<mcp-server-host>/route/<workspace-id>/<subpath>`
+are dynamically proxied directly to the running workspace pod's IP address inside the cluster.
+
+If `AUTH_ENABLED` is true:
+- The proxy requires a valid Bearer token in the `Authorization` header or a `?token=` query parameter.
+- The workspace pod's `nogoo9/user-sub` label must match the JWT's subject claim, preventing unauthorized access to other users' workspaces.
+- The proxy target port inside the workspace pod defaults to `3000` or can be overridden via pod annotation `nogoo9/workspace-port` or the `DEFAULT_WORKSPACE_PORT` environment variable.
+
+### 3. OAuth Resource Discovery (RFC 9728)
+
+Exposes the standardized metadata endpoint `GET /.well-known/oauth-protected-resource` returning:
+- Supported authorization servers.
+- Token format specifications.
+- Required scopes.
+
+This allows client interfaces (and MCP clients) to automatically discover security requirements and handle dynamic OAuth authentication flows.
 
 ---
 

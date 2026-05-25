@@ -15,6 +15,7 @@ import {
 	parseTemplateRef,
 	provisionServiceAccount,
 	readTemplateMap,
+	requestContextStore,
 	resolveNamespace,
 } from "~/k8s/index.js";
 
@@ -83,6 +84,8 @@ export function registerSpawnerTools(
 			async ({ namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
 				const authEnabled = process.env.AUTH_ENABLED === "true";
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
 				logger.info(
 					"Tool list_workspaces called in namespace {namespace} (authEnabled: {authEnabled})",
 					{
@@ -92,7 +95,7 @@ export function registerSpawnerTools(
 				);
 				let labelSelector = "nogoo9/type=workspace";
 				if (authEnabled) {
-					if (!jwtPayload) {
+					if (!activeJwtPayload) {
 						const err = new Error(
 							"Unauthorized: jwtPayload required when AUTH_ENABLED is true",
 						);
@@ -101,7 +104,7 @@ export function registerSpawnerTools(
 					}
 					try {
 						const sub = extractUserIdentity(
-							jwtPayload,
+							activeJwtPayload,
 							process.env.AUTH_SUB_JSONPATH || "$.sub",
 						);
 						logger.debug("Extracted user identity subject: {sub}", { sub });
@@ -172,6 +175,8 @@ export function registerSpawnerTools(
 			async ({ id, namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
 				const authEnabled = process.env.AUTH_ENABLED === "true";
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
 				logger.info(
 					"Tool stop_workspace called for workspace ID {id} in namespace {namespace} (authEnabled: {authEnabled})",
 					{
@@ -182,14 +187,14 @@ export function registerSpawnerTools(
 				);
 				let labelSelector = `nogoo9/type=workspace,nogoo9/workspace-id=${id}`;
 				if (authEnabled) {
-					if (!jwtPayload) {
+					if (!activeJwtPayload) {
 						const err = new Error("Unauthorized: jwtPayload required");
 						logger.error("Authentication failed: {error}", { error: err });
 						return errorResult(k8sContext.kc, err, { id, status: "" });
 					}
 					try {
 						const sub = extractUserIdentity(
-							jwtPayload,
+							activeJwtPayload,
 							process.env.AUTH_SUB_JSONPATH || "$.sub",
 						);
 						logger.debug("Extracted user identity subject: {sub}", { sub });
@@ -294,6 +299,8 @@ export function registerSpawnerTools(
 			}) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
 				const authEnabled = process.env.AUTH_ENABLED === "true";
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
 				logger.info(
 					"Tool spawn_workspace called for workspace ID {id} in namespace {namespace} (templateRef: {templateRef}, authEnabled: {authEnabled})",
 					{
@@ -305,14 +312,14 @@ export function registerSpawnerTools(
 				);
 				let userSub = "anonymous";
 				if (authEnabled) {
-					if (!jwtPayload) {
+					if (!activeJwtPayload) {
 						const err = new Error("Unauthorized: jwtPayload required");
 						logger.error("Authentication failed: {error}", { error: err });
 						return errorResult(k8sContext.kc, err, { id, podName: "" });
 					}
 					try {
 						userSub = extractUserIdentity(
-							jwtPayload,
+							activeJwtPayload,
 							process.env.AUTH_SUB_JSONPATH || "$.sub",
 						);
 						logger.debug("Extracted user identity subject: {sub}", {
@@ -385,6 +392,7 @@ export function registerSpawnerTools(
 							ns,
 							id,
 							roleArn,
+							authEnabled ? userSub : undefined,
 						);
 					}
 					parsedSpec.labels = {
@@ -394,6 +402,12 @@ export function registerSpawnerTools(
 						"nogoo9/managed-by": "nogoo9-spawner",
 						"nogoo9/user-sub": userSub,
 					};
+					if (authEnabled) {
+						parsedSpec.annotations = {
+							...(parsedSpec.annotations || {}),
+							"nogoo9/user-sub": userSub,
+						};
+					}
 					const podName = `ws-${userSub.replace(/[^a-z0-9-]/gi, "").slice(0, 10)}-${id}`;
 					logger.info(
 						"Spawning workspace pod {podName} for workspace ID {id} in namespace {namespace}",

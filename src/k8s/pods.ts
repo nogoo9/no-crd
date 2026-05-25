@@ -45,6 +45,7 @@ export async function provisionServiceAccount(
 	ns: string,
 	workspaceId: string,
 	roleArn: string,
+	userSub?: string,
 ): Promise<string> {
 	const saName = `ws-sa-${workspaceId}`;
 	logger.info(
@@ -61,10 +62,14 @@ export async function provisionServiceAccount(
 		metadata: {
 			name: saName,
 			namespace: ns,
-			annotations: { "eks.amazonaws.com/role-arn": roleArn },
+			annotations: {
+				"eks.amazonaws.com/role-arn": roleArn,
+				...(userSub ? { "nogoo9/user-sub": userSub } : {}),
+			},
 			labels: {
 				"nogoo9/workspace-id": workspaceId,
 				"nogoo9/managed-by": "nogoo9-spawner",
+				...(userSub ? { "nogoo9/user-sub": userSub } : {}),
 			},
 		},
 	};

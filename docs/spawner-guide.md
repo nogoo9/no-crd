@@ -181,3 +181,96 @@ spec:
     - name: code-volume
       emptyDir: {}
 ```
+
+---
+
+## 🌐 Workspace Routing Proxy (Experimental)
+*(Available from v0.2.0 - Experimental)*
+
+> [!WARNING]
+> The workspace routing proxy is experimental and likely to change in the next version.
+
+The server includes a built-in reverse proxy routing service. This enables clients (and AI agents) to access web services running inside workspace containers (e.g. IDE servers, Jupyter notebooks, mock servers) without creating Kubernetes Services or Ingress rules for every container.
+
+### How it Works
+When a client requests a URL matching:
+`http://<gateway>/route/<workspaceId>/<subpath>`
+
+The server performs the following steps:
+1. **Identity & JWT Resolution:** Resolves the JWT token from the `Authorization: Bearer <token>` header or `?token=<token>` query string.
+2. **Access Verification:** Checks if `AUTH_ENABLED` is true. If yes, it verifies that the `sub` (or configured subject claim) in the JWT token matches the pod's `nogoo9/user-sub` label. If it doesn't match, it returns a `403 Forbidden`.
+3. **Target Selection:** Finds the corresponding workspace pod IP inside the cluster. It extracts the target port from the pod's `nogoo9/workspace-port` annotation (falling back to `DEFAULT_WORKSPACE_PORT` or `3000`).
+4. **Streaming Proxy:** Performs an HTTP fetch to `http://<pod-ip>:<port>/<subpath>` and pipes request/response streams (headers, body, query parameters) back and forth.
+### Configuration
+
+You can configure the behavior of the routing proxy using the following settings:
+
+| Environment Variable | Description | Default |
+| --- | --- | --- |
+| `DEFAULT_WORKSPACE_PORT` | The default container port to which the proxy forwards traffic if no template annotation is defined. | `3000` |
+| `BASE_URL` | Subpath prefix for all server routes. If configured (e.g. `/proxy`), the routing proxy path shifts to `/proxy/route/<workspaceId>/<subpath>`. | *(None)* |
+| `AUTH_ENABLED` | If set to `true`, enforces JWT signature verification and checks that the user's identity matches the pod's `nogoo9/user-sub` label. | `false` |
+
+#### Customizing Ports via Template Annotations
+For workspace templates running services on non-standard ports (such as `8888` for Jupyter notebooks or `8080` for code-server), define the `nogoo9/workspace-port` annotation on the template ConfigMap. The proxy service reads this annotation on startup/lookup to route traffic to the correct container port.
+
+### Code Example: Workspace Pod with Target Port Annotation
+Create a template specifying a custom workspace target port:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jupyter-workspace-template
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "Jupyter Notebook environment"
+    nogoo9/workspace-port: "8888" # Proxy forwards requests to port 8888 inside the container
+data:
+  spec: |
+    {
+      "containers": [
+        {
+          "name": "jupyter",
+          "image": "jupyter/base-notebook:latest",
+          "command": ["start-notebook.sh", "--NotebookApp.token=''"],
+          "ports": [
+            { "containerPort": 8888 }
+          ]
+        }
+      ]
+    }
+```
+
+When this workspace is spawned with ID `session-a`, you can connect directly to the Jupyter notebook via the gateway:
+`http://localhost:3000/route/session-a/?token=YOUR_JWT_HERE`
+
+---
+
+## 🔄 Lifecycle Hooks Examples
+*(Available from v0.2.0)*
+
+Provide hooks to pull state before starting workspaces and to backup/flush state before workspaces terminate.
+
+### 1. State Setup (Git example)
+Configure an init-container to pull code from Git at workspace startup:
+
+```yaml
+annotations:
+  nogoo9/required-context: "GIT_REPO_URL"
+  nogoo9/init-image: "alpine/git:latest"
+  nogoo9/init-command: "git clone $GIT_REPO_URL /workspace"
+```
+
+### 2. State Backup (S3 example)
+Configure a `preStop` termination hook to backup data to MinIO/S3 on container shutdown:
+
+```yaml
+annotations:
+  nogoo9/required-context: "AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET,S3_FOLDER"
+  nogoo9/pre-stop-command: "aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER --endpoint-url http://minio-service:9000"
+  nogoo9/pre-stop-sidecar-image: "amazon/aws-cli:latest"
+  nogoo9/default-grace-period: "120"
+```

@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: setup-state-git
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "Developer workspace that automatically clones a Git repository on startup using context tokens"
+    nogoo9/tag: "git-init-v1"
+    nogoo9/required-context: "GIT_REPO_URL,GIT_TOKEN"
+    nogoo9/init-image: "alpine/git:latest"
+    # Clone logic injecting the context-supplied token into the repo URL
+    nogoo9/init-command: "git clone https://$GIT_TOKEN@$(echo $GIT_REPO_URL | sed 's|https://||') /workspace"
+data:
+  spec: |
+    {
+      "containers": [
+        {
+          "name": "workspace",
+          "image": "node:22-alpine",
+          "command": ["sleep", "infinity"],
+          "volumeMounts": [
+            {
+              "name": "workspace-volume",
+              "mountPath": "/workspace"
+            }
+          ]
+        }
+      ],
+      "volumes": [
+        {
+          "name": "workspace-volume",
+          "emptyDir": {}
+        }
+      ]
+    }

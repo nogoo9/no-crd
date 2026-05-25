@@ -113,6 +113,45 @@ describe("provisionServiceAccount", () => {
 		});
 	});
 
+	test("creates service account with userSub successfully", async () => {
+		const mockCreate = spyOn(
+			coreApi,
+			"createNamespacedServiceAccount",
+		).mockResolvedValue({} as any);
+
+		const result = await provisionServiceAccount(
+			coreApi,
+			"default",
+			"user-123",
+			"arn:aws:iam::111122223333:role/my-role",
+			"my-user-sub",
+		);
+
+		expect(result).toBe("ws-sa-user-123");
+		expect(mockCreate).toHaveBeenCalledTimes(1);
+		expect(mockCreate.mock.calls[0][0]).toEqual({
+			namespace: "default",
+			body: {
+				apiVersion: "v1",
+				kind: "ServiceAccount",
+				metadata: {
+					name: "ws-sa-user-123",
+					namespace: "default",
+					annotations: {
+						"eks.amazonaws.com/role-arn":
+							"arn:aws:iam::111122223333:role/my-role",
+						"nogoo9/user-sub": "my-user-sub",
+					},
+					labels: {
+						"nogoo9/workspace-id": "user-123",
+						"nogoo9/managed-by": "nogoo9-spawner",
+						"nogoo9/user-sub": "my-user-sub",
+					},
+				},
+			},
+		});
+	});
+
 	test("ignores 409 Conflict error", async () => {
 		const mockCreate = spyOn(
 			coreApi,
