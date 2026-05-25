@@ -9,8 +9,8 @@ const __dirname = dirname(__filename);
 
 const isSource = __filename.endsWith(".ts");
 const targetFile = isSource
-	? join(__dirname, "index.ts")
-	: join(__dirname, "index.js");
+	? join(__dirname, "server-entry.ts")
+	: join(__dirname, "server-entry.js");
 
 /**
  * Prints a helpful usage command-line guide showing all supported options
@@ -27,6 +27,7 @@ Options:
   -m, --mode <type>          Kubernetes access mode: cluster, namespaced (default: cluster)
   -n, --namespace <name>     Kubernetes namespace to target (default: nogoo9)
   -p, --port <number>        HTTP server port (default: 3000)
+  -H, --host <hostname>      HTTP server host to bind to (default: 0.0.0.0)
   -l, --log-level <level>    Logging level: debug, info, warning, error, fatal (default: info)
   -r, --runtime <type>       JS/TS runtime engine to use: bun, deno, node (default: bun)
   --tls-cert <path>          Path to TLS certificate file for HTTPS
@@ -50,6 +51,7 @@ async function main(): Promise<void> {
 	let mode = "cluster";
 	let namespace = "nogoo9";
 	let port = "3000";
+	let host = "0.0.0.0";
 	let logLevel = "info";
 	let runtime = "bun";
 	let tlsCert: string | undefined;
@@ -96,6 +98,13 @@ async function main(): Promise<void> {
 				process.exit(1);
 			}
 			port = val;
+		} else if (arg === "-H" || arg === "--host") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing host value.");
+				process.exit(1);
+			}
+			host = val;
 		} else if (arg === "-l" || arg === "--log-level") {
 			const val = args[++i];
 			if (
@@ -227,6 +236,7 @@ async function main(): Promise<void> {
 		MODE: mode,
 		NAMESPACE: namespace,
 		PORT: port,
+		HOST: host,
 		LOG_LEVEL: logLevel,
 		DISABLE_PERMISSION_CHECKS: disablePermissionChecks ? "true" : "false",
 		CORS_ALLOWED_ORIGIN: corsOrigin,
@@ -256,7 +266,7 @@ async function main(): Promise<void> {
 
 	console.error(`==> Starting MCP server via ${runtime}...`);
 	console.error(
-		`    Config: Transport=${transport}, Mode=${mode}, Namespace=${namespace}, Port=${port}, LogLevel=${logLevel}${
+		`    Config: Host=${host}, Transport=${transport}, Mode=${mode}, Namespace=${namespace}, Port=${port}, LogLevel=${logLevel}${
 			tlsCert ? ", HTTPS=enabled" : ""
 		}, CORSOrigin=${corsOrigin}`,
 	);

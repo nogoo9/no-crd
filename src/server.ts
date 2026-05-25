@@ -3,11 +3,23 @@ import { fileURLToPath } from "node:url";
 import { getLogger } from "@logtape/logtape";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { initK8sContext, type K8sContext } from "~/k8s/index.js";
+import {
+	DEFAULT_NAMESPACE,
+	extractUserIdentity,
+	initK8sContext,
+	type K8sContext,
+	MODE,
+	requestContextStore,
+	resolveNamespace,
+	verifyToken,
+} from "~/k8s/index.js";
 import { createMcpServer } from "~/mcp/server.js";
 import { loadUiHtml, registerUiApp } from "~/ui/index.js";
 
-const PORT = Number(process.env.PORT) || 3000;
+export function getBasePrefix(): string {
+	const raw = process.env.BASE_URL || "";
+	return raw ? (raw.startsWith("/") ? "" : "/") + raw.replace(/\/$/, "") : "";
+}
 
 const corsOrigin =
 	process.env.CORS_ALLOWED_ORIGIN || process.env.CORS_ORIGIN || "*";
@@ -214,141 +226,365 @@ export async function handleWebRequest(
 	if (req.method === "OPTIONS")
 		return new Response(null, { status: 204, headers: CORS_HEADERS });
 
-	const { pathname } = new URL(req.url);
-	logger.debug("Request: {method} {pathname} - Accept: {accept}", {
-		method: req.method,
-		pathname,
-		accept: req.headers.get("accept"),
-	});
+	let pathname = new URL(req.url).pathname;
+	const prefix = getBasePrefix();
+	if (prefix && pathname.startsWith(prefix)) {
+		pathname = pathname.substring(prefix.length);
+		if (!pathname.startsWith("/")) {
+			pathname = `/${pathname}`;
+		}
+	}
 
-	if (pathname === "/healthz" || pathname === "/mcp/healthz")
-		return Response.json({ status: "ok" });
+	if (pathname === "/.well-known/oauth-protected-resource") {
+		const urlObj = new URL(req.url);
+		const resourceUrl = urlObj.origin + prefix;
+		const authIssuer = process.env.AUTH_ISSUER || process.env.JWT_ISSUER || "";
+		const response = Response.json({
+			resource: resourceUrl,
+			authorization_servers: authIssuer ? [authIssuer] : [],
+			scopes_supported: ["mcp"],
+			bearer_methods_supported: ["header"],
+		});
+		for (const [k, v] of Object.entries(CORS_HEADERS)) {
+			response.headers.set(k, v);
+		}
+		return response;
+	}
 
-	if (pathname === "/" || pathname === "/ui" || pathname === "/ui/") {
+	let token: string | null = null;
+	const authHeader = req.headers.get("Authorization");
+	if (authHeader?.toLowerCase().startsWith("bearer ")) {
+		token = authHeader.substring(7);
+	} else {
 		try {
-			const html = loadUiHtml(DIST_DIR);
-			return new Response(html, {
-				headers: {
-					"Content-Type": "text/html; charset=utf-8",
-					...CORS_HEADERS,
-				},
-			});
+			const urlObj = new URL(req.url);
+			token = urlObj.searchParams.get("token");
+		} catch (_) {}
+	}
+
+	let jwtPayload: any;
+	let authError: Error | null = null;
+	if (token) {
+		try {
+			let expectedAudience: string | undefined;
+			try {
+				const urlObj = new URL(req.url);
+				expectedAudience = `${urlObj.protocol}//${urlObj.host}${getBasePrefix()}`;
+			} catch (_) {}
+			jwtPayload = await verifyToken(token, expectedAudience);
 		} catch (err) {
-			return new Response(err instanceof Error ? err.message : String(err), {
-				status: 500,
-				headers: CORS_HEADERS,
+			authError = err instanceof Error ? err : new Error(String(err));
+			logger.warn("Token verification failed: {error}", {
+				error: authError.message,
 			});
 		}
 	}
 
-	if (pathname === "/permissions" || pathname === "/mcp/permissions") {
-		try {
-			const { DEFAULT_NAMESPACE, MODE, evaluatePermissions } = await import(
-				"~/k8s/index.js"
+	const isAuthRequired =
+		process.env.AUTH_ENABLED === "true" &&
+		(pathname === "/mcp" ||
+			pathname === "/mcp/mcp" ||
+			pathname === "/mcp/" ||
+			pathname === "/permissions" ||
+			pathname === "/mcp/permissions" ||
+			pathname.startsWith("/route/"));
+
+	if (isAuthRequired) {
+		if (!jwtPayload) {
+			const urlObj = new URL(req.url);
+			const metadataUrl = `${urlObj.origin}${prefix}/.well-known/oauth-protected-resource`;
+			const headers = new Headers(CORS_HEADERS);
+			headers.set(
+				"WWW-Authenticate",
+				`Bearer resource_metadata="${metadataUrl}"`,
 			);
-			const report = await evaluatePermissions(
-				getK8sContext(),
-				DEFAULT_NAMESPACE,
-				MODE,
-			);
-			const response = Response.json(report);
-			for (const [k, v] of Object.entries(CORS_HEADERS)) {
-				response.headers.set(k, v);
-			}
-			return response;
-		} catch (err) {
-			const response = Response.json(
-				{ error: err instanceof Error ? err.message : String(err) },
-				{ status: 500 },
-			);
-			for (const [k, v] of Object.entries(CORS_HEADERS)) {
-				response.headers.set(k, v);
-			}
-			return response;
+			headers.set("Link", `<${metadataUrl}>; rel="oauth-protected-resource"`);
+			const msg = authError
+				? `Unauthorized: ${authError.message}`
+				: "Unauthorized: Valid JWT token required";
+			return new Response(msg, {
+				status: 401,
+				headers,
+			});
 		}
 	}
 
-	if (pathname === "/mcp" || pathname === "/mcp/mcp" || pathname === "/mcp/") {
-		// Disable idle timeout for Bun SSE connection if serverInstance is available
-		if (serverInstance && typeof serverInstance.timeout === "function") {
-			serverInstance.timeout(req, 0);
-		}
-
-		const { transport } = await getMcpServerAndTransport(req);
-		const res = await transport.handleRequest(req);
-		logger.debug("Responding to /mcp - Status: {status}", {
-			status: res.status,
+	return requestContextStore.run({ jwtPayload }, async () => {
+		logger.debug("Request: {method} {pathname} - Accept: {accept}", {
+			method: req.method,
+			pathname,
+			accept: req.headers.get("accept"),
 		});
 
-		// Mutate headers directly on the response to maintain clean streaming
-		for (const [k, v] of Object.entries(CORS_HEADERS)) {
-			res.headers.set(k, v);
-		}
-		res.headers.set("X-Accel-Buffering", "no");
+		if (pathname === "/healthz" || pathname === "/mcp/healthz")
+			return Response.json({ status: "ok" });
 
-		for (const [k, v] of (res.headers as any).entries()) {
-			logger.debug("Header: {key}: {value}", { key: k, value: v });
+		if (pathname === "/" || pathname === "/ui" || pathname === "/ui/") {
+			try {
+				const html = loadUiHtml(DIST_DIR, prefix);
+				return new Response(html, {
+					headers: {
+						"Content-Type": "text/html; charset=utf-8",
+						...CORS_HEADERS,
+					},
+				});
+			} catch (err) {
+				return new Response(err instanceof Error ? err.message : String(err), {
+					status: 500,
+					headers: CORS_HEADERS,
+				});
+			}
 		}
 
-		// Wrap text/event-stream body to send an initial keep-alive comment.
-		// This forces intermediate buffering proxies (like Traefik) to flush headers immediately.
-		const contentType = res.headers.get("content-type");
+		if (pathname === "/permissions" || pathname === "/mcp/permissions") {
+			try {
+				const { DEFAULT_NAMESPACE, MODE, evaluatePermissions } = await import(
+					"~/k8s/index.js"
+				);
+				const report = await evaluatePermissions(
+					getK8sContext(),
+					DEFAULT_NAMESPACE,
+					MODE,
+				);
+				const response = Response.json(report);
+				for (const [k, v] of Object.entries(CORS_HEADERS)) {
+					response.headers.set(k, v);
+				}
+				return response;
+			} catch (err) {
+				const response = Response.json(
+					{ error: err instanceof Error ? err.message : String(err) },
+					{ status: 500 },
+				);
+				for (const [k, v] of Object.entries(CORS_HEADERS)) {
+					response.headers.set(k, v);
+				}
+				return response;
+			}
+		}
+
 		if (
-			res.status === 200 &&
-			contentType &&
-			contentType.includes("text/event-stream") &&
-			res.body
+			pathname === "/mcp" ||
+			pathname === "/mcp/mcp" ||
+			pathname === "/mcp/"
 		) {
-			const originalBody = res.body;
-			const encoder = new TextEncoder();
-			let activeReader: ReturnType<typeof originalBody.getReader> | null = null;
-			const stream = new ReadableStream({
-				async start(controller) {
-					// Send initial comment to flush connection through proxies
-					controller.enqueue(encoder.encode(": keep-alive\n\n"));
+			// Disable idle timeout for Bun SSE connection if serverInstance is available
+			if (serverInstance && typeof serverInstance.timeout === "function") {
+				serverInstance.timeout(req, 0);
+			}
 
-					const reader = originalBody.getReader();
-					activeReader = reader;
-					try {
-						while (true) {
-							const { done, value } = await reader.read();
-							if (done) break;
-							controller.enqueue(value);
-						}
-						controller.close();
-					} catch (err) {
-						controller.error(err);
-					}
-				},
-				cancel(reason) {
-					if (activeReader) {
-						activeReader.cancel(reason).catch(() => {});
-					} else {
-						try {
-							originalBody.cancel(reason).catch(() => {});
-						} catch (_) {}
-					}
-				},
-			});
-
-			return new Response(stream, {
+			const { transport } = await getMcpServerAndTransport(req);
+			const res = await transport.handleRequest(req);
+			logger.debug("Responding to /mcp - Status: {status}", {
 				status: res.status,
-				statusText: res.statusText,
-				headers: res.headers,
 			});
+
+			// Mutate headers directly on the response to maintain clean streaming
+			for (const [k, v] of Object.entries(CORS_HEADERS)) {
+				res.headers.set(k, v);
+			}
+			res.headers.set("X-Accel-Buffering", "no");
+
+			for (const [k, v] of (res.headers as any).entries()) {
+				logger.debug("Header: {key}: {value}", { key: k, value: v });
+			}
+
+			// Wrap text/event-stream body to send an initial keep-alive comment.
+			// This forces intermediate buffering proxies (like Traefik) to flush headers immediately.
+			const contentType = res.headers.get("content-type");
+			if (
+				res.status === 200 &&
+				contentType &&
+				contentType.includes("text/event-stream") &&
+				res.body
+			) {
+				const originalBody = res.body;
+				const encoder = new TextEncoder();
+				let activeReader: ReturnType<typeof originalBody.getReader> | null =
+					null;
+				const stream = new ReadableStream({
+					async start(controller) {
+						// Send initial comment to flush connection through proxies
+						controller.enqueue(encoder.encode(": keep-alive\n\n"));
+
+						const reader = originalBody.getReader();
+						activeReader = reader;
+						try {
+							while (true) {
+								const { done, value } = await reader.read();
+								if (done) break;
+								controller.enqueue(value);
+							}
+							controller.close();
+						} catch (err) {
+							controller.error(err);
+						}
+					},
+					cancel(reason) {
+						if (activeReader) {
+							activeReader.cancel(reason).catch(() => {});
+						} else {
+							try {
+								originalBody.cancel(reason).catch(() => {});
+							} catch (_) {}
+						}
+					},
+				});
+
+				return new Response(stream, {
+					status: res.status,
+					statusText: res.statusText,
+					headers: res.headers,
+				});
+			}
+
+			return res;
 		}
 
-		return res;
-	}
+		if (pathname.startsWith("/route/")) {
+			const pathWithoutPrefix = pathname.substring(7);
+			const slashIndex = pathWithoutPrefix.indexOf("/");
+			const workspaceId =
+				slashIndex === -1
+					? pathWithoutPrefix
+					: pathWithoutPrefix.substring(0, slashIndex);
+			const subpath =
+				slashIndex === -1 ? "/" : pathWithoutPrefix.substring(slashIndex);
 
-	return new Response("Not found", { status: 404 });
+			if (!workspaceId) {
+				return new Response("Workspace ID is required", {
+					status: 400,
+					headers: CORS_HEADERS,
+				});
+			}
+
+			let userSub = "anonymous";
+			if (process.env.AUTH_ENABLED === "true") {
+				try {
+					userSub = extractUserIdentity(
+						jwtPayload,
+						process.env.AUTH_SUB_JSONPATH || "$.sub",
+					);
+				} catch (err) {
+					return new Response(
+						`Unauthorized: ${err instanceof Error ? err.message : String(err)}`,
+						{ status: 401, headers: CORS_HEADERS },
+					);
+				}
+			}
+
+			const ns = resolveNamespace(undefined, MODE, DEFAULT_NAMESPACE);
+			const k8sCtx = getK8sContext();
+			try {
+				const res = await k8sCtx.coreApi.listNamespacedPod({
+					namespace: ns,
+					labelSelector: `nogoo9/type=workspace,nogoo9/workspace-id=${workspaceId}`,
+				});
+
+				if (res.items.length === 0) {
+					return new Response(`Workspace "${workspaceId}" not found`, {
+						status: 404,
+						headers: CORS_HEADERS,
+					});
+				}
+
+				const pod = res.items[0];
+				const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
+
+				if (process.env.AUTH_ENABLED === "true" && podSub !== userSub) {
+					return new Response("Forbidden: You do not own this workspace", {
+						status: 403,
+						headers: CORS_HEADERS,
+					});
+				}
+
+				if (pod.status?.phase !== "Running") {
+					return new Response(
+						`Workspace is not running (status: ${pod.status?.phase || "Unknown"})`,
+						{ status: 503, headers: CORS_HEADERS },
+					);
+				}
+
+				const podIP = pod.status?.podIP;
+				if (!podIP) {
+					return new Response("Workspace IP address not assigned yet", {
+						status: 503,
+						headers: CORS_HEADERS,
+					});
+				}
+
+				const targetPortAnnotation =
+					pod.metadata?.annotations?.["nogoo9/workspace-port"];
+				const port =
+					targetPortAnnotation || process.env.DEFAULT_WORKSPACE_PORT || "3000";
+
+				const urlObj = new URL(req.url);
+				const destUrl = `http://${podIP}:${port}${subpath}${urlObj.search}`;
+
+				logger.info(
+					"Proxying request to workspace {workspaceId} at {destUrl}",
+					{ workspaceId, destUrl },
+				);
+
+				const headers = new Headers(req.headers);
+				headers.delete("Host");
+				headers.delete("Connection");
+
+				const proxyResp = await fetch(destUrl, {
+					method: req.method,
+					headers,
+					body:
+						req.method === "GET" || req.method === "HEAD"
+							? undefined
+							: req.body,
+					duplex: req.body ? "half" : undefined,
+				} as any);
+
+				const respHeaders = new Headers(proxyResp.headers);
+				for (const [k, v] of Object.entries(CORS_HEADERS)) {
+					respHeaders.set(k, v);
+				}
+
+				return new Response(proxyResp.body, {
+					status: proxyResp.status,
+					statusText: proxyResp.statusText,
+					headers: respHeaders,
+				});
+			} catch (err) {
+				logger.error("Failed to proxy to workspace {workspaceId}: {error}", {
+					workspaceId,
+					error: err,
+				});
+				return new Response(
+					`Internal Server Error: ${err instanceof Error ? err.message : String(err)}`,
+					{ status: 500, headers: CORS_HEADERS },
+				);
+			}
+		}
+
+		return new Response("Not found", { status: 404 });
+	});
 }
 
 /**
  * Boots the HTTP/HTTPS server based on runtime detection (Bun, Deno, or Node.js).
  * Supports SSL certificates if `TLS_CERT` and `TLS_KEY` env vars are configured.
  */
-export async function startHttpServer(): Promise<void> {
+export async function startHttpServer(
+	customK8sContext?: K8sContext,
+): Promise<void> {
+	const PORT = Number(process.env.PORT) || 3000;
+	const HOST = process.env.HOST || "0.0.0.0";
+
+	if (process.env.AUTH_ENABLED === "true") {
+		logger.warn(
+			"Authentication engine is enabled. Note: MCP Authentication and Routing Proxy are experimental features and likely to change in the next version.",
+		);
+	}
+
+	if (customK8sContext) {
+		globalK8sContext = customK8sContext;
+	}
 	globalIsStateless = process.env.STATELESS === "true";
 	const isBun = typeof Bun !== "undefined";
 	const isDeno = typeof (globalThis as any).Deno !== "undefined";
@@ -379,6 +615,7 @@ export async function startHttpServer(): Promise<void> {
 
 	if (isBun) {
 		const serveOptions: any = {
+			hostname: HOST,
 			port: PORT,
 			async fetch(req: Request, server: any) {
 				return handleWebRequest(req, server);
@@ -389,12 +626,14 @@ export async function startHttpServer(): Promise<void> {
 			serveOptions.key = keyData;
 		}
 		const httpServer = Bun.serve(serveOptions);
-		logger.info("nogoo9-mcp (Bun) listening on {protocol}://localhost:{port}", {
+		logger.info("nogoo9-mcp (Bun) listening on {protocol}://{host}:{port}", {
 			protocol,
+			host: httpServer.hostname,
 			port: httpServer.port,
 		});
-		logger.info("  MCP: {protocol}://localhost:{port}/mcp", {
+		logger.info("  MCP: {protocol}://{host}:{port}/mcp", {
 			protocol,
+			host: httpServer.hostname,
 			port: httpServer.port,
 		});
 
@@ -406,6 +645,7 @@ export async function startHttpServer(): Promise<void> {
 		// Deno runtime
 		const DenoGlobal = (globalThis as any).Deno;
 		const serveOptions: any = {
+			hostname: HOST,
 			port: PORT,
 			onListen({ hostname, port }: { hostname: string; port: number }) {
 				logger.info(
@@ -457,16 +697,18 @@ export async function startHttpServer(): Promise<void> {
 			server = http.createServer(requestListener);
 		}
 
-		server.listen(PORT, () => {
+		server.listen(PORT, HOST, () => {
 			logger.info(
-				"nogoo9-mcp (Node.js) listening on {protocol}://localhost:{port}",
+				"nogoo9-mcp (Node.js) listening on {protocol}://{host}:{port}",
 				{
 					protocol,
+					host: HOST,
 					port: PORT,
 				},
 			);
-			logger.info("  MCP: {protocol}://localhost:{port}/mcp", {
+			logger.info("  MCP: {protocol}://{host}:{port}/mcp", {
 				protocol,
+				host: HOST,
 				port: PORT,
 			});
 		});

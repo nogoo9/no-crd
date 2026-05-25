@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-state-s3
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "Developer workspace that automatically syncs code back to S3 bucket before shutting down"
+    nogoo9/tag: "s3-backup-v1"
+    nogoo9/required-context: "AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_ENDPOINT_URL,S3_BUCKET,S3_FOLDER"
+    # Execute S3 backup in a dedicated sidecar running the AWS CLI
+    nogoo9/pre-stop-sidecar-image: "amazon/aws-cli:latest"
+    # Graceful stop backup script using context variables
+    nogoo9/pre-stop-command: "aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER --endpoint-url=$AWS_ENDPOINT_URL --no-progress"
+    # Ensure transfer has sufficient time to complete
+    nogoo9/default-grace-period: "180"
+data:
+  spec: |
+    {
+      "containers": [
+        {
+          "name": "workspace",
+          "image": "python:3.11-slim",
+          "command": ["sleep", "infinity"],
+          "volumeMounts": [
+            {
+              "name": "workspace-volume",
+              "mountPath": "/workspace"
+            }
+          ]
+        }
+      ],
+      "volumes": [
+        {
+          "name": "workspace-volume",
+          "emptyDir": {}
+        }
+      ]
+    }

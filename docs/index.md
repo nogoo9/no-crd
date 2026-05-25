@@ -13,7 +13,7 @@ hero:
       text: API Reference
       link: /api/
   image:
-    src: https://vitepress.dev/vitepress-logo-large.png
+    src: /logo.png
     alt: logo
 
 features:
@@ -23,4 +23,10 @@ features:
     details: "Provides first-class Model Context Protocol (MCP) server endpoints optimized for AI coding agents."
   - title: "Cross-Runtime"
     details: "Runs seamlessly across Bun, Deno, and Node.js with built-in runtime detection and polyfills."
+  - title: "SDK & Routing Proxy"
+    details: "Programmatically control sandboxes or proxy HTTP traffic natively to container IPs with secure user token isolation."
+  - title: "Lifecycle & Hooks"
+    details: "Automate workspace init (e.g., git cloning) and graceful termination (e.g., S3 syncing) using native pod spawner rules."
+  - title: "Embedded Dashboard"
+    details: "A built-in interactive React UI to view active sandboxes, templates, logs, and manage token details."
 ---

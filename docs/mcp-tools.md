@@ -595,10 +595,11 @@ Spawn a regular pod by copying a template ConfigMap and applying overrides.
 
 ### `list_workspaces`
 Lists active agent workspace pods (pods matching label `nogoo9/type=workspace`). Supports filtering by active JWT owner if `AUTH_ENABLED=true`.
+*(Changed in v0.2.0: Added JWT owner verification/filtering)*
 
 * **Inputs:**
   * `namespace` (optional string): Target namespace.
-  * `jwtPayload` (optional object): Payload dictionary to filter workspaces by JWT `sub` claims.
+  * `jwtPayload` (optional object): Payload dictionary to filter workspaces by JWT `sub` claims. *(Available from v0.2.0; automatically resolved from authentication context if bearer token is provided)*
 * **Example Call:**
 ```json
 {
@@ -628,6 +629,7 @@ Lists active agent workspace pods (pods matching label `nogoo9/type=workspace`).
 
 ### `spawn_workspace`
 Spawns an isolated workspace pod from a template or inline declaration, evaluates spawner annotations, constructs init containers, configures pre-stop hook cleanups, and binds service accounts.
+*(Changed in v0.2.0: Supports lifecycle hooks context verification and automated AsyncLocalStorage JWT ownership extraction)*
 
 * **Inputs:**
   * `id` (string): Unique agent session identifier.
@@ -636,7 +638,7 @@ Spawns an isolated workspace pod from a template or inline declaration, evaluate
   * `annotations` (optional object): Inline lifecycle annotations (if `templateRef` omitted).
   * `namespace` (optional string): Target namespace.
   * `context` (optional object): Key-value pairs to satisfy target template's `nogoo9/required-context` variable validations.
-  * `jwtPayload` (optional object): Decoded JWT payload to assign authenticated workspace ownership.
+  * `jwtPayload` (optional object): Decoded JWT payload to assign authenticated workspace ownership. *(Available from v0.2.0; automatically resolved from authentication context if bearer token is provided)*
 * **Example Call:**
 ```json
 {
@@ -667,11 +669,12 @@ Spawns an isolated workspace pod from a template or inline declaration, evaluate
 
 ### `stop_workspace`
 Initiates a graceful cleanup and termination of the target workspace pod, triggering any registered `preStop` hooks (e.g. syncing data to Git or S3 before pod deletion).
+*(Changed in v0.2.0: Invokes pre-stop graceful shutdown logic and enforces JWT user identity validation)*
 
 * **Inputs:**
   * `id` (string): Workspace ID to terminate.
   * `namespace` (optional string): Target namespace.
-  * `jwtPayload` (optional object): Decoded JWT payload (mandated if authentication is enabled).
+  * `jwtPayload` (optional object): Decoded JWT payload (mandated if authentication is enabled). *(Available from v0.2.0; automatically resolved from authentication context if bearer token is provided)*
 * **Example Call:**
 ```json
 {

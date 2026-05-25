@@ -3,6 +3,17 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.2.0
+
+- **Composable Programmatic SDK**: Refactored `src/index.ts` to export clean programmatic APIs for spawning, stopping, and listing workspaces/templates. Developers can pass custom `KubeConfig` or pre-configured client APIs to run custom pod lifecycles programmatically. The server startup logic is isolated in `src/server-entry.ts`.
+- **Subpath Prefix Support**: Configurable `BASE_URL` allows hosting the dashboard and server behind an enterprise reverse proxy subpath (e.g. `/gateway/no-crd`) without needing path rewrite rules.
+- **Dynamic Routing Proxy**: A built-in JWT-authorized workspace router `/route/:workspaceId/*` routes internal HTTP traffic natively to the target pod IP in the cluster. Ensures that the pod's owner claim matches the token's subject.
+- **RFC 9728 & Extended Auth**: Fully compliant with RFC 9728 by serving `/.well-known/oauth-protected-resource` discovery metadata. Propagates JWT identity context across direct tools calls using `AsyncLocalStorage`.
+- **State Setup & Backup Examples**: Provides robust examples under `examples/` demonstrating how to pull code from Git at workspace startup (`initContainers`) and how to run automated backup scripts to S3/MinIO on workspace termination (`preStop` sidecars).
+- **Dashboard Upgrade**: Re-engineered UI featuring a visual user identity badge, token settings modal, YAML/JSON spec drawer viewer, dynamic template creation form, and live toast notification banners.
+
+---
+
 ## What's New in v0.1.1
 
 - **NPM Publishing Improvements:** Updated `package.json` with standard publishing metadata fields (`homepage`, `repository`, `bugs`, `publishConfig`, `keywords`, and `files`) to ensure clean distribution.

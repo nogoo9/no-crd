@@ -8,6 +8,11 @@ const mockAuthApi = {
 	createSelfSubjectAccessReview: mockCreateSelfSubjectAccessReview,
 } as any;
 
+const mockListNamespacedPod = mock();
+const mockCoreApi = {
+	listNamespacedPod: mockListNamespacedPod,
+} as any;
+
 describe("HTTP/SSE Server - Stateful and Stateless MCP Tool Calls", () => {
 	let testKc: k8s.KubeConfig;
 	let k8sContext: K8sContext;
@@ -40,6 +45,9 @@ users:
 		testKc.makeApiClient = (apiClass: any) => {
 			if (apiClass === k8s.AuthorizationV1Api) {
 				return mockAuthApi;
+			}
+			if (apiClass === k8s.CoreV1Api) {
+				return mockCoreApi;
 			}
 			return originalMakeApiClient.call(testKc, apiClass);
 		};
@@ -230,5 +238,216 @@ users:
 		expect(resp.status).toBe(400);
 		const body = (await resp.json()) as any;
 		expect(body.error.message).toContain("Server not initialized");
+	});
+
+	test("Subpath prefix routing with BASE_URL env variable", async () => {
+		process.env.BASE_URL = "/gateway/no-crd";
+		try {
+			const req = new Request("http://localhost/gateway/no-crd/healthz", {
+				method: "GET",
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			const body = await resp.json();
+			expect(body).toEqual({ status: "ok" });
+		} finally {
+			delete process.env.BASE_URL;
+		}
+	});
+
+	test("Routing proxy - unauthorized if AUTH_ENABLED and missing token", async () => {
+		process.env.AUTH_ENABLED = "true";
+		try {
+			const req = new Request("http://localhost/route/ws-1/subpath", {
+				method: "GET",
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(401);
+			expect(await resp.text()).toContain("Valid JWT token");
+		} finally {
+			delete process.env.AUTH_ENABLED;
+		}
+	});
+
+	test("Routing proxy - routes successfully to running workspace pod IP", async () => {
+		mockListNamespacedPod.mockResolvedValue({
+			items: [
+				{
+					metadata: {
+						name: "ws-anonymous-ws-1",
+						labels: {
+							"nogoo9/user-sub": "anonymous",
+						},
+						annotations: {
+							"nogoo9/workspace-port": "8080",
+						},
+					},
+					status: {
+						phase: "Running",
+						podIP: "10.0.0.5",
+					},
+				},
+			],
+		});
+
+		const originalFetch = globalThis.fetch;
+		const mockFetch = mock((url: string, init?: any) => {
+			expect(url).toBe("http://10.0.0.5:8080/subpath?foo=bar");
+			expect(init.method).toBe("POST");
+			expect(init.headers.get("X-Test-Header")).toBe("hello");
+			return Promise.resolve(
+				new Response("proxied-response-body", {
+					status: 200,
+					headers: { "X-Proxy-Header": "yes" },
+				}),
+			);
+		});
+		globalThis.fetch = mockFetch as any;
+
+		try {
+			const req = new Request("http://localhost/route/ws-1/subpath?foo=bar", {
+				method: "POST",
+				headers: {
+					"X-Test-Header": "hello",
+				},
+				body: "incoming-body",
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			expect(await resp.text()).toBe("proxied-response-body");
+			expect(resp.headers.get("X-Proxy-Header")).toBe("yes");
+			expect(mockFetch).toHaveBeenCalled();
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	test("GET /.well-known/oauth-protected-resource metadata endpoint", async () => {
+		const req = new Request(
+			"http://localhost/.well-known/oauth-protected-resource",
+			{ method: "GET" },
+		);
+		const resp = await handleWebRequest(req);
+		expect(resp.status).toBe(200);
+		const body = await resp.json();
+		expect(body.resource).toBe("http://localhost");
+		expect(body.scopes_supported).toEqual(["mcp"]);
+		expect(body.bearer_methods_supported).toEqual(["header"]);
+	});
+
+	test("Request returns 401 with Link and WWW-Authenticate headers when AUTH_ENABLED and token is missing", async () => {
+		process.env.AUTH_ENABLED = "true";
+		try {
+			const req = new Request("http://localhost/mcp", { method: "GET" });
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(401);
+			expect(resp.headers.get("WWW-Authenticate")).toContain(
+				"resource_metadata=",
+			);
+			expect(resp.headers.get("Link")).toContain(
+				'rel="oauth-protected-resource"',
+			);
+		} finally {
+			delete process.env.AUTH_ENABLED;
+		}
+	});
+
+	test("JWT verification fails if token audience is mismatched", async () => {
+		process.env.AUTH_ENABLED = "true";
+		process.env.JWT_VERIFICATION_REQUIRED = "false";
+		try {
+			// Create a token with a mismatched audience
+			const header = { alg: "RS256" };
+			const payload = {
+				sub: "test-user",
+				aud: "http://mismatched-aud",
+				exp: Math.floor(Date.now() / 1000) + 3600,
+			};
+			const token =
+				Buffer.from(JSON.stringify(header)).toString("base64url") +
+				"." +
+				Buffer.from(JSON.stringify(payload)).toString("base64url") +
+				".sig";
+
+			const req = new Request("http://localhost/mcp", {
+				method: "GET",
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(401);
+			expect(await resp.text()).toContain("audience");
+		} finally {
+			delete process.env.AUTH_ENABLED;
+			delete process.env.JWT_VERIFICATION_REQUIRED;
+		}
+	});
+
+	test("Token verification via Introspection endpoint", async () => {
+		process.env.AUTH_ENABLED = "true";
+		process.env.INTROSPECTION_ENDPOINT = "https://auth.company.com/introspect";
+		process.env.OAUTH_CLIENT_ID = "mcp-server";
+
+		const originalFetch = globalThis.fetch;
+		const mockFetch = mock((url: string, init: any) => {
+			if (url === "https://auth.company.com/introspect") {
+				const bodyParams = new URLSearchParams(init.body);
+				if (
+					bodyParams.get("token") === "opaque-access-token" &&
+					bodyParams.get("client_id") === "mcp-server"
+				) {
+					return Promise.resolve(
+						Response.json({
+							active: true,
+							sub: "introspection-user",
+							aud: "http://localhost",
+							scope: "mcp",
+						}),
+					);
+				}
+			}
+			return Promise.resolve(new Response("Not Found", { status: 404 }));
+		});
+		globalThis.fetch = mockFetch as any;
+
+		try {
+			const req = new Request("http://localhost/mcp", {
+				method: "GET",
+				headers: {
+					Authorization: "Bearer opaque-access-token",
+					Accept: "text/event-stream",
+				},
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(400); // Introspection passed, failed on missing session ID
+		} finally {
+			globalThis.fetch = originalFetch;
+			delete process.env.AUTH_ENABLED;
+			delete process.env.INTROSPECTION_ENDPOINT;
+			delete process.env.OAUTH_CLIENT_ID;
+		}
+	});
+
+	test("startHttpServer uses process.env.HOST", async () => {
+		const originalServe = Bun.serve;
+		let passedOptions: any = null;
+		(Bun as any).serve = (options: any) => {
+			passedOptions = options;
+			return {
+				hostname: options.hostname || "localhost",
+				port: options.port || 3000,
+				stop: () => {},
+			} as any;
+		};
+
+		process.env.HOST = "127.0.0.1";
+		try {
+			const { startHttpServer } = await import("./server.js");
+			await startHttpServer(k8sContext);
+			expect(passedOptions).not.toBeNull();
+			expect(passedOptions.hostname).toBe("127.0.0.1");
+		} finally {
+			(Bun as any).serve = originalServe;
+			delete process.env.HOST;
+		}
 	});
 });

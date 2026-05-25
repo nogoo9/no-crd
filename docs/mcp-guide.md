@@ -248,3 +248,5 @@ ui://nogoo9/app
 * **Real-time Synchronization:** Shows active pods, status phases, template ConfigMaps, and allows terminating running workspaces with a single click.
 * **HTTP Browser Serving:** When running the server in HTTP/SSE transport mode (`TRANSPORT=http` or `both`), the UI dashboard is served directly at the root `/`, `/ui`, and `/ui/` pathnames (e.g., `http://localhost:3000/`).
 * **Robust HTTP Fallback:** If the UI is loaded outside a compatible MCP iframe (e.g. in a standard browser tab, or inside the MCP Inspector which doesn't support ext-apps postMessage handshakes), the client automatically falls back to an HTTP JSON-RPC transport session. It tries relative `/mcp` first, and then absolute `http://localhost:3000/mcp` to support cross-origin testing under the MCP Inspector seamlessly.
+
+

@@ -1,5 +1,11 @@
 export { applySpawnerAnnotations } from "./annotations.js";
-export { extractUserIdentity } from "./auth.js";
+export {
+	base64urlDecode,
+	decodeJwtPayload,
+	extractUserIdentity,
+	requestContextStore,
+	verifyToken,
+} from "./auth.js";
 export {
 	initK8sContext,
 	type K8sContext,

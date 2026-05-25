@@ -13,13 +13,69 @@
   <style>
     body {
       font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.05), transparent 60%),
+                  radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.03), transparent 60%),
+                  #020617;
     }
     .font-mono {
       font-family: 'JetBrains Mono', monospace;
     }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    .glass-panel-hover:hover {
+      background: rgba(15, 23, 42, 0.6);
+      border-color: rgba(99, 102, 241, 0.2);
+      box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.1);
+    }
+    .toast-item {
+      animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      pointer-events: auto;
+    }
+    .toast-item.toast-out {
+      animation: slideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideIn {
+      from {
+        transform: translateY(1.5rem) scale(0.95);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+    }
+    @keyframes slideOut {
+      from {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+      to {
+        transform: translateY(1rem) scale(0.95);
+        opacity: 0;
+      }
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-violet-500 selection:text-white">
+<body class="text-slate-100 min-h-screen selection:bg-indigo-500 selection:text-white">
   <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     
     <!-- Header -->
@@ -37,7 +93,12 @@
       </div>
 
       <!-- Quick Action Stats -->
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-4 flex-wrap">
+        <button id="user-badge-btn" class="px-4 py-2 bg-slate-900/60 hover:bg-slate-900 border border-slate-850 hover:border-slate-700 rounded-xl flex items-center gap-2 transition duration-200 cursor-pointer text-left">
+          <span class="w-2.5 h-2.5 bg-indigo-500 rounded-full"></span>
+          <span class="text-xs text-slate-400 font-medium">User:</span>
+          <span id="user-badge-name" class="text-xs font-bold text-indigo-400 font-mono">Anonymous</span>
+        </button>
         <div class="px-4 py-2 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center gap-2">
           <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
           <span class="text-xs text-slate-400 font-medium">Namespace:</span>
@@ -119,9 +180,17 @@
         
         <!-- ConfigMap Templates -->
         <div class="bg-slate-900/40 rounded-2xl border border-slate-800/80 shadow-xl overflow-hidden backdrop-blur-md">
-          <div class="px-6 py-5 border-b border-slate-850">
-            <h2 class="text-xl font-bold tracking-tight text-white">Pod Templates</h2>
-            <p class="mt-1 text-xs text-slate-400">Reusable ConfigMaps for sandboxes.</p>
+          <div class="px-6 py-5 border-b border-slate-850 flex items-center justify-between">
+            <div>
+              <h2 class="text-xl font-bold tracking-tight text-white">Pod Templates</h2>
+              <p class="mt-1 text-xs text-slate-400">Reusable ConfigMaps for sandboxes.</p>
+            </div>
+            <button id="create-tmpl-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition active:scale-95 cursor-pointer">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Create
+            </button>
           </div>
           <div id="templates-list" class="divide-y divide-slate-850 max-h-[600px] overflow-y-auto">
             <!-- Dynamic templates inserted here -->
@@ -198,6 +267,108 @@
       </form>
     </div>
   </div>
+
+  </div>
+
+  <!-- Token Modal -->
+  <div id="token-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-850 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+        <div>
+          <h3 class="text-lg font-bold text-white">Authentication Settings</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Configure your JWT token for authorized endpoints.</p>
+        </div>
+        <button id="close-token-btn" class="p-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition duration-150 cursor-pointer">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <form id="token-form" class="p-6 space-y-4">
+        <div>
+          <label for="jwt-token-input" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">JWT Token</label>
+          <textarea id="jwt-token-input" rows="4" class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-xs font-mono text-white outline-none transition resize-none" placeholder="Paste your JWT token here..."></textarea>
+        </div>
+        <div class="pt-4 border-t border-slate-850 flex justify-end gap-3">
+          <button type="button" id="clear-token-btn" class="px-4 py-2 bg-slate-850 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg transition cursor-pointer">Clear Token</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition cursor-pointer">Save Token</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Template Spec Modal -->
+  <div id="tmpl-spec-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-850 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="px-6 py-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+        <div>
+          <h3 class="text-lg font-bold text-white" id="tmpl-spec-title">Template Specification</h3>
+          <p id="tmpl-spec-subtitle" class="text-xs text-slate-400 mt-0.5">ConfigMap: dev-node-template</p>
+        </div>
+        <button id="close-tmpl-spec-btn" class="p-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition duration-150 cursor-pointer">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="p-6 bg-slate-950 flex-1 overflow-y-auto font-mono text-xs text-slate-300 leading-relaxed max-h-[60vh] select-text whitespace-pre-wrap" id="tmpl-spec-content">
+        Loading specification...
+      </div>
+      <div class="px-6 py-4 border-t border-slate-850 bg-slate-950/40 flex justify-end gap-3">
+        <button id="close-tmpl-spec-footer-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition active:scale-95 cursor-pointer">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Template Modal -->
+  <div id="create-tmpl-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-850 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+        <div>
+          <h3 class="text-lg font-bold text-white">Create Pod Template</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Define a reusable pod specification template ConfigMap.</p>
+        </div>
+        <button id="close-create-tmpl-btn" class="p-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition duration-150 cursor-pointer">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <form id="create-tmpl-form" class="p-6 space-y-4 overflow-y-auto flex-1 max-h-[70vh]">
+        <div>
+          <label for="create-tmpl-name" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Template Name</label>
+          <input type="text" id="create-tmpl-name" required class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none transition" placeholder="e.g. custom-python-env" />
+        </div>
+        <div>
+          <label for="create-tmpl-desc" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Description</label>
+          <input type="text" id="create-tmpl-desc" class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-sm text-white outline-none transition" placeholder="Brief explanation of this sandbox environment" />
+        </div>
+        <div>
+          <label for="create-tmpl-tag" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tag</label>
+          <input type="text" id="create-tmpl-tag" class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-sm text-white outline-none transition" placeholder="e.g. dev, testing, backup" />
+        </div>
+        <div>
+          <label for="create-tmpl-spec" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Pod Spec (JSON)</label>
+          <textarea id="create-tmpl-spec" rows="8" required class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-xs font-mono text-white outline-none transition resize-y" placeholder='{
+  "containers": [
+    {
+      "name": "workspace",
+      "image": "node:20-alpine",
+      "command": ["sleep", "infinity"]
+    }
+  ]
+}'></textarea>
+        </div>
+        <div class="pt-4 border-t border-slate-850 flex justify-end gap-3">
+          <button type="button" id="cancel-create-tmpl-btn" class="px-4 py-2 bg-slate-850 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition cursor-pointer">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition cursor-pointer">Create Template</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none max-w-sm w-full"></div>
 
   <!-- Injected App Logic Bundle -->
   <script>

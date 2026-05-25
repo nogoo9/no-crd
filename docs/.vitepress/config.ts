@@ -9,6 +9,7 @@ export default withMermaid(
 		description:
 			"Agent-driven, on-demand pod orchestration in Kubernetes without CRDs",
 		themeConfig: {
+			logo: "/logo.png",
 			nav: [
 				{ text: "Home", link: "/" },
 				{ text: "Guide", link: "/getting-started" },
@@ -17,14 +18,31 @@ export default withMermaid(
 			],
 			sidebar: [
 				{
-					text: "Guide",
+					text: "Introduction",
 					items: [
 						{ text: "Getting Started", link: "/getting-started" },
-						{ text: "MCP Client Integration", link: "/mcp-guide" },
-						{ text: "MCP Tools Reference", link: "/mcp-tools" },
+						{ text: "What's New", link: "/whats-new" },
+					],
+				},
+				{
+					text: "Workspace Lifecycle",
+					items: [
 						{ text: "Workspace Spawner", link: "/spawner-guide" },
 						{ text: "RBAC Permissions", link: "/permissions" },
-						{ text: "What's New", link: "/whats-new" },
+					],
+				},
+				{
+					text: "MCP Integration",
+					items: [
+						{ text: "MCP Client Integration", link: "/mcp-guide" },
+						{ text: "MCP Authentication", link: "/mcp-auth" },
+						{ text: "MCP Tools Reference", link: "/mcp-tools" },
+					],
+				},
+				{
+					text: "Programmatic SDK",
+					items: [
+						{ text: "Programmatic SDK Guide", link: "/sdk-guide" },
 					],
 				},
 				{
