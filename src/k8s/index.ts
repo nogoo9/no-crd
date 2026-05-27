@@ -2,8 +2,15 @@ export { applySpawnerAnnotations } from "./annotations.js";
 export {
 	base64urlDecode,
 	decodeJwtPayload,
+	extractAdminRole,
+	extractTokenFromCookie,
 	extractUserIdentity,
+	hasRequiredRole,
+	hasRequiredScope,
 	requestContextStore,
+	verifyAccessOrThrow,
+	verifyRoleOrThrow,
+	verifyScopeOrThrow,
 	verifyToken,
 } from "./auth.js";
 export {
@@ -36,8 +43,10 @@ export {
 } from "./permissions.js";
 export {
 	createPodFromArgs,
+	parseWorkspaceApis,
 	podToSummary,
 	provisionServiceAccount,
+	type WorkspaceApi,
 } from "./pods.js";
 export {
 	Container,

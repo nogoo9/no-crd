@@ -4,17 +4,22 @@ import { getLogger } from "@logtape/logtape";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { config } from "~/config.js";
 import {
 	createPodFromArgs,
 	DEFAULT_NAMESPACE,
 	errorResult,
+	extractAdminRole,
+	extractUserIdentity,
 	getAccessibleNamespaces,
 	type K8sContext,
 	MODE,
 	type PodCreateArgs,
 	PodSpecSchema,
 	podToSummary,
+	requestContextStore,
 	resolveNamespace,
+	verifyAccessOrThrow,
 } from "~/k8s/index.js";
 
 const logger = getLogger(["nogoo9", "mcp-pods"]);
@@ -125,12 +130,47 @@ export function registerPodTools(
 						.positive()
 						.optional()
 						.describe("Maximum results"),
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: ListPodsOutputSchema.shape,
 				_meta: UI_META,
 			},
-			async ({ namespace, labelSelector, fieldSelector, limit }) => {
+			async ({
+				namespace,
+				labelSelector,
+				fieldSelector,
+				limit,
+				jwtPayload,
+			}) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				let sub = "";
+				let isAdmin = false;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ pods: [] },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+						sub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+						isAdmin = extractAdminRole(
+							activeJwtPayload,
+							config.auth.rolesJsonPath,
+							config.auth.adminRole,
+						);
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { pods: [] });
+					}
+				}
 				logger.info(
 					"Tool list_pods called for namespace {namespace} (labelSelector: {labelSelector}, fieldSelector: {fieldSelector})",
 					{
@@ -140,11 +180,19 @@ export function registerPodTools(
 						limit,
 					},
 				);
+				let actualLabelSelector = labelSelector || "";
+				if (authEnabled && !isAdmin) {
+					if (actualLabelSelector) {
+						actualLabelSelector += `,nogoo9/user-sub=${sub}`;
+					} else {
+						actualLabelSelector = `nogoo9/user-sub=${sub}`;
+					}
+				}
 				try {
 					const res = await k8sContext.coreApi.listNamespacedPod({
 						namespace: ns,
 						fieldSelector,
-						labelSelector,
+						labelSelector: actualLabelSelector || undefined,
 						limit,
 					});
 					const summaries = res.items.map(podToSummary);
@@ -195,12 +243,41 @@ export function registerPodTools(
 				inputSchema: {
 					name: z.string().describe("Pod name"),
 					namespace: nsParam,
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: GetPodOutputSchema.shape,
 				_meta: UI_META,
 			},
-			async ({ name, namespace }) => {
+			async ({ name, namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = process.env.AUTH_ENABLED === "true";
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				let sub = "";
+				let isAdmin = false;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ pod: {} },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+						sub = extractUserIdentity(
+							activeJwtPayload,
+							process.env.AUTH_SUB_JSONPATH || "$.sub",
+						);
+						isAdmin = extractAdminRole(
+							activeJwtPayload,
+							process.env.AUTH_ADMIN_JSONPATH || "$.realm_access.roles",
+							process.env.AUTH_ADMIN_ROLE || "nogoo9-admin",
+						);
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { pod: {} });
+					}
+				}
 				logger.info(
 					"Tool get_pod called for pod {name} in namespace {namespace}",
 					{
@@ -213,6 +290,12 @@ export function registerPodTools(
 						name,
 						namespace: ns,
 					});
+					if (authEnabled && !isAdmin) {
+						const podSub = body.metadata?.labels?.["nogoo9/user-sub"];
+						if (podSub !== sub) {
+							throw new Error(`Pod ${name} not found or access denied`);
+						}
+					}
 					logger.debug("Successfully retrieved details for pod {name}", {
 						name,
 					});
@@ -247,13 +330,36 @@ export function registerPodTools(
 				inputSchema: {
 					name: z.string().describe("Pod name"),
 					namespace: nsParam,
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 					...PodSpecSchema.shape,
 				},
 				outputSchema: CreatePodOutputSchema.shape,
 				_meta: UI_META,
 			},
-			async ({ name, namespace, ...specArgs }) => {
+			async ({ name, namespace, jwtPayload, ...specArgs }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				let sub = "";
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ name: "", namespace: "" },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
+						sub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
+					}
+				}
 				logger.info(
 					"Tool create_pod called for pod {name} in namespace {namespace}",
 					{
@@ -262,11 +368,22 @@ export function registerPodTools(
 					},
 				);
 				try {
+					const finalSpecArgs = {
+						...specArgs,
+						labels: {
+							...(specArgs.labels || {}),
+							...(authEnabled ? { "nogoo9/user-sub": sub } : {}),
+						},
+						annotations: {
+							...(specArgs.annotations || {}),
+							...(authEnabled ? { "nogoo9/user-sub": sub } : {}),
+						},
+					};
 					const result = await createPodFromArgs(
 						k8sContext.coreApi,
 						ns,
 						name,
-						specArgs as PodCreateArgs,
+						finalSpecArgs as PodCreateArgs,
 					);
 					logger.info(
 						"Successfully created pod {name} in namespace {namespace}",
@@ -312,12 +429,41 @@ export function registerPodTools(
 						.nonnegative()
 						.optional()
 						.describe("0 for immediate"),
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: DeletePodOutputSchema.shape,
 				_meta: UI_META,
 			},
-			async ({ name, namespace, gracePeriodSeconds }) => {
+			async ({ name, namespace, gracePeriodSeconds, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				let sub = "";
+				let isAdmin = false;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ name: "", namespace: "" },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
+						sub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+						isAdmin = extractAdminRole(
+							activeJwtPayload,
+							config.auth.rolesJsonPath,
+							config.auth.adminRole,
+						);
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
+					}
+				}
 				logger.info(
 					"Tool delete_pod called for pod {name} in namespace {namespace} (gracePeriodSeconds: {gracePeriodSeconds})",
 					{
@@ -327,6 +473,15 @@ export function registerPodTools(
 					},
 				);
 				try {
+					if (authEnabled && !isAdmin) {
+						const pod = await k8sContext.coreApi.readNamespacedPod({
+							name,
+							namespace: ns,
+						});
+						if (pod.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+							throw new Error(`Pod ${name} not found or access denied`);
+						}
+					}
 					await k8sContext.coreApi.deleteNamespacedPod({
 						name,
 						namespace: ns,
@@ -376,12 +531,49 @@ export function registerPodTools(
 					patch: z
 						.record(z.string(), z.unknown())
 						.describe("Strategic merge patch body"),
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: PatchPodOutputSchema.shape,
 				_meta: UI_META,
 			},
-			async ({ name, namespace, patch }) => {
+			async ({ name, namespace, patch, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				let sub = "";
+				let isAdmin = false;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{
+								name: "",
+								namespace: "",
+								resourceVersion: "",
+							},
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
+						sub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+						isAdmin = extractAdminRole(
+							activeJwtPayload,
+							config.auth.rolesJsonPath,
+							config.auth.adminRole,
+						);
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, {
+							name: "",
+							namespace: "",
+							resourceVersion: "",
+						});
+					}
+				}
 				logger.info(
 					"Tool patch_pod called for pod {name} in namespace {namespace}",
 					{
@@ -390,6 +582,15 @@ export function registerPodTools(
 					},
 				);
 				try {
+					if (authEnabled && !isAdmin) {
+						const pod = await k8sContext.coreApi.readNamespacedPod({
+							name,
+							namespace: ns,
+						});
+						if (pod.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+							throw new Error(`Pod ${name} not found or access denied`);
+						}
+					}
 					const options = {
 						middleware: [
 							{
@@ -494,6 +695,7 @@ export function registerPodTools(
 						.boolean()
 						.optional()
 						.describe("Logs from previous container instance"),
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: GetPodLogsOutputSchema.shape,
 				_meta: UI_META,
@@ -507,8 +709,37 @@ export function registerPodTools(
 				limitBytes,
 				timestamps,
 				previous,
+				jwtPayload,
 			}) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				let sub = "";
+				let isAdmin = false;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ logs: "" },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+						sub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+						isAdmin = extractAdminRole(
+							activeJwtPayload,
+							config.auth.rolesJsonPath,
+							config.auth.adminRole,
+						);
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { logs: "" });
+					}
+				}
 				logger.info(
 					"Tool get_pod_logs called for pod {name} (container: {container}) in namespace {namespace}",
 					{
@@ -518,10 +749,39 @@ export function registerPodTools(
 					},
 				);
 				try {
+					let resolvedContainer = container;
+					let pod: any = null;
+
+					if (authEnabled && !isAdmin) {
+						pod = await k8sContext.coreApi.readNamespacedPod({
+							name,
+							namespace: ns,
+						});
+						if (pod.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+							throw new Error(`Pod ${name} not found or access denied`);
+						}
+					}
+
+					if (!resolvedContainer) {
+						if (!pod) {
+							pod = await k8sContext.coreApi.readNamespacedPod({
+								name,
+								namespace: ns,
+							});
+						}
+						const containersList = pod.spec?.containers || [];
+						const containerNames = containersList.map((c: any) => c.name);
+						if (containerNames.includes("agent")) {
+							resolvedContainer = "agent";
+						} else if (containerNames.length > 0) {
+							resolvedContainer = containerNames[0];
+						}
+					}
+
 					const logs = await k8sContext.coreApi.readNamespacedPodLog({
 						name,
 						namespace: ns,
-						container,
+						container: resolvedContainer,
 						follow: false,
 						limitBytes,
 						previous: previous ?? false,
@@ -529,7 +789,10 @@ export function registerPodTools(
 						tailLines,
 						timestamps: timestamps ?? false,
 					});
-					logger.debug("Successfully retrieved logs for pod {name}", { name });
+					logger.debug(
+						"Successfully retrieved logs for pod {name} (container: {container})",
+						{ name, container: resolvedContainer },
+					);
 					return {
 						content: [
 							{
@@ -556,11 +819,30 @@ export function registerPodTools(
 			"list_namespaces",
 			{
 				description: "List namespaces this server has pod access to",
-				inputSchema: {},
+				inputSchema: {
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
+				},
 				outputSchema: ListNamespacesOutputSchema.shape,
 				_meta: UI_META,
 			},
-			async () => {
+			async ({ jwtPayload }) => {
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ namespaces: [] },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { namespaces: [] });
+					}
+				}
 				logger.info("Tool list_namespaces called");
 				try {
 					const namespaces = await getAccessibleNamespaces(
@@ -600,7 +882,7 @@ export function registerPodTools(
 		);
 	}
 
-	const registryUrl = process.env.REGISTRY_URL;
+	const registryUrl = config.k8s.registryUrl;
 	if (enabledTools.includes("list_registry_images")) {
 		registerAppTool(
 			server,
@@ -614,11 +896,32 @@ export function registerPodTools(
 						.string()
 						.optional()
 						.describe("Filter by repository name prefix"),
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: ListRegistryImagesOutputSchema.shape,
 				_meta: UI_META,
 			},
-			async ({ repository }) => {
+			async ({ repository, jwtPayload }) => {
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ images: [], registry: "" },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, {
+							images: [],
+							registry: "",
+						});
+					}
+				}
 				logger.info(
 					"Tool list_registry_images called (repository filter: {repository}, registryUrl: {registryUrl})",
 					{

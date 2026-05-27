@@ -2,6 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { config } from "~/config.js";
 import {
 	applySpawnerAnnotations,
 	createPodFromArgs,
@@ -13,13 +14,23 @@ import {
 	type PodCreateArgs,
 	PodSpecSchema,
 	parseTemplateRef,
+	parseWorkspaceApis,
 	provisionServiceAccount,
 	readTemplateMap,
 	requestContextStore,
 	resolveNamespace,
+	verifyAccessOrThrow,
 } from "~/k8s/index.js";
 
 const logger = getLogger(["nogoo9", "mcp-spawner"]);
+
+export const WorkspaceApiSchema = z.object({
+	name: z.string(),
+	port: z.string(),
+	path: z.string(),
+	desc: z.string().optional(),
+	method: z.string().optional(),
+});
 
 export const ListWorkspacesOutputSchema = z.object({
 	workspaces: z.array(
@@ -27,6 +38,8 @@ export const ListWorkspacesOutputSchema = z.object({
 			id: z.string(),
 			name: z.string(),
 			status: z.string(),
+			templateRef: z.string().optional(),
+			apis: z.array(WorkspaceApiSchema).optional(),
 		}),
 	),
 });
@@ -39,6 +52,24 @@ export const StopWorkspaceOutputSchema = z.object({
 export const SpawnWorkspaceOutputSchema = z.object({
 	id: z.string(),
 	podName: z.string(),
+});
+
+export const GetWorkspaceOutputSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	status: z.string(),
+	podIP: z.string(),
+	port: z.string(),
+	workspacePath: z.string(),
+	workspaceType: z.string(),
+	previewPath: z.string().optional(),
+	previewType: z.string().optional(),
+	userSub: z.string(),
+	annotations: z.record(z.string(), z.string()),
+	labels: z.record(z.string(), z.string()).optional(),
+	templateRef: z.string().optional(),
+	apis: z.array(WorkspaceApiSchema).optional(),
+	spec: z.record(z.string(), z.unknown()).optional(),
 });
 
 const APP_URI = "ui://nogoo9/app";
@@ -83,7 +114,7 @@ export function registerSpawnerTools(
 			},
 			async ({ namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
-				const authEnabled = process.env.AUTH_ENABLED === "true";
+				const authEnabled = config.auth.enabled;
 				const store = requestContextStore.getStore();
 				const activeJwtPayload = jwtPayload || store?.jwtPayload;
 				logger.info(
@@ -103,9 +134,10 @@ export function registerSpawnerTools(
 						return errorResult(k8sContext.kc, err, { workspaces: [] });
 					}
 					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
 						const sub = extractUserIdentity(
 							activeJwtPayload,
-							process.env.AUTH_SUB_JSONPATH || "$.sub",
+							config.auth.subJsonPath,
 						);
 						logger.debug("Extracted user identity subject: {sub}", { sub });
 						labelSelector += `,nogoo9/user-sub=${sub}`;
@@ -121,11 +153,17 @@ export function registerSpawnerTools(
 						namespace: ns,
 						labelSelector,
 					});
-					const workspaces = res.items.map((pod) => ({
-						id: pod.metadata?.labels?.["nogoo9/workspace-id"] ?? "unknown",
-						name: pod.metadata?.name ?? "unknown",
-						status: pod.status?.phase ?? "Unknown",
-					}));
+					const workspaces = res.items.map((pod) => {
+						const ann = pod.metadata?.annotations ?? {};
+						return {
+							id: pod.metadata?.labels?.["nogoo9/workspace-id"] ?? "unknown",
+							name:
+								ann["nogoo9/workspace-name"] ?? pod.metadata?.name ?? "unknown",
+							status: pod.status?.phase ?? "Unknown",
+							templateRef: ann["nogoo9/template-ref"],
+							apis: parseWorkspaceApis(ann),
+						};
+					});
 					logger.debug("Successfully listed {count} workspaces", {
 						count: workspaces.length,
 					});
@@ -158,6 +196,194 @@ export function registerSpawnerTools(
 		);
 	}
 
+	if (enabledTools.includes("get_workspace")) {
+		registerAppTool(
+			server,
+			"get_workspace",
+			{
+				description: "Get workspace details by ID",
+				inputSchema: {
+					id: z.string().describe("Workspace ID to inspect"),
+					namespace: z
+						.string()
+						.optional()
+						.describe(`Namespace (defaults to "${DEFAULT_NAMESPACE}")`),
+					jwtPayload: z
+						.record(z.string(), z.unknown())
+						.optional()
+						.describe(
+							"JWT payload for identity extraction (if AUTH_ENABLED=true)",
+						),
+				},
+				outputSchema: GetWorkspaceOutputSchema.shape,
+				_meta: UI_META,
+			},
+			async ({ id, namespace, jwtPayload }) => {
+				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				logger.info(
+					"Tool get_workspace called for workspace ID {id} in namespace {namespace} (authEnabled: {authEnabled})",
+					{
+						id,
+						namespace: ns,
+						authEnabled,
+					},
+				);
+				let labelSelector = `nogoo9/type=workspace,nogoo9/workspace-id=${id}`;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						const err = new Error(
+							"Unauthorized: jwtPayload required when AUTH_ENABLED is true",
+						);
+						logger.error("Authentication failed: {error}", { error: err });
+						return errorResult(k8sContext.kc, err, {
+							id,
+							name: "",
+							status: "",
+							podIP: "",
+							port: "",
+							workspacePath: "",
+							workspaceType: "",
+							previewPath: "",
+							previewType: "",
+							userSub: "",
+							annotations: {},
+							templateRef: "",
+						});
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+						const sub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+						logger.debug("Extracted user identity subject: {sub}", { sub });
+						labelSelector += `,nogoo9/user-sub=${sub}`;
+					} catch (err) {
+						logger.error("Failed to extract user identity: {error}", {
+							error: err,
+						});
+						return errorResult(k8sContext.kc, err, {
+							id,
+							name: "",
+							status: "",
+							podIP: "",
+							port: "",
+							workspacePath: "",
+							workspaceType: "",
+							previewPath: "",
+							previewType: "",
+							userSub: "",
+							annotations: {},
+							templateRef: "",
+						});
+					}
+				}
+				try {
+					const res = await k8sContext.coreApi.listNamespacedPod({
+						namespace: ns,
+						labelSelector,
+					});
+					if (res.items.length === 0) {
+						const err = new Error(`Workspace ${id} not found or access denied`);
+						logger.warn("Workspace not found: {error}", { error: err });
+						return errorResult(k8sContext.kc, err, {
+							id,
+							name: "",
+							status: "",
+							podIP: "",
+							port: "",
+							workspacePath: "",
+							workspaceType: "",
+							previewPath: "",
+							previewType: "",
+							userSub: "",
+							annotations: {},
+							templateRef: "",
+						});
+					}
+					const pod = res.items[0];
+					const annotations = pod.metadata?.annotations ?? {};
+					const userSub =
+						pod.metadata?.labels?.["nogoo9/user-sub"] ??
+						annotations["nogoo9/user-sub"] ??
+						"";
+					const workspacePath =
+						annotations["nogoo9/workspace-path"] ??
+						annotations["nogoo9/preview-path"] ??
+						"/";
+					const workspaceType =
+						annotations["nogoo9/workspace-type"] ??
+						annotations["nogoo9/preview-type"] ??
+						"html";
+					const apis = parseWorkspaceApis(annotations);
+					const details = {
+						id,
+						name:
+							annotations["nogoo9/workspace-name"] ??
+							pod.metadata?.name ??
+							"unknown",
+						status: pod.status?.phase ?? "Unknown",
+						podIP: pod.status?.podIP ?? "",
+						port: annotations["nogoo9/workspace-port"] ?? "",
+						workspacePath,
+						workspaceType,
+						previewPath: workspacePath,
+						previewType: workspaceType,
+						userSub,
+						annotations,
+						labels: pod.metadata?.labels ?? {},
+						templateRef: annotations["nogoo9/template-ref"],
+						apis,
+						spec: pod.spec,
+					};
+					const fullWorkspaceObj = {
+						metadata: {
+							name: details.name,
+							namespace: ns,
+							labels: details.labels || {},
+							annotations: details.annotations || {},
+						},
+						spec: details.spec,
+					};
+					return {
+						content: [
+							{
+								type: "text" as const,
+								text: JSON.stringify(fullWorkspaceObj, null, 2),
+							},
+						],
+						structuredContent: details,
+					};
+				} catch (err) {
+					logger.error(
+						"Failed to get workspace ID {id} in namespace {namespace}: {error}",
+						{
+							id,
+							namespace: ns,
+							error: err,
+						},
+					);
+					return errorResult(k8sContext.kc, err, {
+						id,
+						name: "",
+						status: "",
+						podIP: "",
+						port: "",
+						workspacePath: "",
+						workspaceType: "",
+						previewPath: "",
+						previewType: "",
+						userSub: "",
+						annotations: {},
+					});
+				}
+			},
+		);
+	}
+
 	if (enabledTools.includes("stop_workspace")) {
 		registerAppTool(
 			server,
@@ -174,7 +400,7 @@ export function registerSpawnerTools(
 			},
 			async ({ id, namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
-				const authEnabled = process.env.AUTH_ENABLED === "true";
+				const authEnabled = config.auth.enabled;
 				const store = requestContextStore.getStore();
 				const activeJwtPayload = jwtPayload || store?.jwtPayload;
 				logger.info(
@@ -193,9 +419,10 @@ export function registerSpawnerTools(
 						return errorResult(k8sContext.kc, err, { id, status: "" });
 					}
 					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
 						const sub = extractUserIdentity(
 							activeJwtPayload,
-							process.env.AUTH_SUB_JSONPATH || "$.sub",
+							config.auth.subJsonPath,
 						);
 						logger.debug("Extracted user identity subject: {sub}", { sub });
 						labelSelector += `,nogoo9/user-sub=${sub}`;
@@ -267,6 +494,10 @@ export function registerSpawnerTools(
 					"Spawn a new agent workspace from a template or inline declaration",
 				inputSchema: {
 					id: z.string().describe("Unique Workspace ID"),
+					name: z
+						.string()
+						.optional()
+						.describe("Optional display name for the workspace"),
 					templateRef: z
 						.string()
 						.optional()
@@ -290,6 +521,7 @@ export function registerSpawnerTools(
 			},
 			async ({
 				id,
+				name,
 				templateRef,
 				spec: inlineSpec,
 				annotations: inlineAnnotations,
@@ -297,19 +529,56 @@ export function registerSpawnerTools(
 				context,
 				jwtPayload,
 			}) => {
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+				const VAR_USER = "${{user}}";
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+				const VAR_WORKSPACE_ID = "${{workspace_id}}";
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+				const VAR_WORKSPACE = "${{workspace}}";
+
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
-				const authEnabled = process.env.AUTH_ENABLED === "true";
+				const authEnabled = config.auth.enabled;
 				const store = requestContextStore.getStore();
 				const activeJwtPayload = jwtPayload || store?.jwtPayload;
 				logger.info(
-					"Tool spawn_workspace called for workspace ID {id} in namespace {namespace} (templateRef: {templateRef}, authEnabled: {authEnabled})",
+					"Tool spawn_workspace called for workspace ID {id} (name: {name}) in namespace {namespace} (templateRef: {templateRef}, authEnabled: {authEnabled})",
 					{
 						id,
+						name,
 						namespace: ns,
 						templateRef,
 						authEnabled,
 					},
 				);
+
+				// Pre-flight uniqueness check
+				try {
+					const existingPods = await k8sContext.coreApi.listNamespacedPod({
+						namespace: ns,
+						labelSelector: `nogoo9/type=workspace,nogoo9/workspace-id=${id}`,
+					});
+					if (existingPods.items && existingPods.items.length > 0) {
+						const err = new Error(`Workspace with ID "${id}" already exists`);
+						logger.warn("Workspace ID uniqueness check failed: {error}", {
+							error: err,
+						});
+						return errorResult(k8sContext.kc, err, { id, podName: "" });
+					}
+				} catch (err) {
+					logger.error(
+						"Failed to check workspace ID uniqueness for {id}: {error}",
+						{
+							id,
+							error: err,
+						},
+					);
+					return errorResult(
+						k8sContext.kc,
+						err instanceof Error ? err : new Error(String(err)),
+						{ id, podName: "" },
+					);
+				}
+
 				let userSub = "anonymous";
 				if (authEnabled) {
 					if (!activeJwtPayload) {
@@ -318,9 +587,10 @@ export function registerSpawnerTools(
 						return errorResult(k8sContext.kc, err, { id, podName: "" });
 					}
 					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
 						userSub = extractUserIdentity(
 							activeJwtPayload,
-							process.env.AUTH_SUB_JSONPATH || "$.sub",
+							config.auth.subJsonPath,
 						);
 						logger.debug("Extracted user identity subject: {sub}", {
 							sub: userSub,
@@ -332,6 +602,18 @@ export function registerSpawnerTools(
 						return errorResult(k8sContext.kc, err, { id, podName: "" });
 					}
 				}
+				let templateUser = "guest";
+				if (activeJwtPayload) {
+					try {
+						templateUser = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+					} catch (_) {
+						// fallback to guest
+					}
+				}
+
 				try {
 					let parsedSpec: PodCreateArgs;
 					let annotations: Record<string, string>;
@@ -354,11 +636,52 @@ export function registerSpawnerTools(
 							logger.error("Template invalid: {error}", { error: err });
 							return errorResult(k8sContext.kc, err, { id, podName: "" });
 						}
-						parsedSpec = PodSpecSchema.parse(JSON.parse(raw)) as PodCreateArgs;
-						annotations = cm.metadata?.annotations ?? {};
+						const interpolatedRaw = raw
+							.replaceAll(VAR_USER, templateUser)
+							.replaceAll(VAR_WORKSPACE_ID, id)
+							.replaceAll(VAR_WORKSPACE, id);
+						parsedSpec = PodSpecSchema.parse(
+							JSON.parse(interpolatedRaw),
+						) as PodCreateArgs;
+
+						annotations = {};
+						if (cm.metadata?.annotations) {
+							for (const [k, v] of Object.entries(cm.metadata.annotations)) {
+								if (k === "__proto__" || k === "constructor") continue;
+								Object.defineProperty(annotations, k, {
+									value: v
+										.replaceAll(VAR_USER, templateUser)
+										.replaceAll(VAR_WORKSPACE_ID, id)
+										.replaceAll(VAR_WORKSPACE, id),
+									writable: true,
+									enumerable: true,
+									configurable: true,
+								});
+							}
+						}
 					} else if (inlineSpec) {
-						parsedSpec = inlineSpec as PodCreateArgs;
-						annotations = inlineAnnotations ?? {};
+						const rawSpec = JSON.stringify(inlineSpec);
+						const interpolatedRawSpec = rawSpec
+							.replaceAll(VAR_USER, templateUser)
+							.replaceAll(VAR_WORKSPACE_ID, id)
+							.replaceAll(VAR_WORKSPACE, id);
+						parsedSpec = JSON.parse(interpolatedRawSpec) as PodCreateArgs;
+
+						annotations = {};
+						if (inlineAnnotations) {
+							for (const [k, v] of Object.entries(inlineAnnotations)) {
+								if (k === "__proto__" || k === "constructor") continue;
+								Object.defineProperty(annotations, k, {
+									value: v
+										.replaceAll(VAR_USER, templateUser)
+										.replaceAll(VAR_WORKSPACE_ID, id)
+										.replaceAll(VAR_WORKSPACE, id),
+									writable: true,
+									enumerable: true,
+									configurable: true,
+								});
+							}
+						}
 					} else {
 						const err = new Error(
 							"Either templateRef or spec must be provided",
@@ -402,11 +725,17 @@ export function registerSpawnerTools(
 						"nogoo9/managed-by": "nogoo9-spawner",
 						"nogoo9/user-sub": userSub,
 					};
+					const displayName = name || id;
+					parsedSpec.annotations = {
+						...annotations,
+						...(parsedSpec.annotations || {}),
+						"nogoo9/workspace-name": displayName,
+					};
+					if (templateRef) {
+						parsedSpec.annotations["nogoo9/template-ref"] = templateRef;
+					}
 					if (authEnabled) {
-						parsedSpec.annotations = {
-							...(parsedSpec.annotations || {}),
-							"nogoo9/user-sub": userSub,
-						};
+						parsedSpec.annotations["nogoo9/user-sub"] = userSub;
 					}
 					const podName = `ws-${userSub.replace(/[^a-z0-9-]/gi, "").slice(0, 10)}-${id}`;
 					logger.info(

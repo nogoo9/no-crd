@@ -184,6 +184,46 @@ spec:
 
 ---
 
+## 🔒 Private Registries & Image Pull Secrets
+
+The spawner natively supports pulling workspace images from private registries (such as private Docker Hub repos, GitHub Container Registry (GHCR), or AWS ECR) by specifying `imagePullSecrets` in your workspace templates.
+
+### Configuring imagePullSecrets in a Template
+
+To use a private image, define the `imagePullSecrets` array at the root of your JSON specification:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: private-workspace-template
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "Workspace pulling from a private registry"
+data:
+  spec: |
+    {
+      "imagePullSecrets": [
+        { "name": "my-registry-key" }
+      ],
+      "containers": [
+        {
+          "name": "workspace",
+          "image": "my-private-registry.com/org/private-image:latest",
+          "command": ["sleep", "infinity"]
+        }
+      ]
+    }
+```
+
+> [!NOTE]
+> The referenced secret (e.g., `my-registry-key`) must exist in the target namespace (usually `nogoo9`) before spawning the workspace. You can create it using:
+> `kubectl -n nogoo9 create secret docker-registry my-registry-key --docker-server=... --docker-username=... --docker-password=...`
+
+---
+
 ## 🌐 Workspace Routing Proxy (Experimental)
 *(Available from v0.2.0 - Experimental)*
 

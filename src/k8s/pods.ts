@@ -185,3 +185,60 @@ export async function createPodFromArgs(
 		throw err;
 	}
 }
+
+export interface WorkspaceApi {
+	name: string;
+	port: string;
+	path: string;
+	desc?: string;
+	method?: string;
+}
+
+/**
+ * Parses additional workspace APIs exposed via kubernetes metadata annotations.
+ * Pattern: `nogoo9/api.<api-name>.(port|path|desc|method)`
+ *
+ * @param annotations Pod metadata annotations.
+ * @returns Parsed list of WorkspaceApi instances.
+ */
+export function parseWorkspaceApis(
+	annotations: Record<string, string> | undefined,
+): WorkspaceApi[] {
+	if (!annotations) return [];
+	const apisMap = new Map<string, Partial<WorkspaceApi>>();
+
+	for (const [key, value] of Object.entries(annotations)) {
+		if (key === "__proto__" || key === "constructor") continue;
+		const match = key.match(/^nogoo9\/api\.([^.]+)\.(port|path|desc|method)$/);
+		if (match) {
+			const [_, apiName, field] = match;
+			if (!apisMap.has(apiName)) {
+				apisMap.set(apiName, { name: apiName, path: "/" });
+			}
+			const api = apisMap.get(apiName)!;
+			if (field === "port") {
+				api.port = value;
+			} else if (field === "path") {
+				api.path = value;
+			} else if (field === "desc") {
+				api.desc = value;
+			} else if (field === "method") {
+				api.method = value;
+			}
+		}
+	}
+
+	const apis: WorkspaceApi[] = [];
+	for (const [_, api] of apisMap.entries()) {
+		if (api.port) {
+			apis.push({
+				name: api.name!,
+				port: api.port,
+				path: api.path ?? "/",
+				desc: api.desc,
+				method: api.method,
+			});
+		}
+	}
+	return apis;
+}

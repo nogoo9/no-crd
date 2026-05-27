@@ -6,30 +6,273 @@
   <title>nogoo9 Pod Manager</title>
   <!-- Tailwind CSS v4 Browser Build -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <!-- Google Fonts: Inter -->
+  <!-- Google Fonts: EB Garamond, Inter, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg-color: #faf9f5; /* Canvas (warm cream) */
+      --text-color: #3d3d3a; /* Body */
+      --text-title: #141413; /* Ink */
+      --text-muted: #6c6a64; /* Muted */
+      --panel-bg: #efe9de; /* Surface card */
+      --panel-border: #e6dfd8; /* Hairline */
+      --item-border: #e6dfd8; /* Hairline */
+      --modal-bg: #faf9f5; /* Canvas */
+      --input-bg: #faf9f5; /* Canvas */
+      --input-border: #e6dfd8; /* Hairline */
+      --input-text: #141413; /* Ink */
+      --badge-bg: #efe9de; /* Surface card */
+      --badge-text: #3d3d3a; /* Body */
+      --accent-color: #cc785c; /* Primary Coral */
+      --accent-active: #a9583e; /* Primary active */
+      --success-color: #5db872;
+      --error-color: #c64545;
+      --warning-color: #d4a017;
+      --panel-hover-bg: #f5f0e8; /* surface-soft */
+      --accent-amber: #e8a55a;
+    }
+    :root.dark {
+      --bg-color: #181715; /* Surface dark */
+      --text-color: #a09d96; /* On dark soft */
+      --text-title: #faf9f5; /* On dark */
+      --text-muted: #a09d96; /* On dark soft */
+      --panel-bg: #1f1e1b; /* Surface dark soft */
+      --panel-border: #252320; /* Surface dark elevated */
+      --item-border: #252320; /* Surface dark elevated */
+      --modal-bg: #1f1e1b; /* Surface dark soft */
+      --input-bg: #181715; /* Surface dark */
+      --input-border: #252320; /* Surface dark elevated */
+      --input-text: #faf9f5; /* On dark */
+      --badge-bg: #252320; /* Surface dark elevated */
+      --badge-text: #a09d96; /* On dark soft */
+      --accent-color: #cc785c; /* Primary Coral */
+      --accent-active: #a9583e; /* Primary active */
+      --success-color: #5db872;
+      --error-color: #c64545;
+      --warning-color: #d4a017;
+      --panel-hover-bg: #252320; /* surface-dark-elevated */
+      --accent-amber: #e8a55a;
+    }
     body {
-      font-family: 'Inter', sans-serif;
-      background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.05), transparent 60%),
-                  radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.03), transparent 60%),
-                  #020617;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color) !important;
+      color: var(--text-color) !important;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    h1, h2, h3, h4, .font-serif {
+      font-family: 'EB Garamond', Garamond, Georgia, serif !important;
+      font-weight: 500 !important;
+      letter-spacing: -0.02em !important;
+      background: none !important;
+      -webkit-background-clip: initial !important;
+      background-clip: initial !important;
+      -webkit-text-fill-color: initial !important;
+      color: var(--text-title) !important;
     }
     .font-mono {
       font-family: 'JetBrains Mono', monospace;
     }
-    .glass-panel {
-      background: rgba(15, 23, 42, 0.4);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.03);
+    
+    /* Semantic theme-agnostic components */
+    .app-body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
     }
-    .glass-panel-hover:hover {
-      background: rgba(15, 23, 42, 0.6);
-      border-color: rgba(99, 102, 241, 0.2);
-      box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.1);
+    .app-header {
+      border-bottom: 1px solid var(--panel-border);
+    }
+    .theme-text-title {
+      color: var(--text-title) !important;
+    }
+    .theme-text-muted {
+      color: var(--text-muted) !important;
+    }
+    .theme-text-body {
+      color: var(--text-color) !important;
+    }
+    .theme-text-success {
+      color: var(--success-color) !important;
+    }
+    .theme-text-error {
+      color: var(--error-color) !important;
+    }
+    .theme-border {
+      border: 1px solid var(--panel-border) !important;
+    }
+    .theme-feature-card {
+      background-color: var(--panel-bg) !important;
+      border: 1px solid var(--panel-border) !important;
+    }
+    .theme-card-header {
+      border-bottom: 1px solid var(--panel-border);
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+    .theme-modal-header {
+      border-bottom: 1px solid var(--panel-border);
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+    .theme-card-row {
+      transition: background-color 0.15s ease-in-out;
+    }
+    .theme-card-row:hover {
+      background-color: var(--panel-hover-bg) !important;
+    }
+    .theme-divide-y > * + * {
+      border-top: 1px solid var(--panel-border) !important;
+    }
+    .theme-badge {
+      background-color: var(--badge-bg) !important;
+      color: var(--badge-text) !important;
+      border: 1px solid var(--panel-border) !important;
+    }
+    .theme-badge-pill {
+      background-color: var(--badge-bg) !important;
+      color: var(--badge-text) !important;
+      border: 1px solid var(--panel-border) !important;
+    }
+    .theme-badge-coral {
+      background-color: rgba(204, 120, 92, 0.1) !important;
+      border: 1px solid rgba(204, 120, 92, 0.2) !important;
+      color: var(--accent-color) !important;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+    }
+    .theme-icon-box {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.625rem;
+      background-color: var(--badge-bg) !important;
+      border-radius: 0.75rem;
+      border: 1px solid var(--item-border) !important;
+      color: var(--accent-color) !important;
+    }
+    .theme-table-header {
+      background-color: rgba(0, 0, 0, 0.04) !important;
+      color: var(--text-muted) !important;
+      border-bottom: 1px solid var(--panel-border) !important;
+    }
+    .theme-modal-overlay {
+      background-color: rgba(24, 23, 21, 0.8) !important;
+      backdrop-filter: blur(4px) !important;
+    }
+    .theme-modal {
+      background-color: var(--modal-bg) !important;
+      border: 1px solid var(--panel-border) !important;
+    }
+    .theme-code-window-card {
+      background-color: var(--input-bg) !important;
+      color: var(--input-text) !important;
+      border: 1px solid var(--panel-border) !important;
+    }
+    .theme-text-input {
+      background-color: var(--input-bg) !important;
+      border: 1px solid var(--input-border) !important;
+      color: var(--input-text) !important;
+      border-radius: 8px !important;
+      transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+    }
+    .theme-text-input:focus {
+      outline: none !important;
+      border-color: var(--accent-color) !important;
+      box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.15) !important;
+    }
+    .theme-btn-close {
+      color: var(--text-muted) !important;
+      padding: 0.25rem;
+      border-radius: 0.5rem;
+      transition: background-color 0.15s, color 0.15s;
+      cursor: pointer;
+    }
+    .theme-btn-close:hover {
+      background-color: var(--panel-hover-bg) !important;
+      color: var(--text-title) !important;
+    }
+    .theme-banner-error {
+      background-color: rgba(198, 69, 69, 0.1) !important;
+      border: 1px solid rgba(198, 69, 69, 0.2) !important;
+    }
+    .theme-status-success-dot {
+      background-color: var(--success-color) !important;
+      width: 0.625rem;
+      height: 0.625rem;
+      border-radius: 9999px;
+      display: inline-block;
+    }
+    .theme-text-link {
+      color: var(--accent-color) !important;
+      background: transparent;
+      transition: color 0.15s;
+    }
+    .theme-text-link:hover {
+      color: var(--accent-active) !important;
+      text-decoration: underline;
+    }
+    .theme-code-inline {
+      background-color: var(--badge-bg) !important;
+      color: var(--accent-color) !important;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+    }
+    
+    /* Status classes mapping */
+    .status-running {
+      background-color: rgba(93, 184, 114, 0.1) !important;
+      color: var(--success-color) !important;
+      border: 1px solid rgba(93, 184, 114, 0.2) !important;
+    }
+    .status-pending {
+      background-color: rgba(232, 165, 90, 0.1) !important;
+      color: var(--accent-amber) !important;
+      border: 1px solid rgba(232, 165, 90, 0.2) !important;
+    }
+    .status-failed {
+      background-color: rgba(198, 69, 69, 0.1) !important;
+      color: var(--error-color) !important;
+      border: 1px solid rgba(198, 69, 69, 0.2) !important;
+    }
+    .status-unknown {
+      background-color: var(--badge-bg) !important;
+      color: var(--text-color) !important;
+      border: 1px solid var(--panel-border) !important;
+    }
+    .status-pulse-running {
+      background-color: var(--success-color) !important;
+    }
+    .status-pulse-pending {
+      background-color: var(--accent-amber) !important;
+    }
+    
+    /* Toast styles mapping */
+    .toast-success {
+      background-color: var(--modal-bg) !important;
+      border-color: rgba(93, 184, 114, 0.3) !important;
+      color: var(--text-color) !important;
+    }
+    .toast-error {
+      background-color: var(--modal-bg) !important;
+      border-color: rgba(198, 69, 69, 0.3) !important;
+      color: var(--text-color) !important;
+    }
+    .toast-icon-success {
+      padding: 0.25rem;
+      background-color: rgba(93, 184, 114, 0.1) !important;
+      color: var(--success-color) !important;
+      border-radius: 0.5rem;
+      flex-shrink: 0;
+    }
+    .toast-icon-error {
+      padding: 0.25rem;
+      background-color: rgba(198, 69, 69, 0.1) !important;
+      color: var(--error-color) !important;
+      border-radius: 0.5rem;
+      flex-shrink: 0;
     }
     .toast-item {
       animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -58,6 +301,7 @@
         opacity: 0;
       }
     }
+    
     /* Custom scrollbars */
     ::-webkit-scrollbar {
       width: 6px;
@@ -67,44 +311,142 @@
       background: transparent;
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(204, 120, 92, 0.2);
       border-radius: 9999px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(204, 120, 92, 0.4);
+    }
+
+    ::selection {
+      background-color: var(--accent-color) !important;
+      color: #ffffff !important;
+    }
+    ::-moz-selection {
+      background-color: var(--accent-color) !important;
+      color: #ffffff !important;
+    }
+
+    /* Button styles matching Claude/DESIGN.md */
+    .theme-button-primary {
+      background-color: var(--accent-color) !important;
+      border: 1px solid var(--accent-color) !important;
+      color: #ffffff !important;
+      border-radius: 8px !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+      font-weight: 500 !important;
+      transition: all 0.15s ease-in-out !important;
+      cursor: pointer !important;
+      box-shadow: 0 4px 6px -1px rgba(204, 120, 92, 0.15), 0 2px 4px -1px rgba(204, 120, 92, 0.1) !important;
+    }
+    .theme-button-primary:hover {
+      background-color: var(--accent-active) !important;
+      border-color: var(--accent-active) !important;
+    }
+    .theme-button-primary:active {
+      transform: scale(0.98) !important;
+    }
+
+    .theme-button-secondary {
+      background-color: var(--panel-bg) !important;
+      border: 1px solid var(--panel-border) !important;
+      color: var(--text-color) !important;
+      border-radius: 8px !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+      font-weight: 500 !important;
+      transition: all 0.15s ease-in-out !important;
+      cursor: pointer !important;
+    }
+    .theme-button-secondary:hover {
+      background-color: var(--input-bg) !important;
+      border-color: var(--accent-color) !important;
+      color: var(--text-title) !important;
+    }
+    .theme-button-secondary:active {
+      transform: scale(0.98) !important;
+    }
+
+    .theme-button-danger {
+      background-color: var(--panel-bg) !important;
+      border: 1px solid var(--panel-border) !important;
+      color: var(--text-color) !important;
+      border-radius: 8px !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+      font-weight: 500 !important;
+      transition: all 0.15s ease-in-out !important;
+      cursor: pointer !important;
+    }
+    .theme-button-danger:hover {
+      background-color: rgba(198, 69, 69, 0.1) !important;
+      border-color: var(--error-color) !important;
+      color: var(--error-color) !important;
+    }
+    .theme-button-danger:active {
+      transform: scale(0.98) !important;
+    }
+
+    /* Logo badge matching theme */
+    .logo-badge {
+      background-color: var(--accent-color) !important;
+      background-image: none !important;
+      color: #ffffff !important;
+      box-shadow: 0 10px 15px -3px rgba(204, 120, 92, 0.2) !important;
     }
   </style>
+  <style id="custom-theme-style"></style>
 </head>
-<body class="text-slate-100 min-h-screen selection:bg-indigo-500 selection:text-white">
+<body class="app-body min-h-screen">
   <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     
     <!-- Header -->
-    <header class="flex flex-col md:flex-row md:items-center md:justify-between pb-8 border-b border-slate-800 gap-4">
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between pb-8 app-header gap-4">
       <div>
         <div class="flex items-center gap-3">
-          <span class="inline-flex items-center justify-center p-2 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl shadow-lg shadow-indigo-500/20">
+          <span class="logo-badge inline-flex items-center justify-center p-2 rounded-xl">
             <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           </span>
-          <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 via-indigo-200 to-white bg-clip-text text-transparent">nogoo9 Pod Manager</h1>
+          <h1 class="text-3xl font-serif">nogoo9 Pod Manager</h1>
         </div>
-        <p class="mt-2 text-sm text-slate-400">On-demand Kubernetes pod orchestration and agent-sandbox management without CRDs.</p>
+        <p class="mt-2 text-sm theme-text-muted">On-demand Kubernetes pod orchestration and agent-sandbox management without CRDs.</p>
       </div>
-
+ 
       <!-- Quick Action Stats -->
       <div class="flex items-center gap-4 flex-wrap">
-        <button id="user-badge-btn" class="px-4 py-2 bg-slate-900/60 hover:bg-slate-900 border border-slate-850 hover:border-slate-700 rounded-xl flex items-center gap-2 transition duration-200 cursor-pointer text-left">
-          <span class="w-2.5 h-2.5 bg-indigo-500 rounded-full"></span>
-          <span class="text-xs text-slate-400 font-medium">User:</span>
-          <span id="user-badge-name" class="text-xs font-bold text-indigo-400 font-mono">Anonymous</span>
-        </button>
-        <div class="px-4 py-2 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center gap-2">
-          <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
-          <span class="text-xs text-slate-400 font-medium">Namespace:</span>
-          <span id="ns-badge" class="text-xs font-bold text-violet-400 font-mono">nogoo9</span>
+        <!-- Theme Select Dropdown -->
+        <div class="relative inline-block">
+          <select id="theme-select" class="theme-button-secondary text-xs px-3 py-2 pr-8 appearance-none cursor-pointer outline-none rounded-lg font-medium">
+            <option value="default">Default Theme</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 theme-text-muted">
+            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+            </svg>
+          </div>
         </div>
-        <button id="refresh-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-sm font-semibold rounded-xl transition duration-200 shadow-lg shadow-violet-600/20 active:scale-95 cursor-pointer">
+
+        <button id="theme-btn" title="Toggle Theme" class="theme-button-secondary px-3 py-2 flex items-center justify-center cursor-pointer">
+          <svg id="theme-icon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        </button>
+        <button id="user-badge-btn" class="theme-button-secondary px-4 py-2 flex items-center gap-2 cursor-pointer text-left">
+          <span class="theme-status-success-dot"></span>
+          <span class="text-xs theme-text-muted font-medium">User:</span>
+          <span id="user-badge-name" class="text-xs font-bold font-mono theme-text-title">Anonymous</span>
+        </button>
+        <button id="logout-btn" title="Sign Out" class="theme-button-secondary px-3 py-2 flex items-center justify-center cursor-pointer hidden theme-text-error">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+        <div class="px-4 py-2 theme-badge rounded-xl flex items-center gap-2">
+          <span class="theme-status-success-dot animate-pulse"></span>
+          <span class="text-xs theme-text-muted font-medium">Namespace:</span>
+          <span id="ns-badge" class="text-xs font-bold font-mono theme-text-success">nogoo9</span>
+        </div>
+        <button id="refresh-btn" class="theme-button-primary inline-flex items-center gap-2 px-4 py-2 text-sm cursor-pointer">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18" />
           </svg>
@@ -112,15 +454,15 @@
         </button>
       </div>
     </header>
-
+ 
     <!-- Error Banner -->
-    <div id="error-banner" class="hidden mt-6 p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center gap-3">
-      <svg class="w-6 h-6 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div id="error-banner" class="hidden mt-6 p-4 theme-banner-error rounded-xl flex items-center gap-3">
+      <svg class="w-6 h-6 theme-text-error shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
-      <div class="text-sm font-medium text-rose-200" id="error-message">Failed to connect to Kubernetes cluster.</div>
+      <div class="text-sm font-medium theme-text-error" id="error-message">Failed to connect to Kubernetes cluster.</div>
     </div>
-
+ 
     <!-- Main Content Grid -->
     <main class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
       
@@ -128,33 +470,33 @@
       <section class="lg:col-span-2 space-y-8">
         
         <!-- Active Workspaces -->
-        <div class="bg-slate-900/40 rounded-2xl border border-slate-800/80 shadow-xl overflow-hidden backdrop-blur-md">
-          <div class="px-6 py-5 border-b border-slate-850 flex items-center justify-between">
+        <div class="theme-feature-card rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
+          <div class="px-6 py-5 theme-card-header flex items-center justify-between">
             <div class="flex items-center gap-2.5">
-              <h2 class="text-xl font-bold tracking-tight text-white">Active Workspaces</h2>
-              <span id="ws-count" class="px-2 py-0.5 bg-slate-800 text-xs font-bold rounded-full text-slate-300">0</span>
+              <h2 class="text-xl font-bold tracking-tight theme-text-title">Active Workspaces</h2>
+              <span id="ws-count" class="px-2 py-0.5 theme-badge-pill text-xs font-bold rounded-full">0</span>
             </div>
-            <p class="text-xs text-slate-400">Agent sandboxes running inside the cluster.</p>
+            <p class="text-xs theme-text-muted">Agent sandboxes running inside the cluster.</p>
           </div>
-          <div id="workspaces-list" class="divide-y divide-slate-850">
+          <div id="workspaces-list" class="theme-divide-y">
             <!-- Dynamic workspace items inserted here -->
-            <div class="p-6 text-center text-slate-500 text-sm">No active workspaces. Click a template to spawn one.</div>
+            <div class="p-6 text-center theme-text-muted text-sm">No active workspaces. Click a template to spawn one.</div>
           </div>
         </div>
-
+ 
         <!-- Pod List -->
-        <div class="bg-slate-900/40 rounded-2xl border border-slate-800/80 shadow-xl overflow-hidden backdrop-blur-md">
-          <div class="px-6 py-5 border-b border-slate-850 flex items-center justify-between">
+        <div class="theme-feature-card rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
+          <div class="px-6 py-5 theme-card-header flex items-center justify-between">
             <div class="flex items-center gap-2.5">
-              <h2 class="text-xl font-bold tracking-tight text-white">Kubernetes Pods</h2>
-              <span id="pods-count" class="px-2 py-0.5 bg-slate-800 text-xs font-bold rounded-full text-slate-300">0</span>
+              <h2 class="text-xl font-bold tracking-tight theme-text-title">Kubernetes Pods</h2>
+              <span id="pods-count" class="px-2 py-0.5 theme-badge-pill text-xs font-bold rounded-full">0</span>
             </div>
-            <p class="text-xs text-slate-400">Raw pods in namespace.</p>
+            <p class="text-xs theme-text-muted">Raw pods in namespace.</p>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm border-collapse">
               <thead>
-                <tr class="bg-slate-950/40 text-slate-400 border-b border-slate-850 text-xs uppercase font-semibold">
+                <tr class="theme-table-header text-xs uppercase font-semibold">
                   <th class="px-6 py-4">Name</th>
                   <th class="px-6 py-4">Phase</th>
                   <th class="px-6 py-4">Ready</th>
@@ -163,81 +505,81 @@
                   <th class="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody id="pods-table-body" class="divide-y divide-slate-850">
+              <tbody id="pods-table-body" class="theme-divide-y">
                 <!-- Dynamic pod items inserted here -->
                 <tr>
-                  <td colspan="6" class="px-6 py-8 text-center text-slate-500">No pods detected.</td>
+                  <td colspan="6" class="px-6 py-8 text-center theme-text-muted">No pods detected.</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
-
+ 
       </section>
-
+ 
       <!-- Right Column: Templates -->
       <section class="space-y-8">
         
         <!-- ConfigMap Templates -->
-        <div class="bg-slate-900/40 rounded-2xl border border-slate-800/80 shadow-xl overflow-hidden backdrop-blur-md">
-          <div class="px-6 py-5 border-b border-slate-850 flex items-center justify-between">
+        <div class="theme-feature-card rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
+          <div class="px-6 py-5 theme-card-header flex items-center justify-between">
             <div>
-              <h2 class="text-xl font-bold tracking-tight text-white">Pod Templates</h2>
-              <p class="mt-1 text-xs text-slate-400">Reusable ConfigMaps for sandboxes.</p>
+              <h2 class="text-xl font-bold tracking-tight theme-text-title">Pod Templates</h2>
+              <p class="mt-1 text-xs theme-text-muted">Reusable ConfigMaps for sandboxes.</p>
             </div>
-            <button id="create-tmpl-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition active:scale-95 cursor-pointer">
+            <button id="create-tmpl-btn" class="theme-button-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer">
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>
               Create
             </button>
           </div>
-          <div id="templates-list" class="divide-y divide-slate-850 max-h-[600px] overflow-y-auto">
+          <div id="templates-list" class="theme-divide-y max-h-[600px] overflow-y-auto">
             <!-- Dynamic templates inserted here -->
-            <div class="p-6 text-center text-slate-500 text-sm">No templates registered.</div>
+            <div class="p-6 text-center theme-text-muted text-sm">No templates registered.</div>
           </div>
         </div>
-
+ 
       </section>
     </main>
   </div>
-
+ 
   <!-- Logs Modal -->
-  <div id="logs-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-850 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-      <div class="px-6 py-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+  <div id="logs-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
         <div>
-          <h3 class="text-lg font-bold text-white flex items-center gap-2">
-            <span class="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span>
+          <h3 class="text-lg font-bold theme-text-title flex items-center gap-2">
+            <span class="w-2 h-2 status-pulse-running rounded-full animate-ping"></span>
             Container Logs
           </h3>
-          <p id="logs-title" class="text-xs text-slate-400 font-mono mt-0.5">ws-anonymous-session1</p>
+          <p id="logs-title" class="text-xs theme-text-muted font-mono mt-0.5">ws-anonymous-session1</p>
         </div>
-        <button id="close-logs-btn" class="p-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition duration-150 cursor-pointer">
+        <button id="close-logs-btn" class="theme-btn-close">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
-      <div class="p-6 bg-slate-950 flex-1 overflow-y-auto font-mono text-xs text-slate-300 leading-relaxed max-h-[60vh] scrollbar-thin select-text whitespace-pre-wrap" id="logs-content">
+      <div class="p-6 theme-code-window-card flex-1 overflow-y-auto font-mono text-xs leading-relaxed max-h-[60vh] scrollbar-thin select-text whitespace-pre-wrap" id="logs-content">
         Fetching logs...
       </div>
-      <div class="px-6 py-4 border-t border-slate-850 bg-slate-950/40 flex justify-end gap-3">
-        <button id="refresh-logs-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition active:scale-95 cursor-pointer">Refresh Logs</button>
-        <button id="close-logs-footer-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition active:scale-95 cursor-pointer">Close</button>
+      <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
+        <button id="refresh-logs-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Refresh Logs</button>
+        <button id="close-logs-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
       </div>
     </div>
   </div>
-
+ 
   <!-- Spawn Workspace Modal -->
-  <div id="spawn-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-850 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+  <div id="spawn-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
         <div>
-          <h3 class="text-lg font-bold text-white">Spawn Workspace</h3>
-          <p id="spawn-template-title" class="text-xs text-slate-400 mt-0.5">Template: dev-node-template</p>
+          <h3 class="text-lg font-bold theme-text-title">Spawn Workspace</h3>
+          <p id="spawn-template-title" class="text-xs theme-text-muted mt-0.5">Template: dev-node-template</p>
         </div>
-        <button id="close-spawn-btn" class="p-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition duration-150 cursor-pointer">
+        <button id="close-spawn-btn" class="theme-btn-close">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -247,20 +589,25 @@
         <input type="hidden" id="spawn-template-ref" />
         
         <div>
-          <label for="workspace-id" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Workspace ID</label>
-          <input type="text" id="workspace-id" required class="w-full bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none transition" placeholder="e.g. workspace-alpha" />
+          <label for="workspace-id" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Workspace ID (Unique URL identifier)</label>
+          <input type="text" id="workspace-id" required class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm font-mono outline-none transition" placeholder="e.g. workspace-alpha" />
+        </div>
+ 
+        <div>
+          <label for="workspace-name" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Workspace Name (Optional display name)</label>
+          <input type="text" id="workspace-name" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm outline-none transition" placeholder="e.g. My Dev Sandbox" />
         </div>
 
         <div id="context-variables-container" class="hidden space-y-3">
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Required Context Variables</label>
+          <label class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Required Context Variables</label>
           <div id="context-inputs" class="space-y-3">
             <!-- Dynamic context key inputs -->
           </div>
         </div>
 
-        <div class="pt-4 border-t border-slate-850 flex justify-end gap-3">
-          <button type="button" id="cancel-spawn-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition cursor-pointer">Cancel</button>
-          <button type="submit" id="submit-spawn-btn" class="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition cursor-pointer flex items-center gap-1.5">
+        <div class="pt-4 border-t theme-border flex justify-end gap-3">
+          <button type="button" id="cancel-spawn-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Cancel</button>
+          <button type="submit" id="submit-spawn-btn" class="theme-button-primary px-4 py-2 text-xs cursor-pointer flex items-center gap-1.5">
             <span id="spawn-btn-text">Spawn Sandbox</span>
           </button>
         </div>
@@ -271,14 +618,14 @@
   </div>
 
   <!-- Token Modal -->
-  <div id="token-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-850 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+  <div id="token-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
         <div>
-          <h3 class="text-lg font-bold text-white">Authentication Settings</h3>
-          <p class="text-xs text-slate-400 mt-0.5">Configure your JWT token for authorized endpoints.</p>
+          <h3 class="text-lg font-bold theme-text-title">Authentication Settings</h3>
+          <p class="text-xs theme-text-muted mt-0.5">Configure your JWT token for authorized endpoints.</p>
         </div>
-        <button id="close-token-btn" class="p-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition duration-150 cursor-pointer">
+        <button id="close-token-btn" class="theme-btn-close">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -286,49 +633,71 @@
       </div>
       <form id="token-form" class="p-6 space-y-4">
         <div>
-          <label for="jwt-token-input" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">JWT Token</label>
-          <textarea id="jwt-token-input" rows="4" class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-xs font-mono text-white outline-none transition resize-none" placeholder="Paste your JWT token here..."></textarea>
+          <label for="jwt-token-input" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">JWT Token</label>
+          <textarea id="jwt-token-input" rows="4" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs font-mono outline-none transition resize-none" placeholder="Paste your JWT token here..."></textarea>
         </div>
-        <div class="pt-4 border-t border-slate-850 flex justify-end gap-3">
-          <button type="button" id="clear-token-btn" class="px-4 py-2 bg-slate-850 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg transition cursor-pointer">Clear Token</button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition cursor-pointer">Save Token</button>
+        <div class="pt-4 border-t theme-border flex justify-end gap-3">
+          <button type="button" id="clear-token-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Clear Token</button>
+          <button type="submit" class="theme-button-primary px-4 py-2 text-xs cursor-pointer">Save Token</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Template Spec Modal -->
-  <div id="tmpl-spec-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-850 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-      <div class="px-6 py-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+  <div id="tmpl-spec-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
         <div>
-          <h3 class="text-lg font-bold text-white" id="tmpl-spec-title">Template Specification</h3>
-          <p id="tmpl-spec-subtitle" class="text-xs text-slate-400 mt-0.5">ConfigMap: dev-node-template</p>
+          <h3 class="text-lg font-bold theme-text-title" id="tmpl-spec-title">Template Specification</h3>
+          <p id="tmpl-spec-subtitle" class="text-xs theme-text-muted mt-0.5">ConfigMap: dev-node-template</p>
         </div>
-        <button id="close-tmpl-spec-btn" class="p-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition duration-150 cursor-pointer">
+        <button id="close-tmpl-spec-btn" class="theme-btn-close">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
-      <div class="p-6 bg-slate-950 flex-1 overflow-y-auto font-mono text-xs text-slate-300 leading-relaxed max-h-[60vh] select-text whitespace-pre-wrap" id="tmpl-spec-content">
-        Loading specification...
+      <div class="p-6 flex-1 overflow-y-auto max-h-[60vh] space-y-6" id="tmpl-spec-body">
+        <div id="tmpl-spec-loading" class="theme-text-muted text-sm font-mono">Loading specification...</div>
+
+        <!-- Annotations Grid -->
+        <div id="tmpl-spec-annotations-container" class="space-y-2 hidden">
+          <h4 class="text-xs font-bold theme-text-title uppercase tracking-wider">Template Annotations & Hooks</h4>
+          <div id="tmpl-spec-annotations-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/5 dark:bg-white/5 p-4 rounded-xl border theme-border">
+            <!-- Dynamic Key-Values will go here -->
+          </div>
+        </div>
+
+        <!-- Labels Badge List -->
+        <div id="tmpl-spec-labels-container" class="space-y-2 hidden">
+          <h4 class="text-xs font-bold theme-text-title uppercase tracking-wider">Labels</h4>
+          <div id="tmpl-spec-labels-list" class="flex flex-wrap gap-1.5">
+            <!-- Dynamic Label Badges will go here -->
+          </div>
+        </div>
+        
+        <!-- Pod Spec JSON -->
+        <div id="tmpl-spec-code-container" class="space-y-2 hidden">
+          <h4 class="text-xs font-bold theme-text-title uppercase tracking-wider">Pod Spec (JSON)</h4>
+          <pre class="p-4 theme-code-window-card rounded-xl font-mono text-xs overflow-x-auto select-text" id="tmpl-spec-code"></pre>
+        </div>
       </div>
-      <div class="px-6 py-4 border-t border-slate-850 bg-slate-950/40 flex justify-end gap-3">
-        <button id="close-tmpl-spec-footer-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition active:scale-95 cursor-pointer">Close</button>
+      <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
+        <button id="close-tmpl-spec-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
       </div>
     </div>
   </div>
 
   <!-- Create Template Modal -->
-  <div id="create-tmpl-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-850 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-      <div class="px-6 py-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+  <div id="create-tmpl-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
         <div>
-          <h3 class="text-lg font-bold text-white">Create Pod Template</h3>
-          <p class="text-xs text-slate-400 mt-0.5">Define a reusable pod specification template ConfigMap.</p>
+          <h3 class="text-lg font-bold theme-text-title">Create Pod Template</h3>
+          <p class="text-xs theme-text-muted mt-0.5">Define a reusable pod specification template ConfigMap.</p>
         </div>
-        <button id="close-create-tmpl-btn" class="p-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition duration-150 cursor-pointer">
+        <button id="close-create-tmpl-btn" class="theme-btn-close">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -336,20 +705,20 @@
       </div>
       <form id="create-tmpl-form" class="p-6 space-y-4 overflow-y-auto flex-1 max-h-[70vh]">
         <div>
-          <label for="create-tmpl-name" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Template Name</label>
-          <input type="text" id="create-tmpl-name" required class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none transition" placeholder="e.g. custom-python-env" />
+          <label for="create-tmpl-name" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Template Name</label>
+          <input type="text" id="create-tmpl-name" required class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm font-mono outline-none transition" placeholder="e.g. custom-python-env" />
         </div>
         <div>
-          <label for="create-tmpl-desc" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Description</label>
-          <input type="text" id="create-tmpl-desc" class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-sm text-white outline-none transition" placeholder="Brief explanation of this sandbox environment" />
+          <label for="create-tmpl-desc" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Description</label>
+          <input type="text" id="create-tmpl-desc" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm outline-none transition" placeholder="Brief explanation of this sandbox environment" />
         </div>
         <div>
-          <label for="create-tmpl-tag" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tag</label>
-          <input type="text" id="create-tmpl-tag" class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-sm text-white outline-none transition" placeholder="e.g. dev, testing, backup" />
+          <label for="create-tmpl-tag" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Tag</label>
+          <input type="text" id="create-tmpl-tag" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm outline-none transition" placeholder="e.g. dev, testing, backup" />
         </div>
         <div>
-          <label for="create-tmpl-spec" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Pod Spec (JSON)</label>
-          <textarea id="create-tmpl-spec" rows="8" required class="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 rounded-xl px-4 py-2.5 text-xs font-mono text-white outline-none transition resize-y" placeholder='{
+          <label for="create-tmpl-spec" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Pod Spec (JSON)</label>
+          <textarea id="create-tmpl-spec" rows="8" required class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs font-mono outline-none transition resize-y" placeholder='{
   "containers": [
     {
       "name": "workspace",
@@ -359,11 +728,143 @@
   ]
 }'></textarea>
         </div>
-        <div class="pt-4 border-t border-slate-850 flex justify-end gap-3">
-          <button type="button" id="cancel-create-tmpl-btn" class="px-4 py-2 bg-slate-850 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition cursor-pointer">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition cursor-pointer">Create Template</button>
+        <details class="border theme-border rounded-xl overflow-hidden transition-all duration-300">
+          <summary class="list-none flex items-center justify-between p-4 cursor-pointer select-none font-bold text-xs theme-text-title uppercase tracking-wider bg-linear-to-b from-transparent to-black/5 dark:to-white/5">
+            <span>Advanced Annotations & Hooks</span>
+            <span>
+              <svg class="w-4 h-4 transform transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </summary>
+          <div class="p-4 border-t theme-border space-y-4 bg-black/5 dark:bg-white/5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="create-tmpl-req-context" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Required Context</label>
+                <input type="text" id="create-tmpl-req-context" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. AWS_ACCESS_KEY_ID,S3_BUCKET" />
+              </div>
+              <div>
+                <label for="create-tmpl-port" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Workspace Port</label>
+                <input type="number" id="create-tmpl-port" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. 3000" />
+              </div>
+              <div>
+                <label for="create-tmpl-preview-path" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Preview Path</label>
+                <input type="text" id="create-tmpl-preview-path" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. /" />
+              </div>
+              <div>
+                <label for="create-tmpl-preview-type" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Preview Type</label>
+                <select id="create-tmpl-preview-type" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition cursor-pointer bg-transparent">
+                  <option value="html" class="theme-text-title bg-neutral-900">HTML</option>
+                  <option value="markdown" class="theme-text-title bg-neutral-900">Markdown</option>
+                </select>
+              </div>
+              <div>
+                <label for="create-tmpl-grace-period" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Grace Period (Seconds)</label>
+                <input type="number" id="create-tmpl-grace-period" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. 60" />
+              </div>
+            </div>
+
+            <div class="border-t theme-border pt-4">
+              <h5 class="text-xs font-bold theme-text-title uppercase tracking-wider mb-3">Init Container Hook</h5>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="create-tmpl-init-image" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Init Image</label>
+                  <input type="text" id="create-tmpl-init-image" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. alpine:latest" />
+                </div>
+                <div>
+                  <label for="create-tmpl-init-cmd" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Init Command</label>
+                  <input type="text" id="create-tmpl-init-cmd" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. echo 'initializing...'" />
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t theme-border pt-4">
+              <h5 class="text-xs font-bold theme-text-title uppercase tracking-wider mb-3">Pre-Stop Lifecycle Hook</h5>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="create-tmpl-prestop-cmd" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Pre-Stop Command</label>
+                  <input type="text" id="create-tmpl-prestop-cmd" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. sync script" />
+                </div>
+                <div>
+                  <label for="create-tmpl-prestop-sidecar" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Pre-Stop Sidecar Image</label>
+                  <input type="text" id="create-tmpl-prestop-sidecar" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. amazon/aws-cli:latest" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+        <div class="pt-4 border-t theme-border flex justify-end gap-3">
+          <button type="button" id="cancel-create-tmpl-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Cancel</button>
+          <button type="submit" class="theme-button-primary px-4 py-2 text-xs cursor-pointer">Create Template</button>
         </div>
       </form>
+    </div>
+  </div>
+  <!-- OIDC Login Overlay -->
+  <div id="login-overlay" class="fixed inset-0 z-[100] hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-md rounded-2xl shadow-2xl p-8 text-center space-y-6">
+      <div class="logo-badge inline-flex items-center justify-center p-4 rounded-2xl">
+        <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </div>
+      <div>
+        <h2 class="text-2xl font-bold theme-text-title">Authentication Required</h2>
+        <p class="text-sm theme-text-muted mt-2">Access to the Pod Manager is protected. Please sign in with your identity provider.</p>
+      </div>
+      <button id="login-btn" class="theme-button-primary w-full py-3 text-sm cursor-pointer">
+        Sign In with OIDC
+      </button>
+      <div id="login-fallback-option" class="text-xs theme-text-muted pt-2 border-t theme-border">
+        Or use an <a href="#" id="use-manual-token-link" class="theme-text-link hover:underline">access token manually</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 403 Forbidden Overlay -->
+  <div id="forbidden-overlay" class="fixed inset-0 z-[100] hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-md rounded-2xl shadow-2xl p-8 text-center space-y-6">
+      <div class="theme-banner-error inline-flex items-center justify-center p-4 rounded-2xl">
+        <svg class="w-10 h-10 theme-text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+      <div>
+        <h2 class="text-2xl font-bold theme-text-error">Access Forbidden (403)</h2>
+        <p id="forbidden-message" class="text-sm theme-text-muted mt-2">You do not have the required scopes or roles to access this resource.</p>
+      </div>
+      <div class="flex flex-col gap-3">
+        <button id="forbidden-retry-btn" class="theme-button-primary w-full py-3 text-sm cursor-pointer">
+          Sign In with Different Account
+        </button>
+        <button id="forbidden-back-btn" class="theme-button-secondary w-full py-3 text-sm cursor-pointer font-medium">
+          Use a Manual Token
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="preview-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold theme-text-title" id="preview-modal-title">Workspace Preview</h3>
+          <p id="preview-modal-subtitle" class="text-xs theme-text-muted mt-0.5">Previewing running workspace</p>
+        </div>
+        <button id="close-preview-btn" class="theme-btn-close">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="flex-1 overflow-auto theme-feature-card p-6 min-h-[50vh] max-h-[70vh]" id="preview-content-area">
+        <!-- Preview Content (iframe or markdown HTML) will be inserted here -->
+      </div>
+      <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
+        <button id="refresh-preview-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Refresh</button>
+        <button id="close-preview-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
+      </div>
     </div>
   </div>
 

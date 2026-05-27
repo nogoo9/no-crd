@@ -3,13 +3,35 @@ import { App } from "@modelcontextprotocol/ext-apps";
 
 // Initialize the MCP App client bridge
 const app = new App(
-	{ name: "nogoo9-pod-manager", version: "0.2.0" },
+	{ name: "nogoo9-pod-manager", version: "0.3.0" },
 	{ tools: {} },
 );
 
 // State management
 let currentNamespace = "nogoo9";
-let workspaces: Array<{ id: string; name: string; status: string }> = [];
+interface WorkspaceApi {
+	name: string;
+	port: string;
+	path: string;
+	desc?: string;
+	method?: string;
+}
+
+let workspaces: Array<{
+	id: string;
+	name: string;
+	status: string;
+	podIP?: string;
+	port?: string;
+	workspacePath?: string;
+	workspaceType?: string;
+	previewPath?: string;
+	previewType?: string;
+	userSub?: string;
+	annotations?: Record<string, string>;
+	templateRef?: string;
+	apis?: WorkspaceApi[];
+}> = [];
 let pods: Array<{
 	name: string;
 	namespace: string;
@@ -28,6 +50,9 @@ let templates: Array<{
 	description: string;
 	tag: string;
 	requiredContext?: string[];
+	workspacePath?: string;
+	workspaceType?: string;
+	apis?: WorkspaceApi[];
 }> = [];
 
 // Authentication & token state
@@ -47,6 +72,36 @@ const podsCount = document.getElementById("pods-count");
 const podsTableBody = document.getElementById("pods-table-body");
 const templatesList = document.getElementById("templates-list");
 
+// Theme Toggle
+const themeBtn = document.getElementById("theme-btn");
+const themeIcon = document.getElementById("theme-icon");
+
+// OIDC Login
+const loginOverlay = document.getElementById("login-overlay");
+const loginBtn = document.getElementById("login-btn");
+const useManualTokenLink = document.getElementById("use-manual-token-link");
+
+// 403 Forbidden Overlay
+const forbiddenOverlay = document.getElementById("forbidden-overlay");
+const forbiddenMessage = document.getElementById("forbidden-message");
+const forbiddenRetryBtn = document.getElementById("forbidden-retry-btn");
+const forbiddenBackBtn = document.getElementById("forbidden-back-btn");
+
+const logoutBtn = document.getElementById("logout-btn");
+
+// Workspace Preview Modal
+const previewModal = document.getElementById("preview-modal");
+const previewModalTitle = document.getElementById("preview-modal-title");
+const previewModalSubtitle = document.getElementById("preview-modal-subtitle");
+const previewContentArea = document.getElementById("preview-content-area");
+const closePreviewBtn = document.getElementById("close-preview-btn");
+const closePreviewFooterBtn = document.getElementById(
+	"close-preview-footer-btn",
+);
+const refreshPreviewBtn = document.getElementById("refresh-preview-btn");
+let activePreviewWorkspaceId: string | null = null;
+let activePreviewPath: string | null = null;
+
 // Modals
 const logsModal = document.getElementById("logs-modal");
 const logsTitle = document.getElementById("logs-title");
@@ -63,6 +118,9 @@ const spawnTemplateRef = document.getElementById(
 const workspaceIdInput = document.getElementById(
 	"workspace-id",
 ) as HTMLInputElement;
+const workspaceNameInput = document.getElementById(
+	"workspace-name",
+) as HTMLInputElement;
 const spawnForm = document.getElementById("spawn-form");
 const closeSpawnBtn = document.getElementById("close-spawn-btn");
 const cancelSpawnBtn = document.getElementById("cancel-spawn-btn");
@@ -75,7 +133,7 @@ const contextInputs = document.getElementById("context-inputs");
 // Token Modal Elements
 const _userBadgeBtn = document.getElementById("user-badge-btn");
 const userBadgeName = document.getElementById("user-badge-name");
-const _tokenModal = document.getElementById("token-modal");
+const tokenModal = document.getElementById("token-modal");
 const _tokenForm = document.getElementById("token-form");
 const jwtTokenInput = document.getElementById(
 	"jwt-token-input",
@@ -87,7 +145,21 @@ const _clearTokenBtn = document.getElementById("clear-token-btn");
 const tmplSpecModal = document.getElementById("tmpl-spec-modal");
 const tmplSpecTitle = document.getElementById("tmpl-spec-title");
 const tmplSpecSubtitle = document.getElementById("tmpl-spec-subtitle");
-const tmplSpecContent = document.getElementById("tmpl-spec-content");
+const tmplSpecLoading = document.getElementById("tmpl-spec-loading");
+const tmplSpecAnnotationsContainer = document.getElementById(
+	"tmpl-spec-annotations-container",
+);
+const tmplSpecAnnotationsGrid = document.getElementById(
+	"tmpl-spec-annotations-grid",
+);
+const tmplSpecLabelsContainer = document.getElementById(
+	"tmpl-spec-labels-container",
+);
+const tmplSpecLabelsList = document.getElementById("tmpl-spec-labels-list");
+const tmplSpecCodeContainer = document.getElementById(
+	"tmpl-spec-code-container",
+);
+const tmplSpecCode = document.getElementById("tmpl-spec-code");
 const closeTmplSpecBtn = document.getElementById("close-tmpl-spec-btn");
 const closeTmplSpecFooterBtn = document.getElementById(
 	"close-tmpl-spec-footer-btn",
@@ -120,20 +192,16 @@ const toastContainer = document.getElementById("toast-container");
 function showToast(message: string, type: "success" | "error" = "success") {
 	if (!toastContainer) return;
 	const toast = document.createElement("div");
-	toast.className = `toast-item p-4 rounded-xl border flex items-start gap-3 shadow-lg transition duration-300 ${
-		type === "success"
-			? "bg-slate-900/95 border-emerald-500/30 text-slate-100"
-			: "bg-slate-900/95 border-rose-500/30 text-slate-100"
-	}`;
+	toast.className = `toast-item toast-${type} p-4 rounded-xl border flex items-start gap-3 shadow-lg transition duration-300`;
 
 	const icon =
 		type === "success"
-			? `<span class="p-1 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0">
+			? `<span class="toast-icon-success">
 				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
 				</svg>
 		   </span>`
-			: `<span class="p-1 bg-rose-500/10 text-rose-400 rounded-lg shrink-0">
+			: `<span class="toast-icon-error">
 				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
 				</svg>
@@ -142,8 +210,8 @@ function showToast(message: string, type: "success" | "error" = "success") {
 	toast.innerHTML = `
 		${icon}
 		<div class="flex-1">
-			<p class="text-sm font-semibold">${type === "success" ? "Success" : "Error"}</p>
-			<p class="text-xs text-slate-400 mt-0.5 leading-relaxed">${message}</p>
+			<p class="text-sm font-semibold theme-text-title">${type === "success" ? "Success" : "Error"}</p>
+			<p class="text-xs theme-text-muted mt-0.5 leading-relaxed">${message}</p>
 		</div>
 	`;
 
@@ -192,6 +260,15 @@ function initToken() {
 	}
 
 	if (token) {
+		const payload = decodeJwt(token);
+		if (payload?.exp && payload.exp < Date.now() / 1000) {
+			console.log("Token in local storage has expired. Clearing it...");
+			localStorage.removeItem("nocr_token");
+			token = null;
+		}
+	}
+
+	if (token) {
 		activeToken = token;
 		if (jwtTokenInput) jwtTokenInput.value = token;
 		updateUserBadge(token);
@@ -203,12 +280,15 @@ function initToken() {
 function updateUserBadge(token: string) {
 	if (!userBadgeName) return;
 	if (token) {
+		if (logoutBtn) logoutBtn.classList.remove("hidden");
 		const payload = decodeJwt(token);
 		if (payload) {
 			const sub = payload.sub || payload.identity || payload.name || "User";
 			userBadgeName.textContent = String(sub);
 			return;
 		}
+	} else {
+		if (logoutBtn) logoutBtn.classList.add("hidden");
 	}
 	userBadgeName.textContent = "Anonymous";
 }
@@ -258,7 +338,42 @@ async function refreshAll() {
 			arguments: { namespace: currentNamespace, jwtPayload: getJwtPayload() },
 		});
 		if (wsRes && !wsRes.isError && wsRes.structuredContent) {
-			workspaces = (wsRes.structuredContent as any).workspaces || [];
+			const wsList = (wsRes.structuredContent as any).workspaces || [];
+			workspaces = await Promise.all(
+				wsList.map(async (ws: any) => {
+					if (ws.status === "Running") {
+						try {
+							const detailsRes = await app.callServerTool({
+								name: "get_workspace",
+								arguments: {
+									id: ws.id,
+									namespace: currentNamespace,
+									jwtPayload: getJwtPayload(),
+								},
+							});
+							if (
+								detailsRes &&
+								!detailsRes.isError &&
+								detailsRes.structuredContent
+							) {
+								return detailsRes.structuredContent as any;
+							}
+						} catch (e) {
+							console.error("Failed to fetch workspace details for", ws.id, e);
+						}
+					}
+					return {
+						...ws,
+						workspacePath: "/",
+						workspaceType: "html",
+						previewPath: "",
+						previewType: "",
+						podIP: "",
+						port: "",
+						apis: ws.apis || [],
+					};
+				}),
+			);
 		} else if (wsRes?.isError) {
 			console.warn("Failed to list workspaces", wsRes);
 		}
@@ -266,7 +381,7 @@ async function refreshAll() {
 		// 3. Fetch pods
 		const podsRes = await app.callServerTool({
 			name: "list_pods",
-			arguments: { namespace: currentNamespace },
+			arguments: { namespace: currentNamespace, jwtPayload: getJwtPayload() },
 		});
 		if (podsRes && !podsRes.isError && podsRes.structuredContent) {
 			pods = (podsRes.structuredContent as any).pods || [];
@@ -312,7 +427,7 @@ function renderWorkspaces() {
 
 	if (workspaces.length === 0) {
 		workspacesList.innerHTML = `
-      <div class="p-6 text-center text-slate-500 text-sm">
+      <div class="p-6 text-center theme-text-muted text-sm">
         No active workspaces. Click a template to spawn one.
       </div>
     `;
@@ -321,49 +436,110 @@ function renderWorkspaces() {
 
 	workspacesList.innerHTML = workspaces
 		.map((ws) => {
-			let statusClass = "bg-slate-800 text-slate-400";
+			let statusClass = "status-unknown";
 			let pulseDot = "";
 			if (ws.status === "Running") {
-				statusClass =
-					"bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-				pulseDot = `<span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>`;
+				statusClass = "status-running";
+				pulseDot = `<span class="w-1.5 h-1.5 status-pulse-running rounded-full animate-ping"></span>`;
 			} else if (ws.status === "Pending") {
-				statusClass =
-					"bg-amber-500/10 text-amber-400 border border-amber-500/20";
-				pulseDot = `<span class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>`;
+				statusClass = "status-pending";
+				pulseDot = `<span class="w-1.5 h-1.5 status-pulse-pending rounded-full animate-pulse"></span>`;
 			} else if (ws.status === "Failed") {
-				statusClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+				statusClass = "status-failed";
 			}
 
 			let openLinkHtml = "";
+			let previewBtnHtml = "";
+			let viewSpecBtnHtml = "";
 			if (ws.status === "Running") {
 				const tokenQuery = activeToken
 					? `?token=${encodeURIComponent(activeToken)}`
 					: "";
-				const workspaceUrl = `${basePath}/route/${ws.id}/${tokenQuery}`;
+				const pathPart = ws.workspacePath || ws.previewPath || "/";
+				const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
+				const workspaceUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
 				openLinkHtml = `
-					<a href="${workspaceUrl}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold rounded-lg transition active:scale-95 shadow-md shadow-indigo-600/10 cursor-pointer">
+					<a href="${workspaceUrl}" target="_blank" class="theme-button-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer">
 						<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
 						</svg>
 						Open Workspace
 					</a>
 				`;
+				viewSpecBtnHtml = `
+					<button data-ws-id="${ws.id}" class="view-ws-spec-btn theme-button-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer">
+						<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+						</svg>
+						View Spec
+					</button>
+				`;
+				const previewTarget = ws.previewPath || ws.workspacePath;
+				if (previewTarget) {
+					previewBtnHtml = `
+						<button data-ws-id="${ws.id}" data-preview-path="${previewTarget}" data-preview-type="${ws.previewType || ws.workspaceType || "html"}" class="preview-ws-btn theme-button-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer">
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+							</svg>
+							Preview
+						</button>
+					`;
+				}
+			}
+
+			let infoHtml = "";
+			if (ws.podIP) {
+				let apisHtml = "";
+				if (ws.apis && ws.apis.length > 0) {
+					apisHtml = ws.apis
+						.map((api) => {
+							const apiPath = api.path.startsWith("/")
+								? api.path
+								: `/${api.path}`;
+							const methodBadge = api.method
+								? `<span class="opacity-75 text-[9px] uppercase font-bold mr-0.5">${api.method.split(",")[0]}</span>`
+								: "";
+							const tooltip = api.desc ? `title="${api.desc}"` : "";
+							const tokenQuery = activeToken
+								? `?token=${encodeURIComponent(activeToken)}`
+								: "";
+							const linkUrl = `${basePath}/route/${ws.id}${apiPath}${tokenQuery}`;
+							return `<a href="${linkUrl}" target="_blank" ${tooltip} class="px-2 py-0.5 theme-button-secondary rounded text-[10px] font-medium transition hover:brightness-110 flex items-center gap-1">
+								${methodBadge}${api.name}
+							</a>`;
+						})
+						.join(" ");
+				}
+
+				infoHtml = `<div class="text-[10px] theme-text-muted mt-1 flex flex-col gap-1.5">
+					<div class="flex flex-wrap gap-x-3 gap-y-1">
+						<span><strong>IP:</strong> <span class="font-mono">${ws.podIP}</span></span>
+						${ws.port ? `<span><strong>Port:</strong> <span class="font-mono">${ws.port}</span></span>` : ""}
+						${ws.userSub ? `<span><strong>Owner:</strong> <span class="font-mono">${ws.userSub}</span></span>` : ""}
+					</div>
+					${apisHtml ? `<div class="flex flex-wrap gap-1.5 items-center mt-0.5"><strong>APIs:</strong> ${apisHtml}</div>` : ""}
+				</div>`;
 			}
 
 			return `
-      <div class="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition hover:bg-slate-900/20">
+      <div class="theme-card-row p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition">
         <div class="flex items-center gap-3">
-          <span class="inline-flex items-center justify-center p-2.5 bg-slate-950/60 rounded-xl border border-slate-800 text-violet-400">
+          <span class="theme-icon-box">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </span>
           <div>
-            <h4 class="font-bold text-white text-sm flex items-center gap-2">
-              ${ws.id}
+            <h4 class="font-bold theme-text-title text-sm flex items-center gap-2">
+              ${ws.name}
             </h4>
-            <p class="text-xs text-slate-400 font-mono mt-0.5">${ws.name}</p>
+            <p class="text-xs theme-text-muted font-mono mt-0.5">
+              ID: ${ws.id}
+              ${ws.templateRef ? ` | Template: <span class="px-1.5 py-0.5 theme-badge-pill text-[10px] font-bold rounded-md">${ws.templateRef}</span>` : ""}
+            </p>
+            ${infoHtml}
           </div>
         </div>
 
@@ -372,8 +548,10 @@ function renderWorkspaces() {
             ${pulseDot}
             ${ws.status}
           </span>
+          ${viewSpecBtnHtml}
+          ${previewBtnHtml}
           ${openLinkHtml}
-          <button data-ws-id="${ws.id}" class="stop-ws-btn inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-rose-950/40 border border-slate-700 hover:border-rose-500/30 text-slate-300 hover:text-rose-400 text-xs font-semibold rounded-lg transition active:scale-95 cursor-pointer">
+          <button data-ws-id="${ws.id}" class="stop-ws-btn theme-button-danger inline-flex items-center gap-1 px-3 py-1.5 text-xs cursor-pointer">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -397,6 +575,28 @@ function renderWorkspaces() {
 			}
 		});
 	});
+
+	document.querySelectorAll(".preview-ws-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", (e: Event) => {
+			const target = e.currentTarget as HTMLButtonElement;
+			const wsId = target.getAttribute("data-ws-id");
+			const path = target.getAttribute("data-preview-path");
+			const type = target.getAttribute("data-preview-type") || "html";
+			if (wsId && path) {
+				openPreviewModal(wsId, path, type);
+			}
+		});
+	});
+
+	document.querySelectorAll(".view-ws-spec-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", async (e: Event) => {
+			const target = e.currentTarget as HTMLButtonElement;
+			const wsId = target.getAttribute("data-ws-id");
+			if (wsId) {
+				await openWsSpecModal(wsId);
+			}
+		});
+	});
 }
 
 function renderPods() {
@@ -406,7 +606,7 @@ function renderPods() {
 	if (pods.length === 0) {
 		podsTableBody.innerHTML = `
       <tr>
-        <td colspan="6" class="px-6 py-8 text-center text-slate-500">No active pods in namespace.</td>
+        <td colspan="6" class="px-6 py-8 text-center theme-text-muted">No active pods in namespace.</td>
       </tr>
     `;
 		return;
@@ -414,33 +614,31 @@ function renderPods() {
 
 	podsTableBody.innerHTML = pods
 		.map((pod) => {
-			let phaseClass = "bg-slate-800 text-slate-400";
+			let phaseClass = "status-unknown";
 			if (pod.phase === "Running") {
-				phaseClass =
-					"bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+				phaseClass = "status-running";
 			} else if (pod.phase === "Pending") {
-				phaseClass =
-					"bg-amber-500/10 text-amber-400 border border-amber-500/20";
+				phaseClass = "status-pending";
 			} else if (pod.phase === "Failed") {
-				phaseClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+				phaseClass = "status-failed";
 			}
 
 			return `
-      <tr class="hover:bg-slate-900/20 transition">
+      <tr class="theme-card-row transition">
         <td class="px-6 py-4">
-          <div class="font-bold text-white max-w-[200px] sm:max-w-xs truncate">${pod.name}</div>
-          <div class="text-[10px] text-slate-400 font-mono mt-0.5">${pod.node || "Pending assignment"}</div>
+          <div class="font-bold theme-text-title max-w-[200px] sm:max-w-xs truncate">${pod.name}</div>
+          <div class="text-[10px] theme-text-muted font-mono mt-0.5">${pod.node || "Pending assignment"}</div>
         </td>
         <td class="px-6 py-4">
           <span class="inline-flex px-2 py-0.5 text-xs font-bold rounded ${phaseClass}">${pod.phase}</span>
         </td>
-        <td class="px-6 py-4 font-mono text-slate-300">${pod.ready}/${pod.total}</td>
-        <td class="px-6 py-4 font-mono text-slate-300">${pod.restarts}</td>
-        <td class="px-6 py-4 font-mono text-slate-300">${pod.podIP || "-"}</td>
+        <td class="px-6 py-4 font-mono theme-text-body">${pod.ready}/${pod.total}</td>
+        <td class="px-6 py-4 font-mono theme-text-body">${pod.restarts}</td>
+        <td class="px-6 py-4 font-mono theme-text-body">${pod.podIP || "-"}</td>
         <td class="px-6 py-4 text-right shrink-0">
           <div class="inline-flex gap-2">
-            <button data-pod-name="${pod.name}" class="view-logs-btn px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded transition cursor-pointer">Logs</button>
-            <button data-pod-name="${pod.name}" class="delete-pod-btn px-2.5 py-1 bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-400 border border-transparent hover:border-rose-500/20 text-xs font-semibold rounded transition cursor-pointer">Delete</button>
+            <button data-pod-name="${pod.name}" class="view-logs-btn theme-button-secondary px-2.5 py-1 text-xs cursor-pointer">Logs</button>
+            <button data-pod-name="${pod.name}" class="delete-pod-btn theme-button-danger px-2.5 py-1 text-xs cursor-pointer">Delete</button>
           </div>
         </td>
       </tr>
@@ -478,7 +676,7 @@ function renderTemplates() {
 
 	if (templates.length === 0) {
 		templatesList.innerHTML = `
-      <div class="p-6 text-center text-slate-500 text-sm">
+      <div class="p-6 text-center theme-text-muted text-sm">
         No templates registered in the cluster.
       </div>
     `;
@@ -487,25 +685,44 @@ function renderTemplates() {
 
 	templatesList.innerHTML = templates
 		.map((tmpl) => {
+			let apisHtml = "";
+			if (tmpl.apis && tmpl.apis.length > 0) {
+				const badges = tmpl.apis
+					.map((api) => {
+						const tooltip = api.desc ? `title="${api.desc}"` : "";
+						const methodBadge = api.method
+							? `<span class="opacity-75 text-[9px] uppercase font-bold mr-0.5">${api.method.split(",")[0]}</span>`
+							: "";
+						return `<span ${tooltip} class="px-2 py-0.5 theme-button-secondary rounded text-[10px] font-medium flex items-center gap-1 select-none">
+							${methodBadge}${api.name}
+						</span>`;
+					})
+					.join(" ");
+				apisHtml = `<div class="flex flex-wrap gap-1.5 items-center mt-2">
+					<strong class="text-[10px] theme-text-muted">APIs:</strong>
+					${badges}
+				</div>`;
+			}
 			return `
-      <div class="p-5 hover:bg-slate-900/20 transition flex flex-col justify-between gap-3">
+      <div class="theme-card-row p-5 flex flex-col justify-between gap-3 transition">
         <div>
           <div class="flex items-center justify-between">
-            <h4 class="font-bold text-white text-sm font-mono">${tmpl.name}</h4>
-            ${tmpl.tag ? `<span class="px-1.5 py-0.5 bg-violet-500/10 border border-violet-500/20 text-[10px] font-bold text-violet-400 rounded">${tmpl.tag}</span>` : ""}
+            <h4 class="font-bold theme-text-title text-sm font-mono">${tmpl.name}</h4>
+            ${tmpl.tag ? `<span class="theme-badge-coral">${tmpl.tag}</span>` : ""}
           </div>
-          <p class="text-xs text-slate-400 mt-1 leading-normal">${tmpl.description || "No description provided."}</p>
+          <p class="text-xs theme-text-muted mt-1 leading-normal">${tmpl.description || "No description provided."}</p>
+          ${apisHtml}
         </div>
         
         <div class="flex justify-end gap-2">
-          <button data-tmpl-name="${tmpl.name}" class="view-spec-btn px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition active:scale-95 flex items-center gap-1 cursor-pointer">
+          <button data-tmpl-name="${tmpl.name}" class="view-spec-btn theme-button-secondary px-3 py-1.5 text-xs flex items-center gap-1 cursor-pointer">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
             View Spec
           </button>
-          <button data-tmpl-name="${tmpl.name}" class="spawn-ws-modal-btn px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition active:scale-95 flex items-center gap-1 cursor-pointer">
+          <button data-tmpl-name="${tmpl.name}" class="spawn-ws-modal-btn theme-button-primary px-3 py-1.5 text-xs flex items-center gap-1 cursor-pointer">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
@@ -635,6 +852,9 @@ async function openSpawnModal(tmplName: string) {
 		workspaceIdInput.value = "";
 		workspaceIdInput.placeholder = `ws-${tmplName}-${Math.floor(Math.random() * 1000)}`;
 	}
+	if (workspaceNameInput) {
+		workspaceNameInput.value = "";
+	}
 
 	// Dynamic context inputs based on template
 	const tmpl = templates.find((t) => t.name === tmplName);
@@ -651,7 +871,7 @@ async function openSpawnModal(tmplName: string) {
 				const label = document.createElement("label");
 				label.setAttribute("for", `context-var-${key}`);
 				label.className =
-					"block text-[10px] font-bold text-slate-400 font-mono";
+					"block text-[10px] font-bold theme-text-muted font-mono uppercase tracking-wider";
 				label.textContent = key;
 
 				const input = document.createElement("input");
@@ -659,20 +879,25 @@ async function openSpawnModal(tmplName: string) {
 				input.id = `context-var-${key}`;
 				input.required = true;
 				input.className =
-					"w-full bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl px-4 py-2 text-xs font-mono text-white outline-none transition";
+					"theme-text-input w-full rounded-xl px-4 py-2.5 text-xs font-mono outline-none transition";
 				input.placeholder = `Value for ${key}`;
 
 				// Pre-populate defaults for common local/testing services
 				if (key === "AWS_ENDPOINT_URL") {
-					input.value = "http://localhost:9000";
+					input.value =
+						window.location.port === "8080"
+							? "http://rustfs.nogoo9.svc.cluster.local:80"
+							: "http://localhost:9000";
 				} else if (key === "S3_BUCKET") {
 					input.value = "nogoo9-agent-workspace";
 				} else if (key === "S3_FOLDER") {
 					input.value = `folder-${Math.floor(Math.random() * 1000)}`;
 				} else if (key === "AWS_ACCESS_KEY_ID") {
-					input.value = "minioadmin";
+					input.value =
+						window.location.port === "8080" ? "test-access-key" : "minioadmin";
 				} else if (key === "AWS_SECRET_ACCESS_KEY") {
-					input.value = "minioadmin";
+					input.value =
+						window.location.port === "8080" ? "test-secret-key" : "minioadmin";
 				}
 
 				div.appendChild(label);
@@ -698,6 +923,7 @@ if (spawnForm) {
 		const tmplName = spawnTemplateRef.value;
 		let wsId = workspaceIdInput.value.trim();
 		if (!wsId) wsId = workspaceIdInput.placeholder;
+		const wsName = workspaceNameInput?.value.trim() || undefined;
 
 		// Collect context values
 		const context: Record<string, string> = {};
@@ -721,6 +947,7 @@ if (spawnForm) {
 				name: "spawn_workspace",
 				arguments: {
 					id: wsId,
+					name: wsName,
 					templateRef: tmplName,
 					namespace: currentNamespace,
 					context,
@@ -747,8 +974,15 @@ if (spawnForm) {
 async function openTmplSpecModal(tmplName: string) {
 	if (tmplSpecTitle) tmplSpecTitle.textContent = `${tmplName} Specification`;
 	if (tmplSpecSubtitle) tmplSpecSubtitle.textContent = `ConfigMap: ${tmplName}`;
-	if (tmplSpecContent)
-		tmplSpecContent.textContent = "Fetching template specification...";
+
+	if (tmplSpecLoading) {
+		tmplSpecLoading.textContent = "Fetching template specification...";
+		tmplSpecLoading.classList.remove("hidden");
+	}
+	if (tmplSpecAnnotationsContainer)
+		tmplSpecAnnotationsContainer.classList.add("hidden");
+	if (tmplSpecLabelsContainer) tmplSpecLabelsContainer.classList.add("hidden");
+	if (tmplSpecCodeContainer) tmplSpecCodeContainer.classList.add("hidden");
 	if (tmplSpecModal) tmplSpecModal.classList.remove("hidden");
 
 	try {
@@ -757,15 +991,248 @@ async function openTmplSpecModal(tmplName: string) {
 			arguments: { name: tmplName, namespace: currentNamespace },
 		});
 		if (res.isError) {
-			if (tmplSpecContent)
-				tmplSpecContent.textContent = `Error: ${(res.content?.[0] as any)?.text || "Could not fetch spec"}`;
+			if (tmplSpecLoading) {
+				tmplSpecLoading.textContent = `Error: ${(res.content?.[0] as any)?.text || "Could not fetch spec"}`;
+			}
 		} else {
-			const spec = (res.structuredContent as any)?.spec || {};
-			if (tmplSpecContent)
-				tmplSpecContent.textContent = JSON.stringify(spec, null, 2);
+			const data = res.structuredContent as any;
+
+			// Show/Hide Loading
+			if (tmplSpecLoading) tmplSpecLoading.classList.add("hidden");
+
+			// Populate Annotations Grid
+			const annotations = data.annotations || {};
+			const supported = [
+				{ key: "nogoo9/description", label: "Description" },
+				{ key: "nogoo9/tag", label: "Tag" },
+				{ key: "nogoo9/required-context", label: "Required Context" },
+				{ key: "nogoo9/workspace-port", label: "Workspace Port" },
+				{ key: "nogoo9/workspace-path", label: "Workspace Path" },
+				{ key: "nogoo9/workspace-type", label: "Workspace Type" },
+				{ key: "nogoo9/preview-path", label: "Preview Path (Fallback)" },
+				{ key: "nogoo9/preview-type", label: "Preview Type (Fallback)" },
+				{ key: "nogoo9/default-grace-period", label: "Grace Period (Sec)" },
+				{ key: "nogoo9/init-image", label: "Init Image" },
+				{ key: "nogoo9/init-command", label: "Init Command" },
+				{ key: "nogoo9/pre-stop-command", label: "Pre-Stop Command" },
+				{
+					key: "nogoo9/pre-stop-sidecar-image",
+					label: "Pre-Stop Sidecar Image",
+				},
+			];
+
+			const gridHtml = supported
+				.map(({ key, label }) => {
+					const val = annotations[key];
+					if (!val) return "";
+					return `
+						<div class="flex flex-col space-y-1">
+							<span class="text-[10px] font-bold theme-text-muted uppercase tracking-wider">${label}</span>
+							<span class="text-xs theme-text-body font-mono break-all">${val}</span>
+						</div>
+					`;
+				})
+				.filter(Boolean)
+				.join("");
+
+			let apisHtml = "";
+			if (data.apis && data.apis.length > 0) {
+				const apisList = data.apis
+					.map((api: any) => {
+						const methodText = api.method ? ` [${api.method}]` : "";
+						const descText = api.desc ? ` - ${api.desc}` : "";
+						return `<div class="text-xs theme-text-body font-mono break-all">• ${api.name} (Port ${api.port}, Path ${api.path})${methodText}${descText}</div>`;
+					})
+					.join("");
+				apisHtml = `
+					<div class="flex flex-col space-y-1 col-span-1 sm:col-span-2 mt-2">
+						<span class="text-[10px] font-bold theme-text-muted uppercase tracking-wider">Configured APIs</span>
+						<div class="flex flex-col gap-1">${apisList}</div>
+					</div>
+				`;
+			}
+
+			if (tmplSpecAnnotationsGrid && tmplSpecAnnotationsContainer) {
+				if (gridHtml || apisHtml) {
+					tmplSpecAnnotationsGrid.innerHTML = gridHtml + apisHtml;
+					tmplSpecAnnotationsContainer.classList.remove("hidden");
+				} else {
+					tmplSpecAnnotationsContainer.classList.add("hidden");
+				}
+			}
+
+			// Populate Labels Badge List
+			const labels = data.labels || {};
+			const labelBadges = Object.entries(labels)
+				.map(
+					([k, v]) =>
+						`<span class="theme-badge-coral font-mono text-[10px]">${k}=${v}</span>`,
+				)
+				.join(" ");
+
+			if (tmplSpecLabelsList && tmplSpecLabelsContainer) {
+				if (labelBadges) {
+					tmplSpecLabelsList.innerHTML = labelBadges;
+					tmplSpecLabelsContainer.classList.remove("hidden");
+				} else {
+					tmplSpecLabelsContainer.classList.add("hidden");
+				}
+			}
+
+			// Populate Spec Code block
+			if (tmplSpecCode && tmplSpecCodeContainer) {
+				const fullSpec = {
+					metadata: {
+						name: data.name,
+						namespace: data.namespace,
+						labels: data.labels || {},
+						annotations: data.annotations || {},
+					},
+					spec: data.spec || {},
+				};
+				tmplSpecCode.textContent = JSON.stringify(fullSpec, null, 2);
+				tmplSpecCodeContainer.classList.remove("hidden");
+			}
 		}
 	} catch (err) {
-		if (tmplSpecContent) tmplSpecContent.textContent = `Error: ${err}`;
+		if (tmplSpecLoading) {
+			tmplSpecLoading.textContent = `Error: ${err}`;
+		}
+	}
+}
+
+// Workspace Spec Modal functions
+async function openWsSpecModal(wsId: string) {
+	if (tmplSpecTitle) tmplSpecTitle.textContent = `${wsId} Specification`;
+	if (tmplSpecSubtitle) tmplSpecSubtitle.textContent = `Workspace Pod: ${wsId}`;
+
+	if (tmplSpecLoading) {
+		tmplSpecLoading.textContent = "Fetching workspace specification...";
+		tmplSpecLoading.classList.remove("hidden");
+	}
+	if (tmplSpecAnnotationsContainer)
+		tmplSpecAnnotationsContainer.classList.add("hidden");
+	if (tmplSpecLabelsContainer) tmplSpecLabelsContainer.classList.add("hidden");
+	if (tmplSpecCodeContainer) tmplSpecCodeContainer.classList.add("hidden");
+	if (tmplSpecModal) tmplSpecModal.classList.remove("hidden");
+
+	try {
+		const res = await app.callServerTool({
+			name: "get_workspace",
+			arguments: {
+				id: wsId,
+				namespace: currentNamespace,
+				jwtPayload: getJwtPayload(),
+			},
+		});
+		if (res.isError) {
+			if (tmplSpecLoading) {
+				tmplSpecLoading.textContent = `Error: ${(res.content?.[0] as any)?.text || "Could not fetch spec"}`;
+			}
+		} else {
+			const data = res.structuredContent as any;
+
+			// Show/Hide Loading
+			if (tmplSpecLoading) tmplSpecLoading.classList.add("hidden");
+
+			// Populate Annotations Grid
+			const annotations = data.annotations || {};
+			const supported = [
+				{ key: "nogoo9/workspace-name", label: "Name" },
+				{ key: "nogoo9/template-ref", label: "Template Ref" },
+				{ key: "nogoo9/user-sub", label: "Owner" },
+				{ key: "nogoo9/workspace-port", label: "Workspace Port" },
+				{ key: "nogoo9/workspace-path", label: "Workspace Path" },
+				{ key: "nogoo9/workspace-type", label: "Workspace Type" },
+				{ key: "nogoo9/preview-path", label: "Preview Path (Fallback)" },
+				{ key: "nogoo9/preview-type", label: "Preview Type (Fallback)" },
+				{ key: "nogoo9/default-grace-period", label: "Grace Period (Sec)" },
+				{ key: "nogoo9/init-image", label: "Init Image" },
+				{ key: "nogoo9/init-command", label: "Init Command" },
+				{ key: "nogoo9/pre-stop-command", label: "Pre-Stop Command" },
+				{
+					key: "nogoo9/pre-stop-sidecar-image",
+					label: "Pre-Stop Sidecar Image",
+				},
+			];
+
+			const gridHtml = supported
+				.map(({ key, label }) => {
+					const val = annotations[key];
+					if (!val) return "";
+					return `
+						<div class="flex flex-col space-y-1">
+							<span class="text-[10px] font-bold theme-text-muted uppercase tracking-wider">${label}</span>
+							<span class="text-xs theme-text-body font-mono break-all">${val}</span>
+						</div>
+					`;
+				})
+				.filter(Boolean)
+				.join("");
+
+			let apisHtml = "";
+			if (data.apis && data.apis.length > 0) {
+				const apisList = data.apis
+					.map((api: any) => {
+						const methodText = api.method ? ` [${api.method}]` : "";
+						const descText = api.desc ? ` - ${api.desc}` : "";
+						return `<div class="text-xs theme-text-body font-mono break-all">• ${api.name} (Port ${api.port}, Path ${api.path})${methodText}${descText}</div>`;
+					})
+					.join("");
+				apisHtml = `
+					<div class="flex flex-col space-y-1 col-span-1 sm:col-span-2 mt-2">
+						<span class="text-[10px] font-bold theme-text-muted uppercase tracking-wider">Configured APIs</span>
+						<div class="flex flex-col gap-1">${apisList}</div>
+					</div>
+				`;
+			}
+
+			if (tmplSpecAnnotationsGrid && tmplSpecAnnotationsContainer) {
+				if (gridHtml || apisHtml) {
+					tmplSpecAnnotationsGrid.innerHTML = gridHtml + apisHtml;
+					tmplSpecAnnotationsContainer.classList.remove("hidden");
+				} else {
+					tmplSpecAnnotationsContainer.classList.add("hidden");
+				}
+			}
+
+			// Populate Labels Badge List
+			const labels = data.labels || {};
+			const labelBadges = Object.entries(labels)
+				.map(
+					([k, v]) =>
+						`<span class="theme-badge-coral font-mono text-[10px]">${k}=${v}</span>`,
+				)
+				.join(" ");
+
+			if (tmplSpecLabelsList && tmplSpecLabelsContainer) {
+				if (labelBadges) {
+					tmplSpecLabelsList.innerHTML = labelBadges;
+					tmplSpecLabelsContainer.classList.remove("hidden");
+				} else {
+					tmplSpecLabelsContainer.classList.add("hidden");
+				}
+			}
+
+			// Populate Spec Code block
+			if (tmplSpecCode && tmplSpecCodeContainer) {
+				const fullSpec = {
+					metadata: {
+						name: data.name,
+						namespace: currentNamespace,
+						labels: data.labels || {},
+						annotations: data.annotations || {},
+					},
+					spec: data.spec || {},
+				};
+				tmplSpecCode.textContent = JSON.stringify(fullSpec, null, 2);
+				tmplSpecCodeContainer.classList.remove("hidden");
+			}
+		}
+	} catch (err) {
+		if (tmplSpecLoading) {
+			tmplSpecLoading.textContent = `Error: ${err}`;
+		}
 	}
 }
 
@@ -799,6 +1266,22 @@ if (createTmplBtn) {
   ]
 }`;
 		}
+		const clearInput = (id: string) => {
+			const el = document.getElementById(id) as
+				| HTMLInputElement
+				| HTMLSelectElement;
+			if (el) el.value = el.tagName === "SELECT" ? "html" : "";
+		};
+		clearInput("create-tmpl-req-context");
+		clearInput("create-tmpl-port");
+		clearInput("create-tmpl-preview-path");
+		clearInput("create-tmpl-preview-type");
+		clearInput("create-tmpl-grace-period");
+		clearInput("create-tmpl-init-image");
+		clearInput("create-tmpl-init-cmd");
+		clearInput("create-tmpl-prestop-cmd");
+		clearInput("create-tmpl-prestop-sidecar");
+
 		if (createTmplModal) createTmplModal.classList.remove("hidden");
 	});
 }
@@ -824,6 +1307,46 @@ if (createTmplForm) {
 			return;
 		}
 
+		// Collect annotations from the form fields
+		const annotations: Record<string, string> = {};
+		const reqContext = (
+			document.getElementById("create-tmpl-req-context") as HTMLInputElement
+		)?.value.trim();
+		if (reqContext) annotations["nogoo9/required-context"] = reqContext;
+		const port = (
+			document.getElementById("create-tmpl-port") as HTMLInputElement
+		)?.value.trim();
+		if (port) annotations["nogoo9/workspace-port"] = port;
+		const previewPath = (
+			document.getElementById("create-tmpl-preview-path") as HTMLInputElement
+		)?.value.trim();
+		if (previewPath) annotations["nogoo9/preview-path"] = previewPath;
+		const previewType = (
+			document.getElementById("create-tmpl-preview-type") as HTMLSelectElement
+		)?.value;
+		if (previewType) annotations["nogoo9/preview-type"] = previewType;
+		const gracePeriod = (
+			document.getElementById("create-tmpl-grace-period") as HTMLInputElement
+		)?.value.trim();
+		if (gracePeriod) annotations["nogoo9/default-grace-period"] = gracePeriod;
+		const initImage = (
+			document.getElementById("create-tmpl-init-image") as HTMLInputElement
+		)?.value.trim();
+		if (initImage) annotations["nogoo9/init-image"] = initImage;
+		const initCmd = (
+			document.getElementById("create-tmpl-init-cmd") as HTMLInputElement
+		)?.value.trim();
+		if (initCmd) annotations["nogoo9/init-command"] = initCmd;
+		const prestopCmd = (
+			document.getElementById("create-tmpl-prestop-cmd") as HTMLInputElement
+		)?.value.trim();
+		if (prestopCmd) annotations["nogoo9/pre-stop-command"] = prestopCmd;
+		const prestopSidecar = (
+			document.getElementById("create-tmpl-prestop-sidecar") as HTMLInputElement
+		)?.value.trim();
+		if (prestopSidecar)
+			annotations["nogoo9/pre-stop-sidecar-image"] = prestopSidecar;
+
 		closeCreateTmplModal();
 
 		try {
@@ -834,6 +1357,7 @@ if (createTmplForm) {
 					namespace: currentNamespace,
 					description,
 					tag,
+					annotations,
 					spec,
 				},
 			});
@@ -868,6 +1392,7 @@ let httpSessionId: string | null = null;
 const basePath = (window as any).__NOCR_BASE_URL__ || "";
 let mcpEndpointUrl = `${basePath}/mcp`;
 const mcpVersion = "2024-11-05";
+let lastHttpFallbackError = "";
 
 async function initHttpFallback(): Promise<boolean> {
 	const endpointsToTry = [`${basePath}/mcp`, "http://localhost:3000/mcp"];
@@ -902,6 +1427,29 @@ async function initHttpFallback(): Promise<boolean> {
 				headers,
 				body: JSON.stringify(initPayload),
 			});
+			if (resp.status === 401) {
+				console.warn(
+					"Unauthorized initialization call. Clearing expired token...",
+				);
+				localStorage.removeItem("nocr_token");
+				activeToken = "";
+				window.location.reload();
+				return false;
+			}
+			if (resp.status === 403) {
+				const text = await resp.text().catch(() => "");
+				lastHttpFallbackError = `${resp.status}${text ? `: ${text}` : ""}`;
+				console.warn(`Access forbidden (403): ${text}`);
+				if (forbiddenOverlay) {
+					if (forbiddenMessage) {
+						forbiddenMessage.textContent =
+							text ||
+							"You do not have the required scopes or roles to access this resource.";
+					}
+					forbiddenOverlay.classList.remove("hidden");
+				}
+				return false;
+			}
 			if (resp.ok) {
 				const sessId = resp.headers.get("mcp-session-id");
 				if (sessId) {
@@ -913,8 +1461,15 @@ async function initHttpFallback(): Promise<boolean> {
 					`HTTP fallback initialized successfully on endpoint: ${endpoint}`,
 				);
 				return true;
+			} else {
+				const text = await resp.text().catch(() => "");
+				lastHttpFallbackError = `${resp.status}${text ? `: ${text}` : ""}`;
+				console.warn(
+					`HTTP fallback failed for ${endpoint} with status ${resp.status}`,
+				);
 			}
 		} catch (err) {
+			lastHttpFallbackError = String(err);
 			console.warn(`HTTP fallback initialization failed for ${endpoint}:`, err);
 		}
 	}
@@ -950,8 +1505,31 @@ async function callServerToolFallback(name: string, args: any): Promise<any> {
 		body: JSON.stringify(payload),
 	});
 
+	if (resp.status === 401) {
+		console.warn("Unauthorized server call. Clearing expired token...");
+		localStorage.removeItem("nocr_token");
+		activeToken = "";
+		window.location.reload();
+	}
+
+	if (resp.status === 403) {
+		const text = await resp.text().catch(() => "");
+		console.warn(`Access forbidden (403): ${text}`);
+		if (forbiddenOverlay) {
+			if (forbiddenMessage) {
+				forbiddenMessage.textContent =
+					text ||
+					"You do not have the required scopes or roles to access this resource.";
+			}
+			forbiddenOverlay.classList.remove("hidden");
+		}
+		throw new Error(`HTTP error 403 (${text || "Forbidden"})`);
+	}
+
 	if (!resp.ok) {
-		throw new Error(`HTTP error ${resp.status}`);
+		const text = await resp.text().catch(() => "");
+		const detailedMsg = text ? `${resp.status} (${text})` : `${resp.status}`;
+		throw new Error(`HTTP error ${detailedMsg}`);
 	}
 
 	const returnedSessionId = resp.headers.get("mcp-session-id");
@@ -967,6 +1545,438 @@ async function callServerToolFallback(name: string, args: any): Promise<any> {
 		};
 	}
 	return json.result;
+}
+
+// Theme handling
+const THEMES = ["system", "light", "dark"] as const;
+type Theme = (typeof THEMES)[number];
+
+function getTheme(): Theme {
+	return (localStorage.getItem("nocr_theme") as Theme) || "system";
+}
+
+function applyTheme(theme: Theme) {
+	const isDark =
+		theme === "dark" ||
+		(theme === "system" &&
+			window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+	if (isDark) {
+		document.documentElement.classList.add("dark");
+	} else {
+		document.documentElement.classList.remove("dark");
+	}
+
+	if (themeIcon) {
+		if (theme === "dark") {
+			themeIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />`;
+		} else if (theme === "light") {
+			themeIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" />`;
+		} else {
+			themeIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 100 10 5 5 0 000-10z" />`;
+		}
+	}
+}
+
+function initTheme() {
+	const currentTheme = getTheme();
+	applyTheme(currentTheme);
+
+	if (themeBtn) {
+		themeBtn.addEventListener("click", () => {
+			const activeTheme = getTheme();
+			const nextTheme =
+				THEMES[(THEMES.indexOf(activeTheme) + 1) % THEMES.length];
+			localStorage.setItem("nocr_theme", nextTheme);
+			applyTheme(nextTheme);
+			showToast(`Theme set to: ${nextTheme}`, "success");
+		});
+	}
+
+	window
+		.matchMedia("(prefers-color-scheme: dark)")
+		.addEventListener("change", () => {
+			if (getTheme() === "system") {
+				applyTheme("system");
+			}
+		});
+
+	void initCustomThemes();
+}
+
+async function fetchAndApplyCustomTheme(themeId: string) {
+	const customStyleTag = document.getElementById("custom-theme-style");
+	if (!customStyleTag) return;
+
+	if (themeId === "default") {
+		customStyleTag.innerHTML = "";
+		return;
+	}
+
+	try {
+		const res = await fetch(`${basePath}/api/themes/${themeId}.css`);
+		if (res.ok) {
+			const css = await res.text();
+			customStyleTag.innerHTML = css;
+		} else {
+			showToast(`Failed to load theme: ${res.statusText}`, "error");
+		}
+	} catch (err) {
+		console.error("Error loading theme:", err);
+		showToast("Error loading theme", "error");
+	}
+}
+
+async function initCustomThemes() {
+	const themeSelect = document.getElementById(
+		"theme-select",
+	) as HTMLSelectElement | null;
+	if (!themeSelect) return;
+
+	try {
+		const res = await fetch(`${basePath}/api/themes`);
+		if (res.ok) {
+			const themesList: Array<{ id: string; name: string }> = await res.json();
+			themeSelect.innerHTML = "";
+			for (const theme of themesList) {
+				const opt = document.createElement("option");
+				opt.value = theme.id;
+				opt.textContent = theme.name;
+				themeSelect.appendChild(opt);
+			}
+
+			// Restore selected theme preference
+			const savedCustomTheme =
+				localStorage.getItem("nocr_custom_theme") || "default";
+			if (themesList.some((t) => t.id === savedCustomTheme)) {
+				themeSelect.value = savedCustomTheme;
+				await fetchAndApplyCustomTheme(savedCustomTheme);
+			}
+		}
+	} catch (err) {
+		console.error("Error fetching available themes:", err);
+	}
+
+	themeSelect.addEventListener("change", async () => {
+		const selectedId = themeSelect.value;
+		localStorage.setItem("nocr_custom_theme", selectedId);
+		await fetchAndApplyCustomTheme(selectedId);
+		const selectedOption = themeSelect.options.item(themeSelect.selectedIndex);
+		const themeName = selectedOption ? selectedOption.text : selectedId;
+		showToast(`Applied theme: ${themeName}`, "success");
+	});
+}
+
+// OIDC PKCE Helpers
+function generateRandomString(length: number): string {
+	const array = new Uint32Array(length);
+	window.crypto.getRandomValues(array);
+	return Array.from(
+		array,
+		(dec) =>
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[
+				dec % 62
+			],
+	).join("");
+}
+
+async function sha256(plain: string): Promise<ArrayBuffer> {
+	const encoder = new TextEncoder();
+	const data = encoder.encode(plain);
+	return window.crypto.subtle.digest("SHA-256", data);
+}
+
+function base64urlEncode(a: ArrayBuffer): string {
+	const bytes = new Uint8Array(a);
+	let str = "";
+	for (let i = 0; i < bytes.byteLength; i++) {
+		str += String.fromCharCode(bytes[i]);
+	}
+	return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function generateChallenge(verifier: string): Promise<string> {
+	const hashed = await sha256(verifier);
+	return base64urlEncode(hashed);
+}
+
+interface OAuthConfig {
+	discoveryUrl?: string;
+	clientId?: string;
+	loginMethod?: "redirect";
+	scopes?: string[];
+}
+
+const oauthConfig: OAuthConfig = (window as any).__NOCR_OAUTH_CONFIG__ || {};
+
+async function initOidc() {
+	if (!oauthConfig.discoveryUrl || !oauthConfig.clientId) {
+		return;
+	}
+
+	async function triggerRedirect() {
+		try {
+			const state = generateRandomString(16);
+			const verifier = generateRandomString(64);
+			localStorage.setItem("nocr_oauth_state", state);
+			localStorage.setItem("nocr_oauth_verifier", verifier);
+
+			const challenge = await generateChallenge(verifier);
+
+			const discRes = await fetch(oauthConfig.discoveryUrl!);
+			const discData = await discRes.json();
+			const authEndpoint = discData.authorization_endpoint;
+
+			const redirectUri = window.location.origin + window.location.pathname;
+			const url = new URL(authEndpoint);
+			url.searchParams.set("response_type", "code");
+			url.searchParams.set("client_id", oauthConfig.clientId!);
+			url.searchParams.set("redirect_uri", redirectUri);
+			url.searchParams.set("state", state);
+			url.searchParams.set("code_challenge", challenge);
+			url.searchParams.set("code_challenge_method", "S256");
+			const scopes = ["openid", "profile", "email"];
+			if (Array.isArray(oauthConfig.scopes)) {
+				for (const s of oauthConfig.scopes) {
+					if (s && !scopes.includes(s)) scopes.push(s);
+				}
+			}
+			url.searchParams.set("scope", scopes.join(" "));
+
+			window.location.href = url.toString();
+		} catch (err) {
+			console.error("Login redirect failed:", err);
+			showToast("Failed to initialize SSO redirect", "error");
+		}
+	}
+
+	// 1. Check if returning from redirect flow
+	const urlParams = new URLSearchParams(window.location.search);
+	const code = urlParams.get("code");
+	const state = urlParams.get("state");
+	const error = urlParams.get("error");
+	const hasOauthCallback = code || error;
+
+	if (code) {
+		const savedState = localStorage.getItem("nocr_oauth_state");
+		const codeVerifier = localStorage.getItem("nocr_oauth_verifier");
+		if (state === savedState && codeVerifier) {
+			try {
+				const discRes = await fetch(oauthConfig.discoveryUrl);
+				const discData = await discRes.json();
+				const tokenEndpoint = discData.token_endpoint;
+
+				const redirectUri = window.location.origin + window.location.pathname;
+				const params = new URLSearchParams({
+					grant_type: "authorization_code",
+					client_id: oauthConfig.clientId,
+					code,
+					redirect_uri: redirectUri,
+					code_verifier: codeVerifier,
+				});
+
+				const tokenRes = await fetch(tokenEndpoint, {
+					method: "POST",
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+					body: params.toString(),
+				});
+
+				if (!tokenRes.ok) {
+					throw new Error(`Token exchange failed: ${tokenRes.status}`);
+				}
+				const tokenData = await tokenRes.json();
+
+				if (tokenData.access_token) {
+					localStorage.setItem("nocr_token", tokenData.access_token);
+					activeToken = tokenData.access_token;
+					if (tokenData.id_token) {
+						localStorage.setItem("nocr_id_token", tokenData.id_token);
+					}
+					updateUserBadge(activeToken);
+					showToast("Login successful!", "success");
+				}
+			} catch (e) {
+				console.error("OAuth token exchange failed:", e);
+				showToast("Authentication failed", "error");
+				sessionStorage.setItem("nocr_oauth_failed", "true");
+			} finally {
+				localStorage.removeItem("nocr_oauth_state");
+				localStorage.removeItem("nocr_oauth_verifier");
+				const cleanUrl = window.location.pathname + window.location.hash;
+				window.history.replaceState({}, document.title, cleanUrl);
+			}
+		}
+	}
+
+	// 2. Control visibility of login overlay and trigger auto-redirect if unauthenticated
+	const token = localStorage.getItem("nocr_token") || activeToken;
+	const oidcFailed = sessionStorage.getItem("nocr_oauth_failed") === "true";
+	if (oidcFailed) {
+		sessionStorage.removeItem("nocr_oauth_failed");
+	}
+
+	if (!token) {
+		if (loginOverlay) loginOverlay.classList.remove("hidden");
+		if (!hasOauthCallback && !oidcFailed) {
+			console.log("Automatically redirecting to OIDC login...");
+			void triggerRedirect();
+		}
+	}
+
+	if (loginBtn) {
+		loginBtn.addEventListener("click", async () => {
+			await triggerRedirect();
+		});
+	}
+
+	if (useManualTokenLink) {
+		useManualTokenLink.addEventListener("click", (e) => {
+			e.preventDefault();
+			if (loginOverlay) loginOverlay.classList.add("hidden");
+			if (tokenModal) tokenModal.classList.remove("hidden");
+		});
+	}
+
+	if (forbiddenRetryBtn) {
+		forbiddenRetryBtn.addEventListener("click", () => {
+			localStorage.removeItem("nocr_token");
+			activeToken = "";
+			if (forbiddenOverlay) forbiddenOverlay.classList.add("hidden");
+			window.location.reload();
+		});
+	}
+
+	if (forbiddenBackBtn) {
+		forbiddenBackBtn.addEventListener("click", () => {
+			if (forbiddenOverlay) forbiddenOverlay.classList.add("hidden");
+			if (tokenModal) tokenModal.classList.remove("hidden");
+		});
+	}
+}
+
+// Workspace Preview Rendering
+function parseMarkdown(md: string): string {
+	return md
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(
+			/^### (.*$)/gim,
+			'<h3 class="text-lg font-bold my-3 theme-text-title">$1</h3>',
+		)
+		.replace(
+			/^## (.*$)/gim,
+			'<h2 class="text-xl font-bold my-4 theme-text-title">$1</h2>',
+		)
+		.replace(
+			/^# (.*$)/gim,
+			'<h1 class="text-2xl font-extrabold my-5 theme-text-title">$1</h1>',
+		)
+		.replace(/\*\*(.*)\*\*/gim, "<strong>$1</strong>")
+		.replace(/\*(.*)\*/gim, "<em>$1</em>")
+		.replace(
+			/```([\s\S]*?)```/gim,
+			'<pre class="theme-code-window-card p-4 rounded-xl font-mono text-xs overflow-x-auto my-3">$1</pre>',
+		)
+		.replace(/`(.*?)`/gim, '<code class="theme-code-inline">$1</code>')
+		.replace(
+			/\[(.*?)\]\((.*?)\)/gim,
+			'<a href="$2" target="_blank" class="theme-text-link hover:underline">$1</a>',
+		)
+		.replace(/^\s*-\s+(.*$)/gim, '<li class="ml-4 list-disc my-1">$1</li>')
+		.replace(/^\s*\*\s+(.*$)/gim, '<li class="ml-4 list-disc my-1">$1</li>')
+		.replace(/\n/g, "<br />");
+}
+
+async function openPreviewModal(wsId: string, path: string, type: string) {
+	activePreviewWorkspaceId = wsId;
+	activePreviewPath = path;
+
+	if (previewModalTitle) {
+		previewModalTitle.textContent = `Workspace Preview: ${wsId}`;
+	}
+	if (previewModalSubtitle) {
+		previewModalSubtitle.textContent = `File: ${path} (Type: ${type})`;
+	}
+	if (previewContentArea) {
+		previewContentArea.textContent = "Loading preview...";
+	}
+	if (previewModal) {
+		previewModal.classList.remove("hidden");
+	}
+
+	await fetchPreview(wsId, path, type);
+}
+
+async function fetchPreview(wsId: string, path: string, type: string) {
+	if (!previewContentArea) return;
+	const tokenQuery = activeToken
+		? `?token=${encodeURIComponent(activeToken)}`
+		: "";
+	const url = `${basePath}/route/${wsId}/${path.replace(/^\//, "")}${tokenQuery}`;
+
+	try {
+		if (type === "html") {
+			const iframe = document.createElement("iframe");
+			iframe.sandbox.add("allow-scripts");
+			iframe.src = url;
+			iframe.className =
+				"w-full h-full min-h-[50vh] border-0 rounded-xl bg-white";
+			previewContentArea.innerHTML = "";
+			previewContentArea.appendChild(iframe);
+		} else if (type === "markdown") {
+			const res = await fetch(url);
+			if (res.status === 403) {
+				const text = await res.text().catch(() => "");
+				if (forbiddenOverlay) {
+					if (forbiddenMessage) {
+						forbiddenMessage.textContent =
+							text ||
+							"You do not have the required scopes or roles to access this resource.";
+					}
+					forbiddenOverlay.classList.remove("hidden");
+				}
+				throw new Error(`HTTP error 403 (${text || "Forbidden"})`);
+			}
+			if (!res.ok) {
+				const text = await res.text().catch(() => "");
+				const detailedMsg = text ? `${res.status} (${text})` : `${res.status}`;
+				throw new Error(`HTTP error ${detailedMsg}`);
+			}
+			const text = await res.text();
+			previewContentArea.className =
+				"flex-1 overflow-auto theme-feature-card p-6 min-h-[50vh] max-h-[70vh] theme-text-body";
+			previewContentArea.innerHTML = parseMarkdown(text);
+		} else {
+			previewContentArea.textContent = `Unsupported preview type: ${type}`;
+		}
+	} catch (e) {
+		previewContentArea.textContent = `Failed to fetch preview: ${e}`;
+	}
+}
+
+function closePreviewModal() {
+	activePreviewWorkspaceId = null;
+	activePreviewPath = null;
+	if (previewModal) {
+		previewModal.classList.add("hidden");
+	}
+}
+
+if (closePreviewBtn) {
+	closePreviewBtn.addEventListener("click", closePreviewModal);
+}
+if (closePreviewFooterBtn) {
+	closePreviewFooterBtn.addEventListener("click", closePreviewModal);
+}
+if (refreshPreviewBtn) {
+	refreshPreviewBtn.addEventListener("click", () => {
+		if (activePreviewWorkspaceId && activePreviewPath) {
+			const ws = workspaces.find((w) => w.id === activePreviewWorkspaceId);
+			const type = ws?.previewType || "html";
+			fetchPreview(activePreviewWorkspaceId, activePreviewPath, type);
+		}
+	});
 }
 
 // Register MCP App lifecycle event listeners before connecting
@@ -1002,6 +2012,55 @@ app.ontoolresult = (params) => {
 
 // Initialize authentication and settings listeners
 initToken();
+initTheme();
+void initOidc();
+
+if (logoutBtn) {
+	logoutBtn.addEventListener("click", async () => {
+		const token = localStorage.getItem("nocr_token");
+		const idToken = localStorage.getItem("nocr_id_token");
+
+		// 1. Call server /logout endpoint to clear path-scoped workspace cookies
+		try {
+			await fetch("/logout", {
+				method: "POST",
+				headers: token ? { Authorization: `Bearer ${token}` } : {},
+			});
+		} catch (err) {
+			console.warn("Failed to clear server cookies during logout:", err);
+		}
+
+		// 2. Clear local storage tokens
+		localStorage.removeItem("nocr_token");
+		localStorage.removeItem("nocr_id_token");
+		activeToken = "";
+
+		// 3. Trigger OIDC logout if configured
+		if (oauthConfig.discoveryUrl && oauthConfig.clientId) {
+			try {
+				const discRes = await fetch(oauthConfig.discoveryUrl);
+				const discData = await discRes.json();
+				const endSessionEndpoint = discData.end_session_endpoint;
+				if (endSessionEndpoint) {
+					const redirectUri = window.location.origin + window.location.pathname;
+					const logoutUrl = new URL(endSessionEndpoint);
+					logoutUrl.searchParams.set("client_id", oauthConfig.clientId);
+					logoutUrl.searchParams.set("post_logout_redirect_uri", redirectUri);
+					if (idToken) {
+						logoutUrl.searchParams.set("id_token_hint", idToken);
+					}
+					window.location.href = logoutUrl.toString();
+					return;
+				}
+			} catch (err) {
+				console.error("Failed to query OIDC end session endpoint:", err);
+			}
+		}
+
+		// Fallback/standard reload
+		window.location.reload();
+	});
+}
 
 // Start connection handshake and retrieve stats
 app
@@ -1009,22 +2068,25 @@ app
 	.then(() => {
 		console.log("Connected to MCP Host successfully!");
 		refreshAll();
-		// Poll every 5 seconds for updates
 		setInterval(refreshAll, 5000);
 	})
 	.catch(async (err) => {
 		console.warn("Connection to MCP Host failed, trying HTTP fallback...", err);
 		const fallbackSuccess = await initHttpFallback();
 		if (fallbackSuccess) {
-			// Override callServerTool with HTTP fallback helper
 			app.callServerTool = async (params) => {
 				return callServerToolFallback(params.name, params.arguments);
 			};
 			console.log("HTTP fallback initialized successfully!");
 			refreshAll();
-			// Poll every 5 seconds for updates in fallback mode
 			setInterval(refreshAll, 5000);
 		} else {
-			showError(`Failed to connect to MCP Host client: ${err}`);
+			showError(
+				`Failed to connect to MCP Host client: ${err}${
+					lastHttpFallbackError
+						? ` (HTTP Fallback: ${lastHttpFallbackError})`
+						: ""
+				}`,
+			);
 		}
 	});

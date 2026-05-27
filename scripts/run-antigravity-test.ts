@@ -186,7 +186,7 @@ async function main() {
 	}
 
 	const textContent = spawnResult.content[0];
-	if (!textContent || textContent.type !== "text") {
+	if (textContent?.type !== "text") {
 		throw new Error("Invalid response from spawn_workspace tool");
 	}
 	console.log(`==> Server Response: ${textContent.text}`);

@@ -15,8 +15,9 @@ import { initK8sContext } from "~/k8s/index.js";
 import { createMcpServer } from "~/mcp/server.js";
 import { startHttpServer } from "~/server.js";
 import { registerUiApp } from "~/ui/index.js";
+import { config } from "./config.js";
 
-const TRANSPORT = process.env.TRANSPORT ?? "http";
+const TRANSPORT = config.server.transport;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,7 +36,7 @@ type LogLevel = (typeof validLevels)[number];
  * @returns Resolves to a valid LogLevel.
  */
 function getLogLevel(): LogLevel {
-	const raw = (process?.env?.LOG_LEVEL ?? "info").toLowerCase();
+	const raw = config.server.logLevel.toLowerCase();
 	if (raw === "warn") return "warning";
 	if (validLevels.includes(raw as any)) {
 		return raw as LogLevel;
@@ -61,7 +62,7 @@ async function main(): Promise<void> {
 		console.error = () => {};
 	}
 
-	const logFile = process.env.LOG_FILE || "nogoo9-mcp.log";
+	const logFile = config.server.logFile;
 	const fileStream = createWriteStream(logFile, { flags: "a" });
 	const webStream = Writable.toWeb(fileStream);
 

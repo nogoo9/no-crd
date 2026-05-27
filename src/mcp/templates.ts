@@ -4,6 +4,7 @@ import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { config } from "~/config.js";
 import {
 	createPodFromArgs,
 	DEFAULT_NAMESPACE,
@@ -11,6 +12,7 @@ import {
 	EnvFromSource,
 	EnvVar,
 	errorResult,
+	extractUserIdentity,
 	getAccessibleNamespaces,
 	type K8sContext,
 	listTemplateMaps,
@@ -20,12 +22,16 @@ import {
 	type PodCreateArgs,
 	PodSpecSchema,
 	parseTemplateRef,
+	parseWorkspaceApis,
 	ResourceQuantity,
 	readTemplateMap,
+	requestContextStore,
 	resolveNamespace,
 	TAG_ANNOTATION,
 	TEMPLATE_LABEL_KEY,
+	verifyAccessOrThrow,
 } from "~/k8s/index.js";
+import { WorkspaceApiSchema } from "~/mcp/spawner.js";
 
 const logger = getLogger(["nogoo9", "mcp-templates"]);
 
@@ -39,6 +45,9 @@ export const ListTemplatesOutputSchema = z.object({
 			description: z.string(),
 			tag: z.string(),
 			requiredContext: z.array(z.string()).optional(),
+			workspacePath: z.string().optional(),
+			workspaceType: z.string().optional(),
+			apis: z.array(WorkspaceApiSchema).optional(),
 		}),
 	),
 });
@@ -48,8 +57,13 @@ export const GetTemplateOutputSchema = z.object({
 	namespace: z.string(),
 	description: z.string(),
 	tag: z.string(),
+	labels: z.record(z.string(), z.string()).optional(),
+	annotations: z.record(z.string(), z.string()).optional(),
 	spec: z.record(z.string(), z.unknown()),
 	requiredContext: z.array(z.string()).optional(),
+	workspacePath: z.string().optional(),
+	workspaceType: z.string().optional(),
+	apis: z.array(WorkspaceApiSchema).optional(),
 });
 
 export const CreateTemplateOutputSchema = z.object({
@@ -172,6 +186,35 @@ export function registerTemplateResources(
 					DEFAULT_NAMESPACE,
 				);
 				const name = variables.name as string;
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return {
+							contents: [
+								{
+									uri: uri.href,
+									text: "Error: Unauthorized",
+									mimeType: "text/plain",
+								},
+							],
+						};
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+					} catch (err) {
+						return {
+							contents: [
+								{
+									uri: uri.href,
+									text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+									mimeType: "text/plain",
+								},
+							],
+						};
+					}
+				}
 				logger.info(
 					"Reading pod-template resource at URI {uri} (namespace: {namespace}, name: {name})",
 					{
@@ -218,12 +261,32 @@ export function registerTemplateResources(
 			{
 				description:
 					"List pod template ConfigMaps (label: nogoo9/pod-template=true)",
-				inputSchema: { namespace: nsParam },
+				inputSchema: {
+					namespace: nsParam,
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
+				},
 				outputSchema: ListTemplatesOutputSchema.shape,
 				_meta: { ui: { resourceUri: APP_URI } },
 			},
-			async ({ namespace }) => {
+			async ({ namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ templates: [] },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { templates: [] });
+					}
+				}
 				logger.info("Tool list_templates called for namespace {namespace}", {
 					namespace: ns,
 				});
@@ -238,13 +301,24 @@ export function registerTemplateResources(
 									.map((s) => s.trim())
 									.filter(Boolean)
 							: [];
+						const annotations = cm.metadata?.annotations ?? {};
+						const workspacePath =
+							annotations["nogoo9/workspace-path"] ??
+							annotations["nogoo9/preview-path"] ??
+							"/";
+						const workspaceType =
+							annotations["nogoo9/workspace-type"] ??
+							annotations["nogoo9/preview-type"] ??
+							"html";
 						return {
 							name: cm.metadata?.name ?? "",
 							namespace: ns,
-							description:
-								cm.metadata?.annotations?.[DESCRIPTION_ANNOTATION] ?? "",
-							tag: cm.metadata?.annotations?.[TAG_ANNOTATION] ?? "",
+							description: annotations[DESCRIPTION_ANNOTATION] ?? "",
+							tag: annotations[TAG_ANNOTATION] ?? "",
 							requiredContext,
+							workspacePath,
+							workspaceType,
+							apis: parseWorkspaceApis(annotations),
 						};
 					});
 					logger.debug("Successfully found {count} templates", {
@@ -290,12 +364,46 @@ export function registerTemplateResources(
 				inputSchema: {
 					name: z.string().describe("Template name"),
 					namespace: nsParam,
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: GetTemplateOutputSchema.shape,
 				_meta: { ui: { resourceUri: APP_URI } },
 			},
-			async ({ name, namespace }) => {
+			async ({ name, namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{
+								name: "",
+								namespace: "",
+								description: "",
+								tag: "",
+								labels: {},
+								annotations: {},
+								spec: {},
+							},
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "read");
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, {
+							name: "",
+							namespace: "",
+							description: "",
+							tag: "",
+							labels: {},
+							annotations: {},
+							spec: {},
+						});
+					}
+				}
 				logger.info(
 					"Tool get_template called for template {name} in namespace {namespace}",
 					{
@@ -310,8 +418,16 @@ export function registerTemplateResources(
 						unknown
 					>;
 					logger.debug("Successfully retrieved template {name}", { name });
-					const reqContextRaw =
-						cm.metadata?.annotations?.["nogoo9/required-context"];
+					const annotations = cm.metadata?.annotations ?? {};
+					const workspacePath =
+						annotations["nogoo9/workspace-path"] ??
+						annotations["nogoo9/preview-path"] ??
+						"/";
+					const workspaceType =
+						annotations["nogoo9/workspace-type"] ??
+						annotations["nogoo9/preview-type"] ??
+						"html";
+					const reqContextRaw = annotations["nogoo9/required-context"];
 					const requiredContext = reqContextRaw
 						? reqContextRaw
 								.split(",")
@@ -320,16 +436,35 @@ export function registerTemplateResources(
 						: [];
 					return {
 						content: [
-							{ type: "text" as const, text: JSON.stringify(spec, null, 2) },
+							{
+								type: "text" as const,
+								text: JSON.stringify(
+									{
+										metadata: {
+											name: cm.metadata?.name ?? name,
+											namespace: ns,
+											labels: cm.metadata?.labels ?? {},
+											annotations,
+										},
+										spec,
+									},
+									null,
+									2,
+								),
+							},
 						],
 						structuredContent: {
 							name: cm.metadata?.name ?? name,
 							namespace: ns,
-							description:
-								cm.metadata?.annotations?.[DESCRIPTION_ANNOTATION] ?? "",
-							tag: cm.metadata?.annotations?.[TAG_ANNOTATION] ?? "",
+							description: annotations[DESCRIPTION_ANNOTATION] ?? "",
+							tag: annotations[TAG_ANNOTATION] ?? "",
+							labels: cm.metadata?.labels ?? {},
+							annotations,
 							spec,
 							requiredContext,
+							workspacePath,
+							workspaceType,
+							apis: parseWorkspaceApis(annotations),
 						},
 					};
 				} catch (err) {
@@ -346,7 +481,12 @@ export function registerTemplateResources(
 						namespace: "",
 						description: "",
 						tag: "",
+						labels: {},
+						annotations: {},
 						spec: {},
+						workspacePath: "",
+						workspaceType: "",
+						apis: [],
 					});
 				}
 			},
@@ -382,6 +522,7 @@ export function registerTemplateResources(
 							"Additional annotations to apply to the template ConfigMap",
 						),
 					spec: PodSpecSchema.describe("Pod spec to store as the template"),
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: CreateTemplateOutputSchema.shape,
 				_meta: { ui: { resourceUri: APP_URI } },
@@ -394,8 +535,26 @@ export function registerTemplateResources(
 				labels: passedLabels,
 				annotations: passedAnnotations,
 				spec,
+				jwtPayload,
 			}) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ name: "", namespace: "" },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
+					}
+				}
 				logger.info(
 					"Tool create_template called for template {name} in namespace {namespace}",
 					{
@@ -480,6 +639,7 @@ export function registerTemplateResources(
 					spec: PodSpecSchema.optional().describe(
 						"New pod spec (replaces existing if provided)",
 					),
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: UpdateTemplateOutputSchema.shape,
 				_meta: { ui: { resourceUri: APP_URI } },
@@ -492,8 +652,26 @@ export function registerTemplateResources(
 				labels: passedLabels,
 				annotations: passedAnnotations,
 				spec,
+				jwtPayload,
 			}) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ name: "", namespace: "" },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
+					}
+				}
 				logger.info(
 					"Tool update_template called for template {name} in namespace {namespace}",
 					{
@@ -572,12 +750,30 @@ export function registerTemplateResources(
 				inputSchema: {
 					name: z.string().describe("Template name"),
 					namespace: nsParam,
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: DeleteTemplateOutputSchema.shape,
 				_meta: { ui: { resourceUri: APP_URI } },
 			},
-			async ({ name, namespace }) => {
+			async ({ name, namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ name: "", namespace: "" },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
+					}
+				}
 				logger.info(
 					"Tool delete_template called for template {name} in namespace {namespace}",
 					{
@@ -668,6 +864,7 @@ export function registerTemplateResources(
 						.describe(
 							"Pod-level overrides; labels/annotations are deep-merged",
 						),
+					jwtPayload: z.record(z.string(), z.unknown()).optional(),
 				},
 				outputSchema: CreatePodFromTemplateOutputSchema.shape,
 				_meta: { ui: { resourceUri: APP_URI } },
@@ -678,8 +875,26 @@ export function registerTemplateResources(
 				namespace,
 				containerOverrides,
 				topLevelOverrides,
+				jwtPayload,
 			}) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						return errorResult(
+							k8sContext.kc,
+							new Error("Unauthorized: jwtPayload required"),
+							{ name: "", namespace: "" },
+						);
+					}
+					try {
+						verifyAccessOrThrow(activeJwtPayload, "write");
+					} catch (err) {
+						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
+					}
+				}
 				logger.info(
 					"Tool create_pod_from_template called for pod {name} in namespace {namespace} using templateRef {templateRef}",
 					{
@@ -704,7 +919,22 @@ export function registerTemplateResources(
 						logger.error("Template invalid: {error}", { error: err });
 						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
 					}
-					const parsedSpec = PodSpecSchema.parse(JSON.parse(raw));
+
+					let templateUser = "guest";
+					if (activeJwtPayload) {
+						try {
+							templateUser = extractUserIdentity(
+								activeJwtPayload,
+								config.auth.subJsonPath,
+							);
+						} catch (_) {
+							// fallback to guest
+						}
+					}
+
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable replacement
+					const interpolatedRaw = raw.replaceAll("${{user}}", templateUser);
+					const parsedSpec = PodSpecSchema.parse(JSON.parse(interpolatedRaw));
 					const merged: PodCreateArgs = topLevelOverrides
 						? (mergeTopLevel(parsedSpec, topLevelOverrides) as PodCreateArgs)
 						: parsedSpec;

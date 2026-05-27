@@ -7,10 +7,12 @@ import {
 } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import { config } from "~/config.js";
+
 const logger = getLogger(["nogoo9", "ui"]);
 
 const APP_URI = "ui://nogoo9/app";
-const UI_ENABLED = process.env.UI_ENABLED !== "false";
+const UI_ENABLED = config.ui.enabled;
 
 /**
  * Reads the HTML interface bundle from the build target directory.
@@ -24,14 +26,24 @@ export function loadUiHtml(distDir: string, basePrefix = ""): string {
 	try {
 		logger.debug("Loading UI HTML index page from {htmlPath}", { htmlPath });
 		let html = readFileSync(htmlPath, "utf-8");
-		if (basePrefix) {
-			const scriptTag = `<script>window.__NOCR_BASE_URL__ = ${JSON.stringify(basePrefix)};</script>`;
-			html = html.replace("<head>", `<head>${scriptTag}`);
-		}
+		const oauthConfig = {
+			discoveryUrl: config.ui.oauth.discoveryUrl,
+			clientId: config.ui.oauth.clientId,
+			loginMethod: config.ui.oauth.loginMethod,
+			scopes: [
+				config.auth.requiredReadScope,
+				config.auth.requiredWriteScope,
+			].filter(Boolean) as string[],
+		};
+		const configScript = `<script>
+window.__NOCR_BASE_URL__ = ${JSON.stringify(basePrefix)};
+window.__NOCR_OAUTH_CONFIG__ = ${JSON.stringify(oauthConfig)};
+</script>`;
+		html = html.replace("<head>", `<head>${configScript}`);
 		return html;
 	} catch (err) {
 		logger.warn("Could not load UI HTML asset: {error}", { error: err });
-		return `<!DOCTYPE html><html><body><p>UI not built. Run: moon run web:build</p></body></html>`;
+		return `<!DOCTYPE html><html><body><p>UI not built. Run: bun run build</p></body></html>`;
 	}
 }
 

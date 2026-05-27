@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workspace-obsidian
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "Obsidian - Note-taking and Knowledge Base workspace"
+    nogoo9/tag: "obsidian"
+    nogoo9/workspace-port: "3000"
+    nogoo9/workspace-path: "/"
+    nogoo9/api.obsidian.port: "3000"
+    nogoo9/api.obsidian.path: "/"
+    nogoo9/api.obsidian.desc: "Obsidian VNC UI"
+    nogoo9/required-context: "AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_ENDPOINT_URL,S3_BUCKET,S3_FOLDER"
+    nogoo9/init-image: "nogoo9-registry.localhost:5001/amazon/aws-cli:latest"
+    # Mount path is /config inside the container, so init sync writes directly to /config
+    nogoo9/init-command: "aws s3 sync s3://$S3_BUCKET/$S3_FOLDER/${{user}} /config --endpoint-url $AWS_ENDPOINT_URL"
+    nogoo9/pre-stop-command: "aws s3 sync /config s3://$S3_BUCKET/$S3_FOLDER/${{user}} --endpoint-url $AWS_ENDPOINT_URL"
+    nogoo9/pre-stop-sidecar-image: "nogoo9-registry.localhost:5001/amazon/aws-cli:latest"
+    nogoo9/default-grace-period: "15"
+data:
+  spec: |
+    {
+      "containers": [{
+        "name": "agent",
+        "image": "nogoo9-registry.localhost:5001/linuxserver/obsidian:latest",
+        "env": [
+          {
+            "name": "SUBFOLDER",
+            "value": "/route/${{workspace_id}}/"
+          }
+        ],
+        "volumeMounts": [
+          {"name": "workspace", "mountPath": "/config"},
+          {"name": "dshm", "mountPath": "/dev/shm"}
+        ]
+      }],
+      "volumes": [
+        {"name": "workspace", "emptyDir": {}},
+        {"name": "dshm", "emptyDir": {"medium": "Memory"}}
+      ]
+    }

@@ -47,6 +47,15 @@ docker pull oven/bun:1-alpine || true
 docker tag oven/bun:1-alpine localhost:5001/bun:latest
 docker push localhost:5001/bun:latest
 
+docker pull lscr.io/linuxserver/obsidian:latest || true
+docker tag lscr.io/linuxserver/obsidian:latest localhost:5001/linuxserver/obsidian:latest
+docker push localhost:5001/linuxserver/obsidian:latest
+
+docker pull tsl0922/ttyd:latest || true
+docker tag tsl0922/ttyd:latest localhost:5001/tsl0922/ttyd:latest
+docker push localhost:5001/tsl0922/ttyd:latest
+
+
 echo "==> Building and pushing @nogoo9/kube-mcp image..."
 docker build -f "$WORKSPACE_ROOT/Dockerfile" -t localhost:5001/kube-mcp:latest "$WORKSPACE_ROOT"
 docker push localhost:5001/kube-mcp:latest
@@ -58,6 +67,17 @@ k3d image import nogoo9/antigravity-agent:latest -c nogoo-dev
 echo "==> Applying manifests..."
 kubectl apply -f "$SCRIPT_DIR/manifests/namespace.yaml"
 kubectl apply -f "$SCRIPT_DIR/manifests/rustfs.yaml"
+kubectl apply -f "$SCRIPT_DIR/manifests/keycloak/"
+
+echo "==> Waiting for Keycloak to be ready..."
+kubectl -n nogoo9 wait --for=condition=available deployment/keycloak --timeout=120s
+
+echo "==> Waiting for RustFS to be ready..."
+kubectl -n nogoo9 wait --for=condition=available deployment/rustfs --timeout=120s
+
+echo "==> Pre-creating default S3 bucket 'nogoo9-test-bucket' in RustFS..."
+kubectl run aws-cli-mb-bootstrap --rm -i --image=nogoo9-registry.localhost:5001/amazon/aws-cli:latest -n nogoo9 --restart=Never --env AWS_ACCESS_KEY_ID=test-access-key --env AWS_SECRET_ACCESS_KEY=test-secret-key --env AWS_ENDPOINT_URL=http://rustfs.nogoo9.svc.cluster.local:80 -- s3 mb s3://nogoo9-test-bucket || true
+
 kubectl apply -f "$SCRIPT_DIR/manifests/mcp/"
 
 echo "==> Forcing rollout restart of MCP server deployment..."
@@ -69,6 +89,7 @@ echo "  Context:        k3d-nogoo-dev"
 echo "  Registry:       nogoo9-registry.localhost:5001"
 echo "  HTTP:           http://localhost:8080"
 echo "  MCP Server:     http://localhost:8080/mcp"
+echo "  Keycloak:       http://localhost:8080/auth"
 echo ""
 kubectl get nodes
 kubectl -n nogoo9 get all

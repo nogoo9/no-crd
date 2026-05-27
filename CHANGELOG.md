@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-28
+
+### Added
+
+- **`get_workspace` MCP Tool**: Retrieves a workspace's status, IP, ports, active annotations, and file preview metadata.
+- **K3d Keycloak Integration**: Added containerized Keycloak realm deployment configuration for local OIDC E2E testing.
+- **SSO PKCE UI Client**: Integrated client-side PKCE authorization redirect flow supporting silent login refresh via iframes.
+- **Dashboard UI Themes**: Added light/dark/system theme toggles.
+- **Obsidian GUI Workspace**: Replaced Razzia with standard Linuxserver Obsidian template with persistent S3 mapping and shared memory limits.
+- **Dynamic Template Interpolation**: Added dynamic placeholder substitution (such as `${{workspace_id}}` and `${{workspace}}`) in pod template specs.
+- **VitePress Docs Expansion**: Added detailed design documentation for authentication hardening, Keycloak setup, SSO integration, UI guide, and GHA security.
+
+### Changed
+
+- **Authentication Hardening**: Enforced strict per-user tenant isolation on all raw pod tools using label selector filters, alongside administrator role escalation.
+- **Proxy Cookie-based Sessions**: Enabled automatic path-scoped session extraction (`nocr_token`) inside the proxy to securely load sub-resources on new tabs.
+- **WebSocket Upgrade Runner**: Switched Docker runner base image to Node.js to bypass Bun's async socket upgrade regression, ensuring stable VNC/terminal proxying.
+- **GHA Workflows Hardening**: Restructured GitHub Action files to enforce job-level least-privilege permissions, added actionlint, and integrated zizmor SAST scanning.
+
 ## [0.2.0] — 2026-05-25
 
 ### Added

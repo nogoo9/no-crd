@@ -7,17 +7,32 @@ RUN bun install
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json tsconfig.json tsconfig.options.json ./
+COPY package.json tsconfig.json tsconfig.options.json typedoc.json ./
 COPY src ./src
 COPY scripts ./scripts
+COPY docs ./docs
+COPY themes ./themes
+COPY README.md ./
 
-# Build MCP server (bun bundle → dist/index.js)
+# Build MCP server (bun bundle → dist/index.js) and frontend UI
 RUN bun run build
 
-FROM dhi.io/bun:1-alpine3.22 AS runner
+# Build static documentation site
+RUN env BASE_URL=/docs/ bun run docs:build
+
+# Compile server entry to a standalone binary
+RUN bun build src/server-entry.ts --compile --outfile dist/server-entry
+
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=builder /app/dist ./dist
+
+# Copy compiled bundle JS, UI assets, static documentation, and themes
+COPY --from=builder /app/dist/server-entry.js /app/server-entry.js
+COPY --from=builder /app/dist/ui /app/ui
+COPY --from=builder /app/docs/.vitepress/dist /app/docs
+COPY --from=builder /app/themes /app/themes
+
 USER 65532
 EXPOSE 3000
-CMD ["bun", "run", "dist/index.js"]
+CMD ["node", "/app/server-entry.js"]

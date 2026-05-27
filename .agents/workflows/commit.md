@@ -10,7 +10,9 @@ Commit all current changes after ensuring formatting and types are clean.
 
 2. Run `bun run typecheck` to verify TypeScript types. If it reports errors, stop and fix them before proceeding.
 
-3. **Safety review** — inspect every file that would be staged:
+3. Run `npm pack --dry-run` to verify that all necessary build artifacts (specifically `dist/**/*.js` and `dist/ui/index.html`) are correctly packaged and that no bulky compiled binaries (such as `dist/server-entry`) are accidentally included.
+
+4. **Safety review** — inspect every file that would be staged:
 
    ```bash
    git status --short
@@ -31,7 +33,7 @@ Commit all current changes after ensuring formatting and types are clean.
 
    If you added anything to `.gitignore`, show the user the exact lines appended.
 
-4. Inspect the current changes to generate a commit message:
+5. Inspect the current changes to generate a commit message:
 
    ```bash
    git diff --stat HEAD
@@ -45,12 +47,12 @@ Commit all current changes after ensuring formatting and types are clean.
 
    Present the generated message to the user and ask: **"Use this commit message? (yes / edit / cancel)"**
 
-5. If the user says **yes** — use the generated message as-is.  
+6. If the user says **yes** — use the generated message as-is.  
    If the user says **edit** — accept their revised message.  
    If the user says **cancel** — stop without committing.
 
-6. Run `git add -A` to stage all changes.
+7. Run `git add -A` to stage all changes.
 
-7. Run `git commit -m "<confirmed message>"`.
+8. Run `git commit -m "<confirmed message>"`.
 
-8. Report the commit hash and the one-line summary from git's output.
+9. Report the commit hash and the one-line summary from git's output.

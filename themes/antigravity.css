@@ -1,0 +1,46 @@
+/* Name: Antigravity */
+:root {
+  --bg-color: #f8fafc;
+  --text-color: #334155;
+  --text-title: #0f172a;
+  --text-muted: #64748b;
+  --panel-bg: #ffffff;
+  --panel-border: #cbd5e1;
+  --item-border: #cbd5e1;
+  --modal-bg: #ffffff;
+  --input-bg: #f1f5f9;
+  --input-border: #cbd5e1;
+  --input-text: #0f172a;
+  --badge-bg: #f1f5f9;
+  --badge-text: #64748b;
+  --accent-color: #1a73e8;
+  --accent-active: #1557b0;
+  --success-color: #10b981;
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --panel-hover-bg: #f1f5f9;
+  --accent-amber: #f59e0b;
+}
+
+:root.dark {
+  --bg-color: #0b0c10;
+  --text-color: #cbd5e1;
+  --text-title: #f8fafc;
+  --text-muted: #94a3b8;
+  --panel-bg: #151720;
+  --panel-border: #1e293b;
+  --item-border: #1e293b;
+  --modal-bg: #151720;
+  --input-bg: #0b0c10;
+  --input-border: #1e293b;
+  --input-text: #f8fafc;
+  --badge-bg: #1e293b;
+  --badge-text: #94a3b8;
+  --accent-color: #1a73e8;
+  --accent-active: #1557b0;
+  --success-color: #10b981;
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --panel-hover-bg: #1e293b;
+  --accent-amber: #f59e0b;
+}

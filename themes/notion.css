@@ -1,0 +1,46 @@
+/* Name: Notion */
+:root {
+  --bg-color: #fbfbfa;
+  --text-color: #37352f;
+  --text-title: #37352f;
+  --text-muted: #787774;
+  --panel-bg: #ffffff;
+  --panel-border: #edece9;
+  --item-border: #edece9;
+  --modal-bg: #ffffff;
+  --input-bg: #f7f6f3;
+  --input-border: #edece9;
+  --input-text: #37352f;
+  --badge-bg: #edece9;
+  --badge-text: #37352f;
+  --accent-color: #2383e2;
+  --accent-active: #1c6bb5;
+  --success-color: #0f7b4b;
+  --error-color: #d44037;
+  --warning-color: #df9b08;
+  --panel-hover-bg: #edece9;
+  --accent-amber: #df9b08;
+}
+
+:root.dark {
+  --bg-color: #191919;
+  --text-color: #9b9b9b;
+  --text-title: #ffffff;
+  --text-muted: #666666;
+  --panel-bg: #202020;
+  --panel-border: #333333;
+  --item-border: #333333;
+  --modal-bg: #202020;
+  --input-bg: #191919;
+  --input-border: #333333;
+  --input-text: #ffffff;
+  --badge-bg: #333333;
+  --badge-text: #ffffff;
+  --accent-color: #2eaadc;
+  --accent-active: #2383b0;
+  --success-color: #0f7b4b;
+  --error-color: #d44037;
+  --warning-color: #df9b08;
+  --panel-hover-bg: #333333;
+  --accent-amber: #df9b08;
+}

@@ -174,3 +174,81 @@ export default {
   fetch: app.fetch
 };
 ```
+
+---
+
+## 💡 Advanced SDK Recipes
+
+Here are code snippets for common operational control loops when building custom orchestrators.
+
+### Recipe 1: Wait for Workspace to Be Ready (Health Checks)
+Before routing HTTP traffic to a newly spawned workspace, you should wait for the pod phase to transition to `Running` and retrieve its cluster IP:
+
+```typescript
+import { listWorkspaces } from "@nogoo9/no-crd";
+
+async function waitForWorkspaceReady(
+  k8sCtx: any,
+  namespace: string,
+  workspaceId: string,
+  timeoutMs = 60000
+): Promise<string> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const list = await listWorkspaces(k8sCtx, { namespace });
+    const ws = list.workspaces.find((w) => w.id === workspaceId);
+    
+    if (ws && ws.status === "Running") {
+      // Fetch the Pod spec directly using coreApi to resolve its IP
+      const podInfo = await k8sCtx.coreApi.readNamespacedPod(ws.name, namespace);
+      const ip = podInfo.body.status?.podIP;
+      if (ip) return ip;
+    }
+    
+    // Wait 1 second before polling again
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(`Timeout waiting for workspace ${workspaceId} to be ready`);
+}
+```
+
+### Recipe 2: Injecting Custom Volumes and Spec Overrides
+You can customize resources, mount secrets, or configure cluster properties dynamically on spawn:
+
+```typescript
+import { spawnWorkspace } from "@nogoo9/no-crd";
+
+const result = await spawnWorkspace(k8sCtx, {
+  id: "user-session-99",
+  templateRef: "default-agent-workspace",
+  namespace: "nogoo9",
+  context: {},
+  // Inject limits or shared emptyDir storage dynamically
+  overrides: {
+    spec: {
+      containers: [
+        {
+          name: "main",
+          resources: {
+            limits: { cpu: "1", memory: "1Gi" },
+            requests: { cpu: "100m", memory: "128Mi" }
+          },
+          volumeMounts: [
+            {
+              name: "shared-data",
+              mountPath: "/data"
+            }
+          ]
+        }
+      ],
+      volumes: [
+        {
+          name: "shared-data",
+          emptyDir: {}
+        }
+      ]
+    }
+  }
+});
+```
+

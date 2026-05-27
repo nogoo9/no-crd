@@ -97,3 +97,4 @@ Slash-command workflows and always-on rules live in `.agents/`. **Always use the
 | `.agents/rules/pre-push.md` | `always_on` | Before `git push`: run `/test-local` (format → typecheck → tests → `/security`). All must pass. Never force-push `main`. |
 | `.agents/rules/code-design.md` | `always_on` | Think before coding, simplicity first, surgical changes, goal-driven execution. |
 | `.agents/rules/commit.md` | `model_decision` | When user asks to commit/stage, run `/commit` workflow. Never use `git commit --no-verify`. |
+| `.agents/rules/publishing.md` | `model_decision` | When modifying package configuration, build scripts, or preparing a release/publishing step. |

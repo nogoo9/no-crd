@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-import
+  namespace: nogoo9
+data:
+  nogoo9-realm.json: |
+    {
+      "id": "nogoo9",
+      "realm": "nogoo9",
+      "enabled": true,
+      "clientScopes": [
+        {
+          "name": "openid",
+          "protocol": "openid-connect"
+        },
+        {
+          "name": "profile",
+          "protocol": "openid-connect"
+        },
+        {
+          "name": "email",
+          "protocol": "openid-connect"
+        },
+        {
+          "name": "mcp:read",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "true"
+          }
+        },
+        {
+          "name": "mcp:write",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "true"
+          }
+        }
+      ],
+      "roles": {
+        "realm": [
+          {
+            "name": "nogoo9-admin",
+            "description": "Admin access role for nogoo9 MCP"
+          },
+          {
+            "name": "mcp-reader",
+            "description": "Read-only access role for nogoo9 MCP"
+          },
+          {
+            "name": "mcp-writer",
+            "description": "Read-write access role for nogoo9 MCP"
+          }
+        ]
+      },
+      "users": [
+        {
+          "username": "readuser",
+          "enabled": true,
+          "emailVerified": true,
+          "email": "readuser@localhost",
+          "firstName": "Read",
+          "lastName": "User",
+          "requiredActions": [],
+          "credentials": [
+            {
+              "type": "password",
+              "value": "password",
+              "temporary": false
+            }
+          ],
+          "realmRoles": [
+            "mcp-reader"
+          ]
+        },
+        {
+          "username": "writeuser",
+          "enabled": true,
+          "emailVerified": true,
+          "email": "writeuser@localhost",
+          "firstName": "Write",
+          "lastName": "User",
+          "requiredActions": [],
+          "credentials": [
+            {
+              "type": "password",
+              "value": "password",
+              "temporary": false
+            }
+          ],
+          "realmRoles": [
+            "mcp-reader",
+            "mcp-writer"
+          ]
+        },
+        {
+          "username": "adminuser",
+          "enabled": true,
+          "emailVerified": true,
+          "email": "adminuser@localhost",
+          "firstName": "Admin",
+          "lastName": "User",
+          "requiredActions": [],
+          "credentials": [
+            {
+              "type": "password",
+              "value": "password",
+              "temporary": false
+            }
+          ],
+          "realmRoles": [
+            "nogoo9-admin"
+          ]
+        }
+      ],
+      "clients": [
+        {
+          "clientId": "nogoo9-mcp",
+          "enabled": true,
+          "publicClient": true,
+          "protocol": "openid-connect",
+          "redirectUris": [
+            "*"
+          ],
+          "webOrigins": [
+            "*"
+          ],
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": true,
+          "serviceAccountsEnabled": false,
+          "defaultClientScopes": [
+            "openid",
+            "profile",
+            "email",
+            "mcp:read",
+            "mcp:write"
+          ],
+          "attributes": {
+            "pkce.code.challenge.method": "S256"
+          },
+          "protocolMappers": [
+            {
+              "name": "audience mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "consentRequired": false,
+              "config": {
+                "included.custom.audience": "http://localhost:8080",
+                "id.token.claim": "true",
+                "access.token.claim": "true"
+              }
+            },
+            {
+              "name": "realm roles mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usermodel-realm-role-mapper",
+              "consentRequired": false,
+              "config": {
+                "multivalued": "true",
+                "userinfo.token.claim": "true",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "realm_access.roles",
+                "jsonType.label": "String"
+              }
+            },
+            {
+              "name": "sub mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usermodel-property-mapper",
+              "consentRequired": false,
+              "config": {
+                "user.attribute": "username",
+                "claim.name": "sub",
+                "jsonType.label": "String",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true"
+              }
+            }
+          ]
+        }
+      ]
+    }
