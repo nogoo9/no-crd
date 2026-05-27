@@ -116,6 +116,7 @@ Slash-command workflows and always-on rules are defined in `.agents/`. Use these
 | `/bump` | `.agents/workflows/bump.md` | Version bump — inspects commits since last tag, picks semver level, updates `package.json`/CHANGELOG |
 | `/test-local` | `.agents/workflows/test-local.md` | Full local gate (no infra) — format, typecheck, all tests |
 | `/security` | `.agents/workflows/security.md` | SAST scan via Semgrep on changed files — required before every push |
+| `/zizmor` | `.agents/workflows/zizmor.md` | Security scan of GitHub Actions workflows using zizmor |
 | `/setup-skills` | `.agents/workflows/setup-skills.md` | Install required AI agent skills after cloning (skills are gitignored) |
 | `/setup-env` | `.agents/workflows/setup-env.md` | Full environment check — verifies Bun, Node, Moon, Deno, Docker, kubectl, k3d, Git, installs deps, runs smoke tests |
 
