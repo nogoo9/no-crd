@@ -17,6 +17,8 @@ spec:
       containers:
         - name: mcp
           image: nogoo9-registry.localhost:5001/kube-mcp:latest
+          securityContext:
+            allowPrivilegeEscalation: false
           imagePullPolicy: Always
           env:
             - name: TRANSPORT
@@ -25,10 +27,36 @@ spec:
               value: "3000"
             - name: NAMESPACE
               value: nogoo9
+            - name: THEMES_CONFIGMAP
+              value: mcp-themes
             - name: MODE
               value: cluster
             - name: STATELESS
               value: "true"
+            - name: AUTH_ENABLED
+              value: "true"
+            - name: JWKS_URI
+              value: "http://keycloak.nogoo9.svc.cluster.local:8080/auth/realms/nogoo9/protocol/openid-connect/certs"
+            - name: AUTH_ISSUER
+              value: "http://localhost:8080/auth/realms/nogoo9"
+            - name: OAUTH_CLIENT_ID
+              value: "nogoo9-mcp"
+            - name: OAUTH_DISCOVERY_URL
+              value: "http://localhost:8080/auth/realms/nogoo9/.well-known/openid-configuration"
+            - name: AUTH_ADMIN_ROLE
+              value: "nogoo9-admin"
+            - name: AUTH_REQUIRED_READ_SCOPE
+              value: "mcp:read"
+            - name: AUTH_REQUIRED_WRITE_SCOPE
+              value: "mcp:write"
+            - name: AUTH_SCOPE_JSONPATH
+              value: "$.scope"
+            - name: AUTH_REQUIRED_READ_ROLE
+              value: "mcp-reader"
+            - name: AUTH_REQUIRED_WRITE_ROLE
+              value: "mcp-writer"
+            - name: AUTH_ROLES_JSONPATH
+              value: "$.realm_access.roles"
           ports:
             - containerPort: 3000
           readinessProbe:

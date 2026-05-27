@@ -1,0 +1,46 @@
+/* Name: Slack */
+:root {
+  --bg-color: #f8f8f8;
+  --text-color: #1d1c1d;
+  --text-title: #4a154b;
+  --text-muted: #616061;
+  --panel-bg: #ffffff;
+  --panel-border: #dddddd;
+  --item-border: #dddddd;
+  --modal-bg: #ffffff;
+  --input-bg: #f8f8f8;
+  --input-border: #dddddd;
+  --input-text: #1d1c1d;
+  --badge-bg: #f3f3f3;
+  --badge-text: #1d1c1d;
+  --accent-color: #4a154b;
+  --accent-active: #3f0e40;
+  --success-color: #2eb67d;
+  --error-color: #e01e5a;
+  --warning-color: #ecb22e;
+  --panel-hover-bg: #f3f3f3;
+  --accent-amber: #ecb22e;
+}
+
+:root.dark {
+  --bg-color: #1a1d21;
+  --text-color: #d1d2d3;
+  --text-title: #f8f8f8;
+  --text-muted: #ababad;
+  --panel-bg: #222529;
+  --panel-border: #35373b;
+  --item-border: #35373b;
+  --modal-bg: #222529;
+  --input-bg: #1a1d21;
+  --input-border: #35373b;
+  --input-text: #d1d2d3;
+  --badge-bg: #35373b;
+  --badge-text: #d1d2d3;
+  --accent-color: #3f0e40;
+  --accent-active: #4a154b;
+  --success-color: #2eb67d;
+  --error-color: #e01e5a;
+  --warning-color: #ecb22e;
+  --panel-hover-bg: #35373b;
+  --accent-amber: #ecb22e;
+}

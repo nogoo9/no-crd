@@ -8,10 +8,15 @@ metadata:
   annotations:
     nogoo9/description: "Default agent workspace with S3 folder sync"
     nogoo9/tag: "default"
+    nogoo9/workspace-port: "5678"
+    nogoo9/workspace-path: "/"
+    nogoo9/api.echo.port: "5678"
+    nogoo9/api.echo.path: "/"
+    nogoo9/api.echo.desc: "HTTP Echo Server"
     nogoo9/required-context: "AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_ENDPOINT_URL,S3_BUCKET,S3_FOLDER"
     nogoo9/init-image: "nogoo9-registry.localhost:5001/amazon/aws-cli:latest"
-    nogoo9/init-command: "aws s3 mb s3://$S3_BUCKET --endpoint-url $AWS_ENDPOINT_URL 2>/dev/null || true && aws s3 sync s3://$S3_BUCKET/$S3_FOLDER /workspace --endpoint-url $AWS_ENDPOINT_URL"
-    nogoo9/pre-stop-command: "aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER --endpoint-url $AWS_ENDPOINT_URL"
+    nogoo9/init-command: "aws s3 sync s3://$S3_BUCKET/$S3_FOLDER/${{user}} /workspace --endpoint-url $AWS_ENDPOINT_URL"
+    nogoo9/pre-stop-command: "aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER/${{user}} --endpoint-url $AWS_ENDPOINT_URL"
     nogoo9/pre-stop-sidecar-image: "nogoo9-registry.localhost:5001/amazon/aws-cli:latest"
     nogoo9/default-grace-period: "10"
 data:

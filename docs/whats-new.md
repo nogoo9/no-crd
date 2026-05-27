@@ -3,6 +3,23 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.3.0
+
+- **GitHub Actions Security Tooling**: Standardized workflows with `actionlint` and `zizmor` security scanning, enforced strict job-level least-privilege permissions, and SHA-pinned Github Actions.
+- **K3d Keycloak Service for E2E OAuth**: Built a comprehensive local OIDC testing environment with a containerized Keycloak deployment (`quay.io/keycloak/keycloak:26.0`) pre-configured with a PKCE-ready public client and test users to validate authorization flows locally.
+- **Authentication & Authorization Hardening**:
+  - Enforced per-user isolation for all raw pod tools (`list_pods`, `get_pod`, `create_pod`, `delete_pod`, `patch_pod`, and `get_pod_logs`) using label selector filtering, alongside admin role escalation via JWT claims.
+  - Added cookie-based session extraction (`nocr_token`) inside the routing proxy, allowing relative sub-resources (JS, CSS, images) inside routed workspaces to load securely on new tabs.
+  - Introduced parameterizable OAuth scope checks (`AUTH_REQUIRED_READ_SCOPE`, `AUTH_REQUIRED_WRITE_SCOPE`, and `AUTH_SCOPE_JSONPATH`) to segregate read-only client permissions from mutation/execution client permissions.
+- **New `get_workspace` Tool**: Implemented a tool that retrieves workspace IP, container port, status, annotations, and preview metadata for a single workspace.
+- **UI Theme & PKCE Authorization**:
+  - Integrated a premium dark/light/system theme toggle.
+  - Implemented client-side PKCE authorization redirect login.
+  - Built an in-dashboard workspace file preview rendering engine supporting sandboxed HTML iframes and custom Markdown formatting.
+- **Bun WebSocket Upgrade Compatibility Warning**: Documented a critical regression in the Bun runtime compatibility layer (`oven-sh/bun#28871`) where asynchronous upgrade handshakes drop incoming frames, and proposed a native `Bun.serve` WebSocket proxy architecture to mitigate this.
+
+---
+
 ## What's New in v0.2.0
 
 - **Composable Programmatic SDK**: Refactored `src/index.ts` to export clean programmatic APIs for spawning, stopping, and listing workspaces/templates. Developers can pass custom `KubeConfig` or pre-configured client APIs to run custom pod lifecycles programmatically. The server startup logic is isolated in `src/server-entry.ts`.

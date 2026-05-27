@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { getLogger } from "@logtape/logtape";
 import { JSONPath } from "jsonpath-plus";
+import { config } from "~/config.js";
 
 const logger = getLogger(["nogoo9", "k8s-auth"]);
 
@@ -129,13 +130,36 @@ async function fetchJwks(jwksUri: string): Promise<JWK[]> {
 		return jwksCache;
 	}
 	try {
-		const res = await fetch(jwksUri);
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		const data = await res.json();
-		if (data && Array.isArray(data.keys)) {
-			jwksCache = data.keys;
-			jwksCacheTimestamp = now;
-			return jwksCache;
+		if (jwksUri.startsWith("http://") || jwksUri.startsWith("https://")) {
+			const res = await fetch(jwksUri);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const data = await res.json();
+			if (data && Array.isArray(data.keys)) {
+				jwksCache = data.keys;
+				jwksCacheTimestamp = now;
+				return jwksCache;
+			}
+		} else {
+			const { readFileSync } = await import("node:fs");
+			let filePath = jwksUri;
+			if (jwksUri.startsWith("file://")) {
+				try {
+					const { fileURLToPath } = await import("node:url");
+					filePath = fileURLToPath(jwksUri);
+				} catch {
+					filePath = jwksUri.substring(7);
+					if (process.platform === "win32" && filePath.startsWith("/")) {
+						filePath = filePath.substring(1);
+					}
+				}
+			}
+			const content = readFileSync(filePath, "utf-8");
+			const data = JSON.parse(content);
+			if (data && Array.isArray(data.keys)) {
+				jwksCache = data.keys;
+				jwksCacheTimestamp = now;
+				return jwksCache;
+			}
 		}
 		return [];
 	} catch (err) {
@@ -185,15 +209,12 @@ export async function verifyToken(
 	token: string,
 	expectedAudience?: string,
 ): Promise<any> {
-	// 1. Check for Token Introspection (RFC 7662)
-	const introspectionEndpoint =
-		process.env.INTROSPECTION_ENDPOINT ||
-		process.env.JWT_INTROSPECTION_ENDPOINT;
+	const introspectionEndpoint = config.auth.introspectionEndpoint;
 
 	if (introspectionEndpoint) {
 		logger.debug("Performing token verification via introspection endpoint.");
-		const clientId = process.env.OAUTH_CLIENT_ID || "";
-		const clientSecret = process.env.OAUTH_CLIENT_SECRET || "";
+		const clientId = config.auth.clientId || "";
+		const clientSecret = config.auth.clientSecret || "";
 
 		const params = new URLSearchParams({ token });
 		if (clientId) params.set("client_id", clientId);
@@ -227,7 +248,7 @@ export async function verifyToken(
 		}
 
 		// Validate audience if expectedAudience or JWT_AUDIENCE is defined
-		const targetAudience = process.env.JWT_AUDIENCE || expectedAudience;
+		const targetAudience = config.auth.audience || expectedAudience;
 		if (targetAudience) {
 			if (!data.aud) {
 				throw new Error("Token is missing required audience (aud) claim");
@@ -271,7 +292,7 @@ export async function verifyToken(
 	}
 
 	// 2.2 Validate signature if required
-	if (process.env.JWT_VERIFICATION_REQUIRED !== "false") {
+	if (config.auth.verificationRequired) {
 		const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
 		const sigBytes = base64urlDecodeToBuffer(signature);
 		let cryptoKey: CryptoKey | null = null;
@@ -280,7 +301,7 @@ export async function verifyToken(
 		const alg = header.alg || "RS256";
 		if (alg === "HS256") {
 			algorithmName = "HMAC";
-			const secret = process.env.JWT_SECRET;
+			const secret = config.auth.secret;
 			if (!secret)
 				throw new Error("JWT_SECRET is not configured on the server");
 			cryptoKey = await crypto.subtle.importKey(
@@ -292,8 +313,8 @@ export async function verifyToken(
 			);
 		} else if (alg === "RS256" || alg === "ES256") {
 			algorithmName = alg === "RS256" ? "RSASSA-PKCS1-v1_5" : "ECDSA";
-			const publicKeyPem = process.env.JWT_PUBLIC_KEY;
-			const jwksUri = process.env.JWKS_URI;
+			const publicKeyPem = config.auth.publicKey;
+			const jwksUri = config.auth.jwksUri;
 
 			if (publicKeyPem) {
 				const pemContents = publicKeyPem
@@ -357,7 +378,7 @@ export async function verifyToken(
 	}
 
 	// 2.3 Validate audience if expectedAudience or JWT_AUDIENCE is defined
-	const targetAudience = process.env.JWT_AUDIENCE || expectedAudience;
+	const targetAudience = config.auth.audience || expectedAudience;
 	if (targetAudience) {
 		if (!payload.aud) {
 			throw new Error("Token is missing required audience (aud) claim");
@@ -379,4 +400,280 @@ export async function verifyToken(
 	}
 
 	return payload;
+}
+
+/**
+ * Extracts the user's roles from a decrypted JWT payload using JSONPath.
+ * Checks if the configured admin role is present in those roles.
+ *
+ * @param jwtPayload Decrypted JWT payload dictionary.
+ * @param jsonPathExpr JSONPath expression specifying where the roles array resides. Defaults to `"$.realm_access.roles"`.
+ * @param adminRole Name of the admin role to check for. Defaults to `"nogoo9-admin"`.
+ * @returns true if the user has the admin role, false otherwise.
+ */
+export function extractAdminRole(
+	jwtPayload: unknown,
+	jsonPathExpr = "$.realm_access.roles",
+	adminRole = "nogoo9-admin",
+): boolean {
+	logger.debug(
+		"Checking admin role in JWT payload using expression '{expr}' and role name '{role}'",
+		{
+			expr: jsonPathExpr,
+			role: adminRole,
+		},
+	);
+	if (!jwtPayload || typeof jwtPayload !== "object") {
+		return false;
+	}
+	try {
+		const match = JSONPath<unknown[]>({
+			path: jsonPathExpr,
+			json: jwtPayload as object,
+		});
+		if (!match || match.length === 0) {
+			return false;
+		}
+		const roles = match[0];
+		if (Array.isArray(roles)) {
+			return roles.includes(adminRole);
+		}
+		if (typeof roles === "string") {
+			return roles === adminRole;
+		}
+		return false;
+	} catch (err) {
+		logger.warn("Failed to extract admin role using JSONPath: {error}", {
+			error: err,
+		});
+		return false;
+	}
+}
+
+/**
+ * Utility to extract a cookie value from a `Cookie` header.
+ *
+ * @param cookieHeader The raw `Cookie` header value.
+ * @param cookieName The name of the cookie to extract. Defaults to `"nocr_token"`.
+ * @returns The cookie value, or undefined if not found.
+ */
+export function extractTokenFromCookie(
+	cookieHeader: string | undefined | null,
+	cookieName = "nocr_token",
+): string | undefined {
+	if (!cookieHeader) return undefined;
+	const cookies = cookieHeader.split(";");
+	for (const cookie of cookies) {
+		const parts = cookie.trim().split("=");
+		const name = parts[0];
+		if (name === cookieName) {
+			return parts.slice(1).join("=");
+		}
+	}
+	return undefined;
+}
+
+/**
+ * Checks if the JWT payload contains the required scope.
+ * Supports both space-separated scope strings and array of scopes.
+ *
+ * @param jwtPayload Decrypted JWT payload dictionary.
+ * @param requiredScope The required scope string (e.g., "mcp:read"). If undefined, returns true.
+ * @param jsonPathExpr JSONPath expression specifying where the scope claim resides. Defaults to "$.scope".
+ * @returns true if scope is present/valid, false otherwise.
+ */
+export function hasRequiredScope(
+	jwtPayload: unknown,
+	requiredScope?: string,
+	jsonPathExpr = "$.scope",
+): boolean {
+	if (!requiredScope) {
+		return true;
+	}
+	if (!jwtPayload || typeof jwtPayload !== "object") {
+		return false;
+	}
+	try {
+		// First try JSONPath lookup
+		const match = JSONPath<unknown[]>({
+			path: jsonPathExpr,
+			json: jwtPayload as object,
+		});
+		let scopesVal: unknown = match && match.length > 0 ? match[0] : undefined;
+
+		// Fallback to $.scp if default $.scope returned nothing
+		if (scopesVal === undefined && jsonPathExpr === "$.scope") {
+			const fallbackMatch = JSONPath<unknown[]>({
+				path: "$.scp",
+				json: jwtPayload as object,
+			});
+			scopesVal =
+				fallbackMatch && fallbackMatch.length > 0
+					? fallbackMatch[0]
+					: undefined;
+		}
+
+		// Direct fallback checks if JSONPath didn't resolve anything
+		if (scopesVal === undefined) {
+			scopesVal = (jwtPayload as any).scope ?? (jwtPayload as any).scp;
+		}
+
+		if (scopesVal === undefined || scopesVal === null) {
+			return false;
+		}
+
+		if (Array.isArray(scopesVal)) {
+			return scopesVal.some((s) => String(s) === requiredScope);
+		}
+		if (typeof scopesVal === "string") {
+			const parts = scopesVal.split(/\s+/);
+			return parts.includes(requiredScope);
+		}
+		return false;
+	} catch (err) {
+		logger.warn("Failed to extract scope using JSONPath: {error}", {
+			error: err,
+		});
+		return false;
+	}
+}
+
+/**
+ * Validates scope against JWT payload, throwing a clear error if mismatch.
+ */
+export function verifyScopeOrThrow(
+	jwtPayload: unknown,
+	requiredScope?: string,
+	jsonPathExpr = "$.scope",
+): void {
+	if (!requiredScope) {
+		return;
+	}
+	if (!hasRequiredScope(jwtPayload, requiredScope, jsonPathExpr)) {
+		throw new Error(`Forbidden: Missing required scope: ${requiredScope}`);
+	}
+}
+
+/**
+ * Checks if the JWT payload contains the required role.
+ * Supports checking standard roles arrays or strings, and always allows admins.
+ *
+ * @param jwtPayload Decrypted JWT payload dictionary.
+ * @param requiredRole The required role string (e.g., "mcp-reader"). If undefined, returns true.
+ * @param jsonPathExpr JSONPath expression specifying where the roles claim resides. Defaults to "$.realm_access.roles".
+ * @returns true if role is present/valid, false otherwise.
+ */
+export function hasRequiredRole(
+	jwtPayload: unknown,
+	requiredRole?: string,
+	jsonPathExpr = "$.realm_access.roles",
+): boolean {
+	if (!requiredRole) {
+		return true;
+	}
+	if (!jwtPayload || typeof jwtPayload !== "object") {
+		return false;
+	}
+
+	// Admins always bypass role checks
+	const adminRole = config.auth.adminRole;
+	const adminJsonPath = config.auth.rolesJsonPath;
+	if (extractAdminRole(jwtPayload, adminJsonPath, adminRole)) {
+		return true;
+	}
+
+	try {
+		// First try JSONPath lookup
+		const match = JSONPath<unknown[]>({
+			path: jsonPathExpr,
+			json: jwtPayload as object,
+		});
+		let rolesVal: unknown = match && match.length > 0 ? match[0] : undefined;
+
+		// Fallback to $.roles if default $.realm_access.roles returned nothing
+		if (rolesVal === undefined && jsonPathExpr === "$.realm_access.roles") {
+			const fallbackMatch = JSONPath<unknown[]>({
+				path: "$.roles",
+				json: jwtPayload as object,
+			});
+			rolesVal =
+				fallbackMatch && fallbackMatch.length > 0
+					? fallbackMatch[0]
+					: undefined;
+		}
+
+		// Direct fallback checks if JSONPath didn't resolve anything
+		if (rolesVal === undefined) {
+			rolesVal =
+				(jwtPayload as any).roles ?? (jwtPayload as any).realm_access?.roles;
+		}
+
+		if (rolesVal === undefined || rolesVal === null) {
+			return false;
+		}
+
+		if (Array.isArray(rolesVal)) {
+			return rolesVal.some((r) => String(r) === requiredRole);
+		}
+		if (typeof rolesVal === "string") {
+			const parts = rolesVal.split(/[\s,]+/);
+			return parts.includes(requiredRole);
+		}
+		return false;
+	} catch (err) {
+		logger.warn("Failed to extract roles using JSONPath: {error}", {
+			error: err,
+		});
+		return false;
+	}
+}
+
+/**
+ * Validates role against JWT payload, throwing a clear error if mismatch.
+ */
+export function verifyRoleOrThrow(
+	jwtPayload: unknown,
+	requiredRole?: string,
+	jsonPathExpr = "$.realm_access.roles",
+): void {
+	if (!requiredRole) {
+		return;
+	}
+	if (!hasRequiredRole(jwtPayload, requiredRole, jsonPathExpr)) {
+		throw new Error(`Forbidden: Missing required role: ${requiredRole}`);
+	}
+}
+
+/**
+ * Verifies both scope and role constraints against the JWT payload for a given action.
+ */
+export function verifyAccessOrThrow(
+	jwtPayload: unknown,
+	action: "read" | "write",
+): void {
+	// 1. Verify Scope
+	const requiredScope =
+		action === "read"
+			? config.auth.requiredReadScope
+			: config.auth.requiredWriteScope;
+	const scopeJsonPath = config.auth.scopeJsonPath;
+	if (
+		requiredScope &&
+		!hasRequiredScope(jwtPayload, requiredScope, scopeJsonPath)
+	) {
+		throw new Error(`Forbidden: Missing required scope: ${requiredScope}`);
+	}
+
+	// 2. Verify Role
+	const requiredRole =
+		action === "read"
+			? config.auth.requiredReadRole
+			: config.auth.requiredWriteRole;
+	const rolesJsonPath = config.auth.rolesJsonPath;
+	if (
+		requiredRole &&
+		!hasRequiredRole(jwtPayload, requiredRole, rolesJsonPath)
+	) {
+		throw new Error(`Forbidden: Missing required role: ${requiredRole}`);
+	}
 }

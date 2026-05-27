@@ -32,10 +32,20 @@ Options:
   -r, --runtime <type>       JS/TS runtime engine to use: bun, deno, node (default: bun)
   --tls-cert <path>          Path to TLS certificate file for HTTPS
   --tls-key <path>           Path to TLS private key file for HTTPS
+  --tls-ca <path>            Path to TLS CA certificate file for HTTPS
   --disable-permission-checks Disable Kubernetes RBAC permission checks
   --cors-origin <origin>     CORS Allowed Origin (default: *)
   --cors-methods <methods>   CORS Allowed Methods (default: GET, POST, OPTIONS)
   --cors-headers <headers>   CORS Allowed Headers (default: Content-Type, Authorization, mcp-protocol-version)
+  --cors-allow-credentials   Enable CORS Access-Control-Allow-Credentials (default: false)
+  --cors-expose-headers <headers> CORS Exposed Headers (default: mcp-session-id)
+  --cors-max-age <seconds>   CORS Access-Control-Max-Age header
+  --auth-required-read-scope <scope>  OAuth scope required for read operations
+  --auth-required-write-scope <scope> OAuth scope operations require write scope
+  --auth-scope-jsonpath <path>        JSONPath to extract scope claims from JWT payload (default: $.scope)
+  --auth-required-read-role <role>    User role required for read operations
+  --auth-required-write-role <role>   User role required for write operations
+  --auth-roles-jsonpath <path>        JSONPath to extract roles from JWT payload (default: $.realm_access.roles)
   -c, --check-permissions    Run Kubernetes RBAC permissions diagnostics and exit
   -h, --help                 Show this help message
 `);
@@ -56,11 +66,21 @@ async function main(): Promise<void> {
 	let runtime = "bun";
 	let tlsCert: string | undefined;
 	let tlsKey: string | undefined;
+	let tlsCa: string | undefined;
 	let checkPermissionsOnly = false;
 	let disablePermissionChecks = false;
 	let corsOrigin = "*";
 	let corsMethods = "GET, POST, OPTIONS";
 	let corsHeaders = "Content-Type, Authorization, mcp-protocol-version";
+	let corsAllowCredentials = "false";
+	let corsExposeHeaders = "mcp-session-id";
+	let corsMaxAge: string | undefined;
+	let authRequiredReadScope: string | undefined;
+	let authRequiredWriteScope: string | undefined;
+	let authScopeJsonpath = "$.scope";
+	let authRequiredReadRole: string | undefined;
+	let authRequiredWriteRole: string | undefined;
+	let authRolesJsonpath = "$.realm_access.roles";
 
 	const args = process.argv;
 	for (let i = 2; i < args.length; i++) {
@@ -140,6 +160,13 @@ async function main(): Promise<void> {
 				process.exit(1);
 			}
 			tlsKey = val;
+		} else if (arg === "--tls-ca") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --tls-ca path value.");
+				process.exit(1);
+			}
+			tlsCa = val;
 		} else if (arg === "-c" || arg === "--check-permissions") {
 			checkPermissionsOnly = true;
 		} else if (arg === "--disable-permission-checks") {
@@ -165,6 +192,64 @@ async function main(): Promise<void> {
 				process.exit(1);
 			}
 			corsHeaders = val;
+		} else if (arg === "--cors-allow-credentials") {
+			corsAllowCredentials = "true";
+		} else if (arg === "--cors-expose-headers") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --cors-expose-headers value.");
+				process.exit(1);
+			}
+			corsExposeHeaders = val;
+		} else if (arg === "--cors-max-age") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --cors-max-age value.");
+				process.exit(1);
+			}
+			corsMaxAge = val;
+		} else if (arg === "--auth-required-read-scope") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --auth-required-read-scope value.");
+				process.exit(1);
+			}
+			authRequiredReadScope = val;
+		} else if (arg === "--auth-required-write-scope") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --auth-required-write-scope value.");
+				process.exit(1);
+			}
+			authRequiredWriteScope = val;
+		} else if (arg === "--auth-scope-jsonpath") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --auth-scope-jsonpath value.");
+				process.exit(1);
+			}
+			authScopeJsonpath = val;
+		} else if (arg === "--auth-required-read-role") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --auth-required-read-role value.");
+				process.exit(1);
+			}
+			authRequiredReadRole = val;
+		} else if (arg === "--auth-required-write-role") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --auth-required-write-role value.");
+				process.exit(1);
+			}
+			authRequiredWriteRole = val;
+		} else if (arg === "--auth-roles-jsonpath") {
+			const val = args[++i];
+			if (!val) {
+				console.error("Error: Missing --auth-roles-jsonpath value.");
+				process.exit(1);
+			}
+			authRolesJsonpath = val;
 		} else if (arg === "-h" || arg === "--help") {
 			printHelp();
 			process.exit(0);
@@ -221,10 +306,10 @@ async function main(): Promise<void> {
 		process.exit(1);
 	}
 
-	if (tlsCert || tlsKey) {
+	if (tlsCert || tlsKey || tlsCa) {
 		if (!tlsCert || !tlsKey) {
 			console.error(
-				"Error: Both --tls-cert and --tls-key must be specified to enable HTTPS.",
+				"Error: Both --tls-cert and --tls-key must be specified to enable HTTPS (even when using --tls-ca).",
 			);
 			process.exit(1);
 		}
@@ -242,7 +327,25 @@ async function main(): Promise<void> {
 		CORS_ALLOWED_ORIGIN: corsOrigin,
 		CORS_ALLOWED_METHODS: corsMethods,
 		CORS_ALLOWED_HEADERS: corsHeaders,
+		CORS_ALLOW_CREDENTIALS: corsAllowCredentials,
+		CORS_EXPOSED_HEADERS: corsExposeHeaders,
+		...(corsMaxAge ? { CORS_MAX_AGE: corsMaxAge } : {}),
+		...(authRequiredReadScope
+			? { AUTH_REQUIRED_READ_SCOPE: authRequiredReadScope }
+			: {}),
+		...(authRequiredWriteScope
+			? { AUTH_REQUIRED_WRITE_SCOPE: authRequiredWriteScope }
+			: {}),
+		AUTH_SCOPE_JSONPATH: authScopeJsonpath,
+		...(authRequiredReadRole
+			? { AUTH_REQUIRED_READ_ROLE: authRequiredReadRole }
+			: {}),
+		...(authRequiredWriteRole
+			? { AUTH_REQUIRED_WRITE_ROLE: authRequiredWriteRole }
+			: {}),
+		AUTH_ROLES_JSONPATH: authRolesJsonpath,
 		...(tlsCert && tlsKey ? { TLS_CERT: tlsCert, TLS_KEY: tlsKey } : {}),
+		...(tlsCa ? { TLS_CA: tlsCa } : {}),
 	};
 
 	let runCmd = "";

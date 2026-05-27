@@ -1,0 +1,46 @@
+/* Name: Superhuman */
+:root {
+  --bg-color: #f5f6f7;
+  --text-color: #4b5563;
+  --text-title: #111827;
+  --text-muted: #9ca3af;
+  --panel-bg: #ffffff;
+  --panel-border: #e5e7eb;
+  --item-border: #e5e7eb;
+  --modal-bg: #ffffff;
+  --input-bg: #f5f6f7;
+  --input-border: #e5e7eb;
+  --input-text: #111827;
+  --badge-bg: #f3f4f6;
+  --badge-text: #4b5563;
+  --accent-color: #3b82f6;
+  --accent-active: #2563eb;
+  --success-color: #10b981;
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --panel-hover-bg: #f3f4f6;
+  --accent-amber: #f59e0b;
+}
+
+:root.dark {
+  --bg-color: #0a0b0d;
+  --text-color: #b3b7bd;
+  --text-title: #f3f4f6;
+  --text-muted: #4b5563;
+  --panel-bg: #121317;
+  --panel-border: #1f2937;
+  --item-border: #1f2937;
+  --modal-bg: #121317;
+  --input-bg: #0a0b0d;
+  --input-border: #1f2937;
+  --input-text: #f3f4f6;
+  --badge-bg: #1f2937;
+  --badge-text: #b3b7bd;
+  --accent-color: #3b82f6;
+  --accent-active: #2563eb;
+  --success-color: #10b981;
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --panel-hover-bg: #1f2937;
+  --accent-amber: #f59e0b;
+}

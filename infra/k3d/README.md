@@ -1,21 +1,59 @@
-# Minimal k3d Local Kubernetes Environment
+# Local Kubernetes Dev Sandbox (k3d)
 
-This directory contains the configurations and scripts to bootstrap a minimal local Kubernetes development environment using `k3d` to run, test, and debug the `@nogoo9/kube-mcp` service.
-
-## Prerequisites
-
-Ensure you have the following installed on your machine:
-- **Docker**
-- **k3d** (`curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.6.0 bash`)
-- **kubectl**
-- **Bun** (for package management and scripts)
-- **Moon** (task runner)
+This directory contains the configurations and scripts to bootstrap a local Kubernetes development environment using `k3d`. It is designed to run, test, and validate the `@nogoo9/kube-mcp` service, Keycloak OIDC authentication, and resource-isolated workspace lifecycles in a production-like setting.
 
 ---
 
-## 1. Setup (Bootstrap Cluster)
+## 1. System Architecture
 
-To spin up the cluster, build the `@nogoo9/kube-mcp` image, push it to the local registry, and deploy all services:
+The local development cluster routes all external traffic through a single Traefik Ingress controller mapped to port `8080` on the host machine. 
+
+```mermaid
+graph TD
+    subgraph Host Machine
+        HostPort[http://localhost:8080]
+        RegistryPort[localhost:5001]
+    end
+
+    subgraph k3d Cluster (nogoo-dev)
+        Ingress[Traefik Ingress Controller] -->|/auth| KeycloakService[Keycloak Service]
+        Ingress -->|/mcp| McpService[MCP Server Service]
+        Ingress -->|/route/:id| McpService
+        
+        McpService -->|Proxies dynamically| PodA[Workspace Pod A]
+        McpService -->|Proxies dynamically| PodB[Workspace Pod B]
+
+        McpService -->|Dynamic JWKS Resolution| KeycloakService
+        
+        PodA -->|AWS SDK S3 Sync| RustfsService[Rustfs Mock S3 Service]
+        PodB -->|AWS SDK S3 Sync| RustfsService
+    end
+
+    HostPort --> Ingress
+    RegistryPort --> LocalRegistry[Local Registry: nogoo9-registry.localhost]
+```
+
+### Ingress Routing Rules
+- `/auth` routes to Keycloak (`keycloak:8080`) for user authentication.
+- `/mcp` routes to the MCP Server (`nogoo-mcp:3000`) for SSE/JSON-RPC interactions.
+- `/route/<workspace-id>/` routes to the MCP Server proxy which dynamically forwards requests to the designated running agent workspace pod.
+
+---
+
+## 2. Prerequisites
+
+Ensure you have the following installed locally:
+- **Docker**
+- **k3d** (`curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.6.0 bash`)
+- **kubectl**
+- **Bun** (for running scripts and package management)
+- **Moon** (workspace task runner)
+
+---
+
+## 3. Bootstrapping the Cluster
+
+To spin up the cluster, build the images, push them to the local registry, and deploy all manifests:
 
 ```bash
 # Using Moon
@@ -25,79 +63,130 @@ moon run k3d:bootstrap
 ./bootstrap.sh
 ```
 
-This script will automatically:
-1. Initialize the single-node `k3d` cluster (`nogoo-dev`) if it doesn't exist, or start it if it exists but is stopped.
-2. Add `nogoo9-registry.localhost` to your `/etc/hosts` if not present.
-3. Pre-load testing images (like `aws-cli` and `rustfs`) to the registry.
-4. Build the `@nogoo9/kube-mcp` docker image using the local Dockerfile and push it.
-5. Apply the Kubernetes manifests (namespace, Rbac roles, MCP server, mock S3, and the in-cluster MCP Inspector).
+### What happens under the hood?
+1. **Cluster Creation**: Initializes a single-node k3d cluster named `nogoo-dev` using [cluster.yaml](file:///home/eterna2/github/nogoo9-no-crd/infra/k3d/cluster.yaml).
+2. **Kubeconfig Patching**: Modifies your active kubeconfig to route the Kubernetes API server via loopback (`127.0.0.1`) instead of `0.0.0.0`.
+3. **Image Cache Pre-loading**: Pulls external test images (`rustfs`, `aws-cli`, `bun`) and pushes them to the local registry at `nogoo9-registry.localhost:5001`.
+4. **Local Builds**:
+   - Builds the `@nogoo9/kube-mcp` image and pushes it to the registry.
+   - Builds the `nogoo9/antigravity-agent` image and imports it directly into the cluster.
+5. **Manifest Application**: Installs the namespace (`nogoo9`), RBAC rules, Keycloak (pre-loaded with realms and users), `rustfs` mock storage service, and the MCP server.
 
-### Starting a stopped cluster
-If you have stopped the cluster and want to start it without running the full bootstrap process:
+To start a stopped cluster without repeating the full bootstrap process:
 ```bash
 moon run k3d:start
 ```
 
 ---
 
-## 2. Accessing the Services
+## 4. Exposed Services & Endpoints
 
-Once the bootstrap task completes, you can access the exposed services on the host machine:
+Once bootstrapped, the following services are reachable from your host machine:
 
-- **MCP Server HTTP SSE Endpoint**: `http://localhost:8080/mcp`
-
----
-
-## 3. Using the MCP Inspector
-
-The MCP Inspector can be run locally on the host to connect and debug the MCP server:
-
-1. Run `moon run mcp:inspect` or `bun run inspect`.
-2. Open `http://localhost:6277` in your browser.
-3. In the connection panel, select **SSE** (Server-Sent Events) as the transport method.
-4. Set the SSE URL to: `http://localhost:8080/mcp`.
-5. Click **Connect** to browse, inspect, and trigger the tools.
+| Service | Port / Protocol | Local Endpoint | Details & Credentials |
+| :--- | :--- | :--- | :--- |
+| **MCP Server SSE** | HTTP / SSE | `http://localhost:8080/mcp` | Primary entry point for MCP clients (Inspector, Cursor, etc.). |
+| **Keycloak Console** | HTTP | `http://localhost:8080/auth` | OIDC Admin Console. Admin Credentials: `admin` / `admin`. |
+| **Keycloak Realm OIDC** | HTTP / JSON | `http://localhost:8080/auth/realms/nogoo9/.well-known/openid-configuration` | OpenID discovery configuration endpoint. |
+| **Keycloak JWKS** | HTTP / JSON | `http://localhost:8080/auth/realms/nogoo9/protocol/openid-connect/certs` | JWK Set endpoint for signature validation. |
+| **Rustfs Mock S3** | HTTP (In-cluster only) | `http://rustfs.nogoo9.svc.cluster.local:80` | Mock S3 Bucket Storage. Access Key: `test-access-key` / Secret Key: `test-secret-key`. |
 
 ---
 
-## 4. Development Rebuilds
+## 5. Authentication & Authorization (No-CRD Side)
 
-If you make modifications to the MCP server code, you can quickly rebuild the container, push it to the registry, and trigger a rolling update of the Kubernetes pod:
+The project includes built-in OIDC-compliant authentication, user-level RBAC, and tenant resource isolation, enforced entirely without Custom Resource Definitions (CRDs).
 
-```bash
-# Standard local setup
-moon run mcp:deploy
+### 5.1 Configuration
+Authentication behavior on the MCP server is governed by the following environment variables (defined in [deployment.yaml](file:///home/eterna2/github/nogoo9-no-crd/infra/k3d/manifests/mcp/deployment.yaml)):
+- `AUTH_ENABLED="true"`: Toggles authentication checks.
+- `JWKS_URI`: Cluster-internal URL to retrieve Keycloak public keys to verify signature integrity.
+- `AUTH_ISSUER`: Expected token issuer (`http://localhost:8080/auth/realms/nogoo9`).
+- `AUTH_SUB_JSONPATH`: JSONPath expression to extract the unique user identifier (default: `$.sub`).
+- `AUTH_ADMIN_JSONPATH`: JSONPath to locate role array claims (default: `$.realm_access.roles`).
+- `AUTH_ADMIN_ROLE`: Role name granting admin escalation capabilities (default: `nogoo9-admin`).
+- `AUTH_REQUIRED_READ_SCOPE`: Scope required for read operations (e.g. `mcp:read`).
+- `AUTH_REQUIRED_WRITE_SCOPE`: Scope required for write/mutation operations (e.g. `mcp:write`).
+- `AUTH_SCOPE_JSONPATH`: JSONPath to locate scope claims in the token (default: `$.scope`).
+- `AUTH_REQUIRED_READ_ROLE`: User role required for read operations (e.g. `mcp-reader`).
+- `AUTH_REQUIRED_WRITE_ROLE`: User role required for write/mutation operations (e.g. `mcp-writer`).
+- `AUTH_ROLES_JSONPATH`: JSONPath to locate user role claims in the token (default: `$.realm_access.roles`).
 
-# If running on WSL 2
-moon run mcp:deploy-wsl
-```
+### 5.2 Token Acceptance
+The MCP server accepts JWTs via three mechanisms:
+1. **Authorization Header**: `Authorization: Bearer <token>`
+2. **Query Parameter**: `?token=<token>`
+3. **Cookie**: Cookie named `nocr_token` (typically used for routed session persistence).
+
+### 5.3 OIDC Realm Users
+Keycloak is provisioned with a realm named `nogoo9` and two preset developer accounts:
+- **Standard User**: `testuser` / `password` (has no special roles; restricted to own workspaces).
+- **Admin User**: `adminuser` / `password` (has the `nogoo9-admin` role; possesses administrative rights).
+
+### 5.4 RBAC & Tenant Isolation
+- **Resource Ownership Enforcer**: When `AUTH_ENABLED` is `true`, any invocation of pod management tools (`list_pods`, `get_pod`, `delete_pod`, `list_workspaces`, `stop_workspace`, `spawn_workspace`) automatically extracts the requester's `sub` identifier. The server then appends `nogoo9/user-sub=<extracted-sub>` as a label selector filter to all Kubernetes API queries and assigns it to created pods/workspaces.
+- **Admin Bypass**: Users carrying the `nogoo9-admin` role bypass the sub-filtering, allowing cluster administrators to query, inspect, and delete workspaces belonging to any tenant.
+- **Routing Proxy Owner Check**: The `/route/<workspace-id>/` proxy ensures that standard users can only route traffic to workspaces they own. When a standard user accesses their workspace with a valid Bearer token, the proxy issues a path-scoped cookie:
+  ```http
+  Set-Cookie: nocr_token=<token>; Path=/route/<workspace-id>/; SameSite=Lax; HttpOnly; Max-Age=86400
+  ```
+  Subsequent requests to sub-resources (like static HTML, CSS, and JS files) automatically present the cookie, maintaining authentication without requiring headers on every asset request.
+- **RFC 9728 Compliance**: If a client attempts to connect to `/mcp`, `/permissions`, or `/route/*` without a valid token, the server returns a `401 Unauthorized` response with matching `WWW-Authenticate` and `Link` headers directing clients to the OAuth protected resource metadata endpoint (`/.well-known/oauth-protected-resource`).
 
 ---
 
-## 5. Running Validation & Tests
+## 6. Running the Demos & Verification Tests
 
-To run local formatting and type checking:
-```bash
-# From root
-bun run format && bun run typecheck
-```
+### Scenario A: Local Workspace Lifecycle Demo
+This demo launches a stdio-based MCP client, registers templates, spawns a workspace pod, executes commands inside it, validates local S3 sync, and stops the workspace (checking that data is synced back to S3 on shutdown).
 
-To run all unit tests:
 ```bash
-moon run mcp:test
-```
-
-To validate the full workspace spawner lifecycle (spawns pod, writes to mock S3, tears down, validates artifact sync):
-```bash
-# From root
 bun run test:lifecycle
 ```
 
+### Scenario B: E2E Authentication & Resource Isolation Test
+This validates the authentication challenges, token-fetching, RBAC isolation boundary, admin escalation, and proxy cookie persistence against the running cluster.
+
+```bash
+moon run mcp:test-e2e-auth
+```
+
+### Scenario C: Interactive Tool Debugging via MCP Inspector
+To manually test and debug the MCP tools in a browser-based UI:
+
+1. Launch the inspector from the project root:
+   ```bash
+   moon run mcp:inspect # or: bun run inspect
+   ```
+2. Open `http://localhost:6277` in your browser.
+3. Select **SSE** (Server-Sent Events) as the connection type.
+4. Set the SSE URL to `http://localhost:8080/mcp`.
+5. *Note: If `AUTH_ENABLED` is true, you must provide a valid OIDC token in the headers/query parameters (e.g. `?token=<JWT>`) to successfully connect.*
+
 ---
 
-## 6. Teardown
+## 7. Development Iteration
 
-To stop and delete the k3d cluster completely:
+If you modify the MCP server source code and want to redeploy it to the cluster:
+
+```bash
+# Redeploy on Linux / macOS
+moon run mcp:deploy
+
+# Redeploy if using Windows / WSL 2
+moon run mcp:deploy-wsl
+```
+
+This task compiles the TypeScript codebase, rebuilds the docker container, pushes it to your local registry, and triggers a Kubernetes rolling rollout restart:
+```bash
+kubectl -n nogoo9 rollout restart deployment/nogoo-mcp
+```
+
+---
+
+## 8. Teardown
+
+To delete all deployments, stop the registry, and completely destroy the k3d cluster:
 
 ```bash
 # Using Moon
@@ -106,3 +195,4 @@ moon run k3d:teardown
 # Or run the script directly
 ./teardown.sh
 ```
+

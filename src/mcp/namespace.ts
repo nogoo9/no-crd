@@ -2,7 +2,13 @@ import { getLogger } from "@logtape/logtape";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { evaluatePermissions, type K8sContext } from "~/k8s/index.js";
+import { config } from "~/config.js";
+import {
+	evaluatePermissions,
+	type K8sContext,
+	requestContextStore,
+	verifyAccessOrThrow,
+} from "~/k8s/index.js";
 
 const _logger = getLogger(["nogoo9", "mcp-namespace"]);
 
@@ -67,22 +73,37 @@ export function registerNamespaceTools(
 		{
 			description:
 				"Show the namespace and mode this MCP server is currently configured to use",
-			inputSchema: {},
+			inputSchema: {
+				jwtPayload: z.record(z.string(), z.unknown()).optional(),
+			},
 			outputSchema: CurrentNamespaceOutputSchema.shape,
 			_meta: { ui: { resourceUri: APP_URI } },
 		},
-		async (): Promise<{
+		async ({
+			jwtPayload,
+		}): Promise<{
 			content: Array<{ type: "text"; text: string }>;
 			structuredContent: z.infer<typeof CurrentNamespaceOutputSchema>;
-		}> => ({
-			content: [
-				{
-					type: "text" as const,
-					text: currentNamespaceText(defaultNamespace, mode),
-				},
-			],
-			structuredContent: currentNamespaceData(defaultNamespace, mode),
-		}),
+		}> => {
+			const authEnabled = config.auth.enabled;
+			const store = requestContextStore.getStore();
+			const activeJwtPayload = jwtPayload || store?.jwtPayload;
+			if (authEnabled) {
+				if (!activeJwtPayload) {
+					throw new Error("Unauthorized: jwtPayload required");
+				}
+				verifyAccessOrThrow(activeJwtPayload, "read");
+			}
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: currentNamespaceText(defaultNamespace, mode),
+					},
+				],
+				structuredContent: currentNamespaceData(defaultNamespace, mode),
+			};
+		},
 	);
 
 	registerAppTool(
@@ -91,16 +112,29 @@ export function registerNamespaceTools(
 		{
 			description:
 				"Verify the Kubernetes RBAC permissions of the current session and list enabled/disabled tools",
-			inputSchema: {},
+			inputSchema: {
+				jwtPayload: z.record(z.string(), z.unknown()).optional(),
+			},
 			outputSchema: CheckPermissionsOutputSchema.shape,
 			_meta: { ui: { resourceUri: APP_URI } },
 		},
-		async (): Promise<{
+		async ({
+			jwtPayload,
+		}): Promise<{
 			content: Array<{ type: "text"; text: string }>;
 			structuredContent?: z.infer<typeof CheckPermissionsOutputSchema>;
 			isError?: boolean;
 		}> => {
 			try {
+				const authEnabled = config.auth.enabled;
+				const store = requestContextStore.getStore();
+				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				if (authEnabled) {
+					if (!activeJwtPayload) {
+						throw new Error("Unauthorized: jwtPayload required");
+					}
+					verifyAccessOrThrow(activeJwtPayload, "read");
+				}
 				const report = await evaluatePermissions(
 					k8sContext,
 					defaultNamespace,

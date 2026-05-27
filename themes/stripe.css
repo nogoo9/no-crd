@@ -1,0 +1,46 @@
+/* Name: Stripe */
+:root {
+  --bg-color: #f6f9fc;
+  --text-color: #425466;
+  --text-title: #0a2540;
+  --text-muted: #697386;
+  --panel-bg: #ffffff;
+  --panel-border: #e6ebf1;
+  --item-border: #e6ebf1;
+  --modal-bg: #ffffff;
+  --input-bg: #ffffff;
+  --input-border: #dbdfeb;
+  --input-text: #0a2540;
+  --badge-bg: #f6f9fc;
+  --badge-text: #425466;
+  --accent-color: #635bff;
+  --accent-active: #4d44e6;
+  --success-color: #22c55e;
+  --error-color: #df1b41;
+  --warning-color: #e3b300;
+  --panel-hover-bg: #f8fafc;
+  --accent-amber: #e3b300;
+}
+
+:root.dark {
+  --bg-color: #0b0c10;
+  --text-color: #adbac7;
+  --text-title: #f0f6fc;
+  --text-muted: #768390;
+  --panel-bg: #161b22;
+  --panel-border: #30363d;
+  --item-border: #30363d;
+  --modal-bg: #161b22;
+  --input-bg: #0d1117;
+  --input-border: #30363d;
+  --input-text: #f0f6fc;
+  --badge-bg: #21262d;
+  --badge-text: #adbac7;
+  --accent-color: #635bff;
+  --accent-active: #4d44e6;
+  --success-color: #22c55e;
+  --error-color: #df1b41;
+  --warning-color: #e3b300;
+  --panel-hover-bg: #21262d;
+  --accent-amber: #e3b300;
+}

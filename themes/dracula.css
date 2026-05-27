@@ -1,0 +1,46 @@
+/* Name: Dracula */
+:root {
+  --bg-color: #f8f8f2;
+  --text-color: #44475a;
+  --text-title: #282a36;
+  --text-muted: #6272a4;
+  --panel-bg: #ffffff;
+  --panel-border: #e2e4e9;
+  --item-border: #e2e4e9;
+  --modal-bg: #ffffff;
+  --input-bg: #f8f8f2;
+  --input-border: #e2e4e9;
+  --input-text: #282a36;
+  --badge-bg: #f1f2f4;
+  --badge-text: #44475a;
+  --accent-color: #bd93f9;
+  --accent-active: #ff79c6;
+  --success-color: #50fa7b;
+  --error-color: #ff5555;
+  --warning-color: #f1fa8c;
+  --panel-hover-bg: #f1f2f4;
+  --accent-amber: #f1fa8c;
+}
+
+:root.dark {
+  --bg-color: #282a36;
+  --text-color: #f8f8f2;
+  --text-title: #ff79c6;
+  --text-muted: #6272a4;
+  --panel-bg: #1e1f29;
+  --panel-border: #44475a;
+  --item-border: #44475a;
+  --modal-bg: #1e1f29;
+  --input-bg: #282a36;
+  --input-border: #44475a;
+  --input-text: #f8f8f2;
+  --badge-bg: #44475a;
+  --badge-text: #f8f8f2;
+  --accent-color: #bd93f9;
+  --accent-active: #ff79c6;
+  --success-color: #50fa7b;
+  --error-color: #ff5555;
+  --warning-color: #f1fa8c;
+  --panel-hover-bg: #44475a;
+  --accent-amber: #f1fa8c;
+}

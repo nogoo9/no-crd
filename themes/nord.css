@@ -1,0 +1,46 @@
+/* Name: Nord */
+:root {
+  --bg-color: #eceff4;
+  --text-color: #4c566a;
+  --text-title: #2e3440;
+  --text-muted: #d8dee9;
+  --panel-bg: #ffffff;
+  --panel-border: #e5e9f0;
+  --item-border: #e5e9f0;
+  --modal-bg: #ffffff;
+  --input-bg: #eceff4;
+  --input-border: #e5e9f0;
+  --input-text: #2e3440;
+  --badge-bg: #e5e9f0;
+  --badge-text: #4c566a;
+  --accent-color: #5e81ac;
+  --accent-active: #4c566a;
+  --success-color: #a3be8c;
+  --error-color: #bf616a;
+  --warning-color: #ebcb8b;
+  --panel-hover-bg: #e5e9f0;
+  --accent-amber: #ebcb8b;
+}
+
+:root.dark {
+  --bg-color: #2e3440;
+  --text-color: #d8dee9;
+  --text-title: #eceff4;
+  --text-muted: #4c566a;
+  --panel-bg: #3b4252;
+  --panel-border: #434c5e;
+  --item-border: #434c5e;
+  --modal-bg: #3b4252;
+  --input-bg: #2e3440;
+  --input-border: #434c5e;
+  --input-text: #eceff4;
+  --badge-bg: #434c5e;
+  --badge-text: #d8dee9;
+  --accent-color: #88c0d0;
+  --accent-active: #81a1c1;
+  --success-color: #a3be8c;
+  --error-color: #bf616a;
+  --warning-color: #ebcb8b;
+  --panel-hover-bg: #434c5e;
+  --accent-amber: #ebcb8b;
+}

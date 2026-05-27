@@ -11,13 +11,20 @@ async function main() {
 		console.warn("Failed to perform initial cleanup:", err);
 	}
 
+	console.log("Ensuring S3 bucket 'nogoo9-test-bucket' exists...");
+	try {
+		await $`kubectl run aws-cli-mb --rm -i --image=nogoo9-registry.localhost:5001/amazon/aws-cli:latest -n nogoo9 --restart=Never --env AWS_ACCESS_KEY_ID=test-access-key --env AWS_SECRET_ACCESS_KEY=test-secret-key --env AWS_ENDPOINT_URL=http://rustfs.nogoo9.svc.cluster.local:80 -- s3 mb s3://nogoo9-test-bucket`.quiet();
+	} catch (err) {
+		console.warn("Bucket creation warning (it might already exist):", err);
+	}
+
 	console.log("Building MCP Server for Node target...");
-	await $`bun build src/index.ts --outfile dist/index.js --target node --minify`;
+	await $`bun build src/server-entry.ts --outfile dist/server-entry.js --target node --minify`;
 
 	console.log("Starting MCP Server via stdio...");
 	const transport = new StdioClientTransport({
 		command: "node",
-		args: ["dist/index.js"],
+		args: ["dist/server-entry.js"],
 		env: {
 			...process.env,
 			TRANSPORT: "stdio",
@@ -58,9 +65,11 @@ async function main() {
 					"nogoo9/init-image":
 						"nogoo9-registry.localhost:5001/amazon/aws-cli:latest",
 					"nogoo9/init-command":
-						"aws s3 mb s3://$S3_BUCKET --endpoint-url $AWS_ENDPOINT_URL 2>/dev/null || true && aws s3 sync s3://$S3_BUCKET/$S3_FOLDER /workspace --endpoint-url $AWS_ENDPOINT_URL",
+						// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+						"aws s3 sync s3://$S3_BUCKET/$S3_FOLDER/${{user}} /workspace --endpoint-url $AWS_ENDPOINT_URL",
 					"nogoo9/pre-stop-command":
-						"aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER --endpoint-url $AWS_ENDPOINT_URL",
+						// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+						"aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER/${{user}} --endpoint-url $AWS_ENDPOINT_URL",
 					"nogoo9/pre-stop-sidecar-image":
 						"nogoo9-registry.localhost:5001/amazon/aws-cli:latest",
 					"nogoo9/default-grace-period": "10",
@@ -145,7 +154,7 @@ async function main() {
 		await $`kubectl wait --for=delete pod/${podName} -n nogoo9 --timeout=120s`;
 
 		console.log(`\n[6/6] Checking RustFS for the synced echo log...`);
-		const s3Url = `s3://nogoo9-test-bucket/${workspaceId}/echo.log`;
+		const s3Url = `s3://nogoo9-test-bucket/${workspaceId}/guest/echo.log`;
 		const logContent =
 			await $`kubectl run aws-cli-check-${workspaceId} --rm -i --image=nogoo9-registry.localhost:5001/amazon/aws-cli:latest -n nogoo9 --restart=Never --env AWS_ACCESS_KEY_ID=test-access-key --env AWS_SECRET_ACCESS_KEY=test-secret-key --env AWS_ENDPOINT_URL=http://rustfs.nogoo9.svc.cluster.local:80 -- s3 cp ${s3Url} -`.text();
 
@@ -184,9 +193,11 @@ async function main() {
 					"nogoo9/init-image":
 						"nogoo9-registry.localhost:5001/amazon/aws-cli:latest",
 					"nogoo9/init-command":
-						"aws s3 mb s3://$S3_BUCKET --endpoint-url $AWS_ENDPOINT_URL 2>/dev/null || true && aws s3 sync s3://$S3_BUCKET/$S3_FOLDER /workspace --endpoint-url $AWS_ENDPOINT_URL",
+						// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+						"aws s3 sync s3://$S3_BUCKET/$S3_FOLDER/${{user}} /workspace --endpoint-url $AWS_ENDPOINT_URL",
 					"nogoo9/pre-stop-command":
-						"aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER --endpoint-url $AWS_ENDPOINT_URL",
+						// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+						"aws s3 sync /workspace s3://$S3_BUCKET/$S3_FOLDER/${{user}} --endpoint-url $AWS_ENDPOINT_URL",
 					"nogoo9/pre-stop-sidecar-image":
 						"nogoo9-registry.localhost:5001/amazon/aws-cli:latest",
 					"nogoo9/default-grace-period": "10",
@@ -261,7 +272,7 @@ async function main() {
 		await $`kubectl wait --for=delete pod/${inlinePodName} -n nogoo9 --timeout=120s`;
 
 		console.log(`\n[5/5] Checking RustFS for the synced inline echo log...`);
-		const inlineS3Url = `s3://nogoo9-test-bucket/${inlineWorkspaceId}/echo.log`;
+		const inlineS3Url = `s3://nogoo9-test-bucket/${inlineWorkspaceId}/guest/echo.log`;
 		const inlineLogContent =
 			await $`kubectl run aws-cli-check-${inlineWorkspaceId} --rm -i --image=nogoo9-registry.localhost:5001/amazon/aws-cli:latest -n nogoo9 --restart=Never --env AWS_ACCESS_KEY_ID=test-access-key --env AWS_SECRET_ACCESS_KEY=test-secret-key --env AWS_ENDPOINT_URL=http://rustfs.nogoo9.svc.cluster.local:80 -- s3 cp ${inlineS3Url} -`.text();
 

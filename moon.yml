@@ -36,12 +36,16 @@ tasks:
       runInCI: false
 
   build:
-    command: 'bun build src/index.ts --outfile dist/index.js --target bun --minify'
+    command: 'bun run build'
     inputs:
       - 'src/**/*'
+      - 'scripts/**/*'
       - 'package.json'
     outputs:
       - 'dist/index.js'
+      - 'dist/server-entry.js'
+      - 'dist/cli.js'
+      - 'dist/ui/index.html'
 
   typecheck:
     command: 'bun x tsc --noEmit'
@@ -61,6 +65,18 @@ tasks:
       runInCI: false
       cache: false
 
+  test-e2e-auth:
+    command: 'bun run scripts/test-e2e-auth.ts'
+    options:
+      runInCI: false
+      cache: false
+
+  demo:
+    command: 'sh -c "moon run k3d:bootstrap && moon run mcp:test-e2e-auth"'
+    options:
+      runInCI: false
+      cache: false
+
   test-antigravity:
     command: 'bun run scripts/run-antigravity-test.ts'
     options:
@@ -76,11 +92,13 @@ tasks:
     command: 'sh -c "docker build -f $MOON_PROJECT_ROOT/Dockerfile -t nogoo9-registry.localhost:5001/kube-mcp:latest $MOON_WORKSPACE_ROOT && docker push nogoo9-registry.localhost:5001/kube-mcp:latest && kubectl apply -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ && kubectl -n nogoo9 rollout restart deployment/nogoo-mcp"'
     options:
       runInCI: false
+      cache: false
 
   deploy-wsl:
     command: 'sh -c "docker build -f $MOON_PROJECT_ROOT/Dockerfile -t nogoo9-registry.localhost:5001/kube-mcp:latest $MOON_WORKSPACE_ROOT && docker tag nogoo9-registry.localhost:5001/kube-mcp:latest localhost:5001/kube-mcp:latest && docker push localhost:5001/kube-mcp:latest && kubectl apply -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ && kubectl -n nogoo9 rollout restart deployment/nogoo-mcp"'
     options:
       runInCI: false
+      cache: false
 
   undeploy:
     command: 'kubectl delete -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ --ignore-not-found'

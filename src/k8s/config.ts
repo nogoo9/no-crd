@@ -1,5 +1,6 @@
 import type * as k8s from "@kubernetes/client-node";
 import { getLogger } from "@logtape/logtape";
+import { config } from "~/config.js";
 import { getK8sError } from "./errors.js";
 
 const logger = getLogger(["nogoo9", "k8s-config"]);
@@ -9,10 +10,10 @@ const logger = getLogger(["nogoo9", "k8s-config"]);
  * - `"cluster"`: Allows operating across all namespaces if permissions permit.
  * - `"namespaced"`: Locks the server operation to a single namespace.
  */
-export const MODE = (process.env.MODE ?? "cluster") as "cluster" | "namespaced";
+export const MODE = config.k8s.mode;
 
 /** Default Kubernetes namespace to fallback onto. */
-export const DEFAULT_NAMESPACE = process.env.NAMESPACE ?? "default";
+export const DEFAULT_NAMESPACE = config.k8s.namespace;
 
 /** Standard annotation/label keys used to tag managed pod workloads. */
 export const LABELS = {

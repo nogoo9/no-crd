@@ -26,6 +26,7 @@ This reference details the Model Context Protocol (MCP) tools exposed by `@nogoo
    - [`create_pod_from_template`](#create_pod_from_template)
 4. [Agent Workspace (Spawner) Tools](#agent-workspace-spawner-tools)
    - [`list_workspaces`](#list_workspaces)
+   - [`get_workspace`](#get_workspace)
    - [`spawn_workspace`](#spawn_workspace)
    - [`stop_workspace`](#stop_workspace)
 
@@ -623,6 +624,50 @@ Lists active agent workspace pods (pods matching label `nogoo9/type=workspace`).
         "status": "Running"
       }
     ]
+  }
+}
+```
+
+### `get_workspace`
+Fetches complete status, pod IP, preview metadata, ports, and annotations for a single workspace. Supports filtering by active JWT owner if `AUTH_ENABLED=true`.
+*(Available from v0.3.0)*
+
+* **Inputs:**
+  * `id` (string): Workspace ID to fetch.
+  * `namespace` (optional string): Target namespace.
+  * `jwtPayload` (optional object): Decoded JWT payload (mandated if authentication is enabled).
+* **Example Call:**
+```json
+{
+  "id": "session45",
+  "namespace": "nogoo9"
+}
+```
+* **Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Workspace session45:\nStatus: Running\nIP: 10.42.0.45\nPort: 8080\nPreview: /README.md (markdown)"
+    }
+  ],
+  "structuredContent": {
+    "id": "session45",
+    "name": "ws-anonymous-session45",
+    "status": "Running",
+    "podIP": "10.42.0.45",
+    "port": "8080",
+    "workspacePath": "/README.md",
+    "workspaceType": "markdown",
+    "previewPath": "/README.md",
+    "previewType": "markdown",
+    "userSub": "testuser",
+    "annotations": {
+      "nogoo9/workspace-path": "/README.md",
+      "nogoo9/workspace-type": "markdown",
+      "nogoo9/workspace-port": "8080"
+    }
   }
 }
 ```

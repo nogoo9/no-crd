@@ -1,0 +1,46 @@
+/* Name: Linear */
+:root {
+  --bg-color: #f7f7f8;
+  --text-color: #4b5262;
+  --text-title: #111217;
+  --text-muted: #747d90;
+  --panel-bg: #ffffff;
+  --panel-border: #e2e4e9;
+  --item-border: #e2e4e9;
+  --modal-bg: #ffffff;
+  --input-bg: #f7f7f8;
+  --input-border: #e2e4e9;
+  --input-text: #111217;
+  --badge-bg: #f1f2f4;
+  --badge-text: #4b5262;
+  --accent-color: #5e6ad2;
+  --accent-active: #4d58b3;
+  --success-color: #15a85f;
+  --error-color: #f34747;
+  --warning-color: #eab308;
+  --panel-hover-bg: #f1f2f4;
+  --accent-amber: #eab308;
+}
+
+:root.dark {
+  --bg-color: #0f0f13;
+  --text-color: #b4b9c5;
+  --text-title: #f7f8f9;
+  --text-muted: #707584;
+  --panel-bg: #15151c;
+  --panel-border: #22232b;
+  --item-border: #22232b;
+  --modal-bg: #15151c;
+  --input-bg: #0f0f13;
+  --input-border: #22232b;
+  --input-text: #f7f8f9;
+  --badge-bg: #22232b;
+  --badge-text: #b4b9c5;
+  --accent-color: #5e6ad2;
+  --accent-active: #4d58b3;
+  --success-color: #15a85f;
+  --error-color: #f34747;
+  --warning-color: #eab308;
+  --panel-hover-bg: #22232b;
+  --accent-amber: #eab308;
+}

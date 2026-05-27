@@ -10,6 +10,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
 [![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg?style=flat-square)](https://nogoo9.github.io/no-crd/)
 [![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE)
+[![Coverage Status](https://img.shields.io/coveralls/github/nogoo9/no-crd?style=flat-square)](https://coveralls.io/github/nogoo9/no-crd?branch=main)
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Server-orange.svg?style=flat-square)](https://modelcontextprotocol.io)
 [![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.11-black?logo=bun&style=flat-square)](https://bun.sh)
 [![Deno](https://img.shields.io/badge/Deno-compatible-blue?logo=deno&style=flat-square)](https://deno.land)
@@ -19,7 +20,7 @@
 
 It provides JupyterHub-like dynamic pod lifecycle management but is completely agnostic to actual workloads and supports multi-runtime execution under **Bun**, **Deno**, and **Node.js**.
 
-📚 **For detailed guides, API reference, and configuration options, visit the [Documentation Website](https://nogoo9.github.io/no-crd/).**
+📚 **For detailed guides, API reference, and configuration options, visit the public [Documentation Website](https://nogoo9.github.io/no-crd/) or access the built-in documentation served directly at `/docs/` (e.g. `http://localhost:3000/docs/`) when running the server.**
 
 ---
 
@@ -29,8 +30,8 @@ It provides JupyterHub-like dynamic pod lifecycle management but is completely a
 - **Agent Sandbox Spawner:** Specialized spawner tools that automate workspace provisioning with context validation, init containers, IAM roles, pre-stop hooks, and lifecycle sync.
 - **ConfigMap-Based Templates:** Store, version, and load reusable pod templates stored as standard Kubernetes ConfigMaps.
 - **Isomorphic Multi-Runtime SDK:** Imports seamlessly as a composable programmatic SDK or MCP server running under Node.js, Bun, or Deno.
-- **Workspace Routing Proxy (Experimental):** Built-in reverse proxy routing that dynamically pipes traffic to running container IPs with secure user token ownership checks.
-- **Embedded Web UI App:** Exposes an interactive React/web-based Pod Manager interface to view workspaces, templates, logs, and manage token details.
+- **Workspace Routing Proxy:** Built-in reverse proxy routing that dynamically pipes traffic to running container IPs with secure user token ownership verification and path-scoped session cookie (`nocr_token`) support.
+- **Embedded Web UI App:** Exposes an interactive web-based Pod Manager interface featuring a light/dark theme toggle, client-side PKCE OIDC login, and workspace file preview rendering (supporting HTML sandboxed iframes and custom Markdown rendering).
 
 ---
 
@@ -77,35 +78,96 @@ By default, the `@kubernetes/client-node` package uses Node.js's `https.Agent` t
 * **Propagates to Bun**: Feeds certificate options directly into the native Bun `fetch` `tls` configurations.
 * **Propagates to Deno**: Instantiates a temporary `Deno.HttpClient` with `caCerts` to securely perform requests (meaning you do not need the `--unsafely-ignore-certificate-errors` flag for Kubernetes connections).
 
+### 🔌 Bun WebSocket Upgrade Compatibility Warning
+
+When running the MCP server or proxy under **Bun** (versions before the fix in [oven-sh/bun#28871](https://github.com/oven-sh/bun/pull/28871) is fully integrated), there is a known issue where WebSocket connection upgrades through Fastify or `node:http` drop data or close immediately.
+
+*   **Symptoms**: WebSocket connections (e.g. term/GUI access to workspace pods) hang, fail, or return `400 Bad Request` followed by immediate termination.
+*   **Root Cause**: Bun's native HTTP parser doesn't switch the socket into raw streaming mode in userland quickly enough when the `upgrade` event handler executes asynchronously. The native C++ HTTP parser keeps expecting subsequent payloads to be HTTP requests and rejects them.
+*   **Mitigation**: Run the production container or daemon using **Node.js** (`node dist/server-entry.js` or `npx tsx src/server-entry.ts`) where the upgrade flow behaves natively.
+
 ---
 
 ## ⚙️ Configuration & Environment Variables
 
 The server and command-line utility are configurable using CLI options or environment variables.
 
-| CLI Option | Environment Variable | Defaults | Allowed Values | Description |
+### 🔌 Server Configuration
+
+| CLI Option | Environment Variable | Default | Allowed Values | Description |
 |---|---|---|---|---|
 | `-t, --transport` | `TRANSPORT` | `http` | `http`, `stdio`, `both` | Server transport mode. `both` fires up both transports simultaneously. |
-| `-m, --mode` | `MODE` | `cluster` | `cluster`, `namespaced` | Kubernetes access scope. `namespaced` locks operations to a single namespace. |
-| `-n, --namespace` | `NAMESPACE` | `nogoo9` | String | Default Kubernetes namespace for operations. |
 | `-p, --port` | `PORT` | `3000` | Number | HTTP server port for SSE transport. |
+| `-H, --host` | `HOST` | `0.0.0.0` | String | Host interface to bind the HTTP/SSE server to. |
+| `--base-url` | `BASE_URL` | - | Path string | Base URL path prefix for hosting behind a reverse proxy (e.g. `/gateway/no-crd`). |
+| - | `STATELESS` | `false` | `true`, `false` | Enable stateless request handling (no session affinity). |
 | `-l, --log-level` | `LOG_LEVEL` | `info` | `debug`, `info`, `warning`, `error`, `fatal` | Logging verbosity filter. |
+| - | `LOG_FILE` | `nogoo9-mcp.log` | String | Output file path for file logging. |
+
+### 🔒 TLS Configuration
+
+| CLI Option | Environment Variable | Default | Allowed Values | Description |
+|---|---|---|---|---|
 | `--tls-cert` | `TLS_CERT` | - | Path string | Path to TLS certificate file to enable HTTPS. |
 | `--tls-key` | `TLS_KEY` | - | Path string | Path to TLS private key file to enable HTTPS. |
-| `--disable-permission-checks` | `DISABLE_PERMISSION_CHECKS` | `false` | `true`, `false` | Disable Kubernetes RBAC permission checks and assume all tools are enabled. |
+| `--tls-ca` | `TLS_CA` | - | Path string | Path to TLS CA certificate file for HTTPS client/verification. |
+| - | `NODE_TLS_REJECT_UNAUTHORIZED` | `1` (true) | `0` (false), `1` (true) | Set to `0` to bypass TLS verification (for development/testing only). |
+
+### 🌐 CORS Configuration
+
+| CLI Option | Environment Variable | Default | Allowed Values | Description |
+|---|---|---|---|---|
 | `--cors-origin` | `CORS_ALLOWED_ORIGIN`, `CORS_ORIGIN` | `*` | String | CORS Allowed Origin header. |
 | `--cors-methods` | `CORS_ALLOWED_METHODS`, `CORS_METHODS` | `GET, POST, OPTIONS` | String | CORS Allowed Methods header. |
-| `--cors-headers` | `CORS_ALLOWED_HEADERS`, `CORS_HEADERS` | `Content-Type, Authorization, mcp-protocol-version` | String | CORS Allowed Headers header. |
-| - | `UI_ENABLED` | `true` | `true`, `false` | Enables the embedded HTML Pod Manager UI resource. |
-| - | `AUTH_ENABLED` | `false` | `true`, `false` | When true, restricts workspace operations to JWT validated identities. (Experimental, likely to change) |
-| - | `AUTH_SUB_JSONPATH`| `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. (Experimental, likely to change) |
+| `--cors-headers` | `CORS_ALLOWED_HEADERS`, `CORS_HEADERS` | `Content-Type, Authorization, mcp-protocol-version, mcp-session-id` | String | CORS Allowed Headers header. |
+| `--cors-allow-credentials` | `CORS_ALLOW_CREDENTIALS`, `CORS_CREDENTIALS` | `false` | `true`, `false` | Enable CORS Access-Control-Allow-Credentials header. |
+| `--cors-expose-headers` | `CORS_EXPOSED_HEADERS`, `CORS_EXPOSED` | `mcp-session-id` | String | Custom CORS Access-Control-Expose-Headers header. |
+| `--cors-max-age` | `CORS_MAX_AGE` | - | Number | Custom CORS Access-Control-Max-Age header in seconds. |
+
+### ☸️ Kubernetes Configuration
+
+| CLI Option | Environment Variable | Default | Allowed Values | Description |
+|---|---|---|---|---|
+| `-m, --mode` | `MODE` | `cluster` | `cluster`, `namespaced` | Kubernetes access scope. `namespaced` locks operations to a single namespace. |
+| `-n, --namespace` | `NAMESPACE`, `DEFAULT_NAMESPACE` | `nogoo9` | String | Default Kubernetes namespace for operations. |
+| `--disable-permission-checks` | `DISABLE_PERMISSION_CHECKS` | `false` | `true`, `false` | Disable Kubernetes RBAC permission checks and assume all tools are enabled. |
+| `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | `3000` | Number | Default target port inside the workspace pods to proxy traffic to. |
 | - | `REGISTRY_URL` | - | URL string | Target container registry URL to query for images (e.g. `http://localhost:5001`). |
-| `--base-url` | `BASE_URL` | - | Path string | Base subpath prefix for hosting behind a reverse proxy (e.g. `/gateway/no-crd`). |
-| `--jwt-secret` | `JWT_SECRET` | - | String | Symmetric HMAC-SHA256 secret for token verification. (Experimental, likely to change) |
-| `--jwt-public-key` | `JWT_PUBLIC_KEY` | - | String | PEM encoded RSA/ECDSA public key for asymmetric token verification. (Experimental, likely to change) |
-| `--jwks-uri` | `JWKS_URI` | - | URL string | Remote JWKS endpoint URL to dynamically retrieve verification keys. (Experimental, likely to change) |
-| `--auth-issuer` | `AUTH_ISSUER` | - | URL string | Identifier URL for the Authorization Server advertised in metadata discovery. (Experimental, likely to change) |
-| `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | `3000` | Number | Default target port inside the workspace pods to proxy traffic to. (Experimental, likely to change) |
+
+### 🔑 Authentication Configuration
+
+| CLI Option | Environment Variable | Default | Allowed Values | Description |
+|---|---|---|---|---|
+| `--auth-enabled` | `AUTH_ENABLED` | `false` | `true`, `false` | Enables JWT token authentication on MCP tools and route proxy. |
+| - | `JWT_VERIFICATION_REQUIRED` | `true` | `true`, `false` | Enable/disable JWT signature verification (signature checks). |
+| `--jwt-secret` | `JWT_SECRET` | - | String | Symmetric HMAC-SHA256 secret for token verification. |
+| `--jwt-public-key` | `JWT_PUBLIC_KEY` | - | String | PEM encoded RSA/ECDSA public key for asymmetric token verification. |
+| `--jwks-uri` | `JWKS_URI` | - | URL string | Remote JWKS endpoint URL to dynamically retrieve verification keys. |
+| - | `INTROSPECTION_ENDPOINT`, `JWT_INTROSPECTION_ENDPOINT` | - | URL string | Endpoint for token introspection/validation. |
+| - | `OAUTH_CLIENT_ID` | - | String | OAuth client ID for auth configuration. |
+| - | `OAUTH_CLIENT_SECRET` | - | String | OAuth client secret for auth configuration. |
+| - | `JWT_AUDIENCE` | - | String | Expected token audience. Falls back to `OAUTH_CLIENT_ID` if set. |
+| `--auth-issuer` | `AUTH_ISSUER`, `JWT_ISSUER` | `""` | URL string | Identifier URL for the Authorization Server advertised in metadata discovery. |
+| `--auth-sub-jsonpath` | `AUTH_SUB_JSONPATH` | `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. |
+| `--auth-scope-jsonpath` | `AUTH_SCOPE_JSONPATH` | `$.scope` | JSONPath | Payload path to extract scopes claim from JWT payload. |
+| `--auth-roles-jsonpath` | `AUTH_ROLES_JSONPATH`, `AUTH_ADMIN_JSONPATH` | `$.realm_access.roles` | JSONPath | Payload path to extract user roles from JWT payload. |
+| - | `AUTH_ADMIN_ROLE` | `nogoo9-admin` | String | Role name signifying administrator access. |
+| `--auth-required-read-scope` | `AUTH_REQUIRED_READ_SCOPE` | - | String | OAuth scope required for read operations. If not set, read scope check is bypassed. |
+| `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | - | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
+| `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | - | String | User role required for read operations. If not set, read role check is bypassed. |
+| `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | - | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
+
+### 🖥️ UI & Themes Configuration
+
+| CLI Option | Environment Variable | Default | Allowed Values | Description |
+|---|---|---|---|---|
+| - | `UI_ENABLED` | `true` | `true`, `false` | Enables the embedded HTML Pod Manager UI resource. |
+| - | `THEMES_DIR` | `themes` | Path string | Local directory path containing custom CSS UI themes. |
+| - | `THEMES_CONFIGMAP` | - | String | Name of Kubernetes ConfigMap containing custom UI theme configurations. |
+| - | `DOCS_DIR` | `/app/docs` (Docker) or `docs/.vitepress/dist` (Local) | Path string | Base directory from which static documentation files are served. |
+| - | `OAUTH_DISCOVERY_URL` | `""` | URL string | Discovery URL for the OAuth authorization server used by the UI client. |
+| - | `OAUTH_CLIENT_ID` | `""` | String | OAuth client ID for UI authorization. |
+| - | `OAUTH_LOGIN_METHOD` | `"redirect"` | `redirect`, `popup` | Login interaction mode for UI OAuth client. |
 
 ---
 
@@ -140,7 +202,7 @@ Below is the mapping showing which Kubernetes API resources and verbs each MCP t
 |---|---|---|
 | `create` | `create_pod`, `create_pod_from_template`, `spawn_workspace` | Provision and deploy new pods or workspace sandboxes. |
 | `delete` | `delete_pod`, `stop_workspace` | Terminate and clean up pods or workspace sandboxes. |
-| `get` | `get_pod` | Retrieve detailed JSON spec for a specific pod. |
+| `get` | `get_pod`, `get_workspace` | Retrieve detailed JSON spec for a specific pod. |
 | `list` | `list_pods`, `list_workspaces` | Retrieve lists of pods or agent workspace pods. |
 | `patch` | `patch_pod` | Strategic merge patch labels, annotations, or resource requests/limits. |
 

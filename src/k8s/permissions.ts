@@ -1,5 +1,6 @@
 import * as k8s from "@kubernetes/client-node";
 import { getLogger } from "@logtape/logtape";
+import { config } from "~/config.js";
 import { type K8sContext, makeApiClient } from "./client.js";
 
 const logger = getLogger(["nogoo9", "permissions"]);
@@ -29,6 +30,7 @@ export const REQUIRED_PERMISSIONS: Record<string, RbacPermission[]> = {
 	list_workspaces: [{ verb: "list", resource: "pods" }],
 	spawn_workspace: [{ verb: "create", resource: "pods" }],
 	stop_workspace: [{ verb: "delete", resource: "pods" }],
+	get_workspace: [{ verb: "get", resource: "pods" }],
 };
 
 export interface PermissionReport {
@@ -59,7 +61,7 @@ export async function checkPermission(
 	resource: string,
 	namespace: string,
 ): Promise<boolean> {
-	if (process.env.DISABLE_PERMISSION_CHECKS === "true") {
+	if (config.k8s.disablePermissionChecks) {
 		logger.debug("Bypassing permission check (DISABLE_PERMISSION_CHECKS=true)");
 		return true;
 	}
@@ -129,7 +131,7 @@ export async function evaluatePermissions(
 			mode,
 		},
 	);
-	if (process.env.DISABLE_PERMISSION_CHECKS === "true") {
+	if (config.k8s.disablePermissionChecks) {
 		logger.info(
 			"Permission checks are disabled via environment variable. Granting full access.",
 		);

@@ -10,6 +10,8 @@ import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger(["nogoo9", "k8s-client"]);
 
+import { config } from "~/config.js";
+
 // ─── Types & Configuration ───────────────────────────────────────────────────
 
 /**
@@ -64,7 +66,7 @@ export class BunDenoHttpLibrary {
 			if (key) tls.key = key;
 			if (ca) tls.ca = ca;
 			if (
-				process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0" ||
+				!config.tls.rejectUnauthorized ||
 				agentOpts.rejectUnauthorized === false ||
 				this.kc.getCurrentCluster()?.skipTLSVerify
 			) {
@@ -187,7 +189,7 @@ export function initK8sContext(customKc?: k8s.KubeConfig): K8sContext {
 
 	const cluster = kc.getCurrentCluster();
 	if (cluster) {
-		if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
+		if (!config.tls.rejectUnauthorized) {
 			logger.warn(
 				"Disabling TLS verification for cluster {cluster} due to NODE_TLS_REJECT_UNAUTHORIZED=0",
 				{
