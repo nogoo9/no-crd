@@ -8,13 +8,18 @@ metadata:
     nogoo9/api.chat.port: "8080"
     nogoo9/api.chat.path: "/"
     nogoo9/api.chat.desc: "Open WebUI Portal"
+    nogoo9/required-context: "OPENAI_API_KEY"
 spec:
   containers:
     - name: agent
       image: ghcr.io/open-webui/open-webui:main
+      securityContext:
+        allowPrivilegeEscalation: false
       env:
         - name: WEBUI_SECRET_KEY
           value: "no-crd-secret-key-change-me"
+        - name: HF_HUB_OFFLINE
+          value: 1
       volumeMounts:
         - name: workspace
           mountPath: /app/backend/data

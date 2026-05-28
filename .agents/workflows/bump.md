@@ -32,12 +32,12 @@ Apply the highest-severity bump found across all commits.
 
 Calculate `<new_version>` by incrementing the appropriate semver component of the current version (from root `package.json`). Reset lower components to 0 (e.g. minor bump: `0.1.0` → `0.2.0`).
 
-## Step 4 — Update version in root package.json
+## Step 4 — Update version in root package.json and server.json
 
-The version string appears in the root `package.json` — update it to `<new_version>`:
+The version string appears in the root `package.json` and in `server.json` (both the top-level `"version"` field and the package-level `"version"` field) — update all of them to `<new_version>`:
 
 ```bash
-grep '"version"' package.json
+grep '"version"' package.json server.json
 ```
 
 ## Step 5 — Update CHANGELOG.md and Release Notes

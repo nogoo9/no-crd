@@ -24,3 +24,6 @@ Before pushing commits or triggers that lead to publishing (e.g., version bumps,
 3. **Verify Executables & Entrypoints**:
    - Ensure the `package.json` `"bin"` configuration points to `dist/cli.js` and that the file remains executable.
    - Ensure the `"exports"` property correctly maps Node, Bun, and Deno environments to their respective entry points.
+
+4. **Verify MCP Server Metadata**:
+   - Ensure that the version fields in `server.json` (both top-level `"version"` and package `"version"`) exactly match the version defined in `package.json`.

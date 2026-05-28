@@ -1,0 +1,319 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
+  "name": "io.github.nogoo9/no-crd",
+  "description": "Dynamic pod spawner & proxy for ephemeral AI agent workspaces on Kubernetes without CRDs",
+  "repository": {
+    "url": "https://github.com/nogoo9/no-crd",
+    "source": "github"
+  },
+  "version": "0.4.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@nogoo9/no-crd",
+      "version": "0.4.0",
+      "runtimeHint": "bunx",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--transport",
+          "valueHint": "stdio|http|both",
+          "description": "Transport channel for MCP client-server communication: stdio, http, both",
+          "default": "stdio"
+        },
+        {
+          "type": "named",
+          "name": "--mode",
+          "valueHint": "cluster|namespaced",
+          "description": "Kubernetes cluster access scope: cluster-wide or namespace-restricted",
+          "default": "cluster"
+        },
+        {
+          "type": "named",
+          "name": "--namespace",
+          "valueHint": "nogoo9",
+          "description": "Target namespace for workspace pods, services, and local templates",
+          "default": "nogoo9"
+        },
+        {
+          "type": "named",
+          "name": "--port",
+          "valueHint": "3000",
+          "description": "HTTP port for SSE transport, routing proxy, and dashboard UI",
+          "default": "3000"
+        },
+        {
+          "type": "named",
+          "name": "--host",
+          "valueHint": "0.0.0.0",
+          "description": "Network interface host address to bind the HTTP server to",
+          "default": "0.0.0.0"
+        },
+        {
+          "type": "named",
+          "name": "--log-level",
+          "valueHint": "debug|info|warning|error|fatal",
+          "description": "Granularity of output logs: debug, info, warning, error, fatal",
+          "default": "info"
+        },
+        {
+          "type": "named",
+          "name": "--disable-permission-checks",
+          "description": "Bypass startup diagnostics checking Kubernetes RBAC access permissions",
+          "isFlag": true
+        },
+        {
+          "type": "named",
+          "name": "--cors-origin",
+          "valueHint": "*",
+          "description": "Allowed origins for HTTP CORS cross-site requests (default: *)",
+          "default": "*"
+        },
+        {
+          "type": "named",
+          "name": "--cors-methods",
+          "valueHint": "GET, POST, OPTIONS",
+          "description": "Allowed HTTP request methods for CORS configuration",
+          "default": "GET, POST, OPTIONS"
+        },
+        {
+          "type": "named",
+          "name": "--cors-headers",
+          "valueHint": "Content-Type, Authorization",
+          "description": "Allowed HTTP header names for incoming CORS requests",
+          "default": "Content-Type, Authorization"
+        },
+        {
+          "type": "named",
+          "name": "--cors-allow-credentials",
+          "description": "Allow credentials (cookies, headers) in cross-origin requests",
+          "isFlag": true
+        },
+        {
+          "type": "named",
+          "name": "--auth-required-read-scope",
+          "valueHint": "mcp:read",
+          "description": "Mandatory OAuth scope claim value to query or get workspaces"
+        },
+        {
+          "type": "named",
+          "name": "--auth-required-write-scope",
+          "valueHint": "mcp:write",
+          "description": "Mandatory OAuth scope claim value to spawn or stop workspaces"
+        },
+        {
+          "type": "named",
+          "name": "--auth-scope-jsonpath",
+          "valueHint": "$.scope",
+          "description": "JSONPath pattern to extract scope permissions from the token payload",
+          "default": "$.scope"
+        },
+        {
+          "type": "named",
+          "name": "--auth-required-read-role",
+          "valueHint": "reader",
+          "description": "OAuth role required to view workspaces (e.g. reader)"
+        },
+        {
+          "type": "named",
+          "name": "--auth-required-write-role",
+          "valueHint": "writer",
+          "description": "OAuth role required to spawn or delete workspaces (e.g. writer)"
+        },
+        {
+          "type": "named",
+          "name": "--auth-roles-jsonpath",
+          "valueHint": "$.realm_access.roles",
+          "description": "JSONPath query to retrieve user roles list from token payload",
+          "default": "$.realm_access.roles"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "KUBECONFIG",
+          "description": "Path to the Kubernetes API credentials configuration file",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "BASE_URL",
+          "description": "Hosting URL subpath prefix for gateways and reverse proxies",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "STATELESS",
+          "description": "Disable in-memory session tracking for stateless execution",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TLS_CERT",
+          "description": "Local file path containing TLS public certificate (HTTPS)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TLS_KEY",
+          "description": "Local file path containing TLS private key (HTTPS)",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "TLS_CA",
+          "description": "Local file path containing trusted client Certificate Authority",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "NODE_TLS_REJECT_UNAUTHORIZED",
+          "description": "Set to '0' to allow connection to unverified TLS endpoints",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "REGISTRY_URL",
+          "description": "Default container registry for workspace image resolution",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TEMPLATES_DIR",
+          "description": "Local filesystem directory containing custom YAML/JSON templates",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "BUILTIN_TEMPLATES",
+          "description": "Enable loading of standard pre-configured templates (default: true)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "AUTH_ENABLED",
+          "description": "Enforce JWT verification and user tenant isolation (default: false)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "JWT_VERIFICATION_REQUIRED",
+          "description": "Set to 'false' to skip OIDC cryptographic signature checks",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "JWT_SECRET",
+          "description": "HMAC-SHA symmetric secret key to sign/verify JWT tokens",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "JWT_PUBLIC_KEY",
+          "description": "PEM public key to verify asymmetric OIDC signatures",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "JWKS_URI",
+          "description": "Discovery URI to fetch keys from OIDC provider dynamically",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "INTROSPECTION_ENDPOINT",
+          "description": "RFC 7662 compliant token introspection validation endpoint",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "OAUTH_CLIENT_ID",
+          "description": "Client identifier for OAuth2 authentication flows",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "OAUTH_CLIENT_SECRET",
+          "description": "Client secret credentials used for token introspection",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "JWT_AUDIENCE",
+          "description": "Target audience check value for incoming OIDC tokens",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "AUTH_ISSUER",
+          "description": "Expected token issuer authority check value (e.g. Keycloak)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "AUTH_SUB_JSONPATH",
+          "description": "JSONPath pattern to extract user identity subject from token",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "AUTH_ADMIN_ROLE",
+          "description": "Bypass role name that grants admin access (default: nogoo9-admin)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "PROXY_SESSION_TTL",
+          "description": "Active lifetime in seconds for signed proxy session cookies",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "PROXY_SESSION_SECRET",
+          "description": "Secret key for session cookie signing",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "UI_ENABLED",
+          "description": "Serve the built-in HTML dashboard (default: true)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "THEMES_DIR",
+          "description": "Filesystem directory to scan for custom CSS themes",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "THEMES_CONFIGMAP",
+          "description": "ConfigMap name storing dynamic CSS theme overrides",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DOCS_DIR",
+          "description": "Directory containing static documentation web files to serve",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "OAUTH_DISCOVERY_URL",
+          "description": "Standard OIDC .well-known configuration discovery endpoint",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "OAUTH_LOGIN_METHOD",
+          "description": "UI SSO flow login method: 'redirect' or silent 'iframe'",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
