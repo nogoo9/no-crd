@@ -12,6 +12,7 @@ COPY src ./src
 COPY scripts ./scripts
 COPY docs ./docs
 COPY themes ./themes
+COPY templates ./templates
 COPY README.md ./
 
 # Build MCP server (bun bundle → dist/index.js) and frontend UI
@@ -27,11 +28,12 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy compiled bundle JS, UI assets, static documentation, and themes
+# Copy compiled bundle JS, UI assets, static documentation, themes, and templates
 COPY --from=builder /app/dist/server-entry.js /app/server-entry.js
 COPY --from=builder /app/dist/ui /app/ui
 COPY --from=builder /app/docs/.vitepress/dist /app/docs
 COPY --from=builder /app/themes /app/themes
+COPY --from=builder /app/templates /app/templates
 
 USER 65532
 EXPOSE 3000

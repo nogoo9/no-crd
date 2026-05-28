@@ -30,6 +30,7 @@
 		"dist/ui/index.html",
 		"src",
 		"themes",
+		"templates",
 		"deno.json",
 		"mcp_servers.json"
 	],
@@ -77,6 +78,7 @@
 		"@modelcontextprotocol/ext-apps": "^1.7.2",
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"fastify": "^5.8.5",
+		"js-yaml": "^4.1.0",
 		"jsonpath-plus": "^10.4.0",
 		"zod": "^4.4.3"
 	},

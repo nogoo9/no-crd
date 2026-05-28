@@ -603,9 +603,13 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(200);
-			expect(resp.headers.get("Set-Cookie")).toBe(
-				`nocr_token=${token}; Path=/route/ws-1/; SameSite=Lax; HttpOnly; Max-Age=86400`,
-			);
+			const setCookies =
+				typeof resp.headers.getSetCookie === "function"
+					? resp.headers.getSetCookie()
+					: resp.headers.get("Set-Cookie")?.split(",") || [];
+			const tokenCookie = setCookies.find((c) => c.includes("nocr_token="));
+			expect(tokenCookie).toContain(`nocr_token=${token}`);
+			expect(tokenCookie).toContain("Path=/route/ws-1/");
 			expect(mockFetch).toHaveBeenCalled();
 		} finally {
 			globalThis.fetch = originalFetch;
@@ -899,8 +903,13 @@ users:
 		expect(paths).toContain("/route/ws-456/");
 		expect(paths).toContain("/");
 
+		// Both nocr_token and nocr_sess cookies should be cleared
+		const tokenCookies = cookies.filter((c) => c.includes("nocr_token="));
+		const sessCookies = cookies.filter((c) => c.includes("nocr_sess="));
+		expect(tokenCookies.length).toBeGreaterThanOrEqual(1);
+		expect(sessCookies.length).toBeGreaterThanOrEqual(1);
+
 		for (const cookie of cookies) {
-			expect(cookie).toContain("nocr_token=");
 			expect(cookie).toContain("Max-Age=0");
 		}
 	});
@@ -969,6 +978,48 @@ users:
 			delete process.env.THEMES_DIR;
 			try {
 				fs.rmSync(testThemesDir, { recursive: true, force: true });
+			} catch (_) {}
+		}
+	});
+
+	test("serves built-in themes as fallback", async () => {
+		const fs = await import("node:fs");
+		const pathMod = await import("node:path");
+		const emptyDir = pathMod.resolve("./test-themes-empty");
+		if (!fs.existsSync(emptyDir)) {
+			fs.mkdirSync(emptyDir);
+		}
+		process.env.THEMES_DIR = emptyDir;
+
+		try {
+			// 1. Themes list should include built-in themes
+			const reqList = new Request("http://localhost/api/themes", {
+				method: "GET",
+			});
+			const respList = await handleWebRequest(reqList);
+			expect(respList.status).toBe(200);
+			const list = (await respList.json()) as Array<{
+				id: string;
+				name: string;
+			}>;
+			const ids = list.map((t) => t.id);
+			expect(ids).toContain("antigravity");
+			expect(ids).toContain("dracula");
+			expect(ids).toContain("nord");
+
+			// 2. Retrieve a built-in theme by ID (fallback from empty custom dir)
+			const reqFile = new Request("http://localhost/api/themes/antigravity", {
+				method: "GET",
+			});
+			const respFile = await handleWebRequest(reqFile);
+			expect(respFile.status).toBe(200);
+			expect(respFile.headers.get("Content-Type")).toContain("text/css");
+			const css = await respFile.text();
+			expect(css.length).toBeGreaterThan(0);
+		} finally {
+			delete process.env.THEMES_DIR;
+			try {
+				fs.rmSync(emptyDir, { recursive: true, force: true });
 			} catch (_) {}
 		}
 	});

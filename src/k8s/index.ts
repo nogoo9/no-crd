@@ -32,6 +32,13 @@ export {
 	type K8sErrorDetails,
 } from "./errors.js";
 export {
+	type LocalTemplate,
+	listLocalTemplates,
+	parseSpecString,
+	parseTemplateContent,
+	readLocalTemplate,
+} from "./local-templates.js";
+export {
 	mergeContainersByName,
 	mergeTopLevel,
 } from "./merge.js";
@@ -57,6 +64,14 @@ export {
 	ResourceQuantity,
 	Volume,
 } from "./schemas.js";
+export {
+	createSessionCookie,
+	extractSessionCookieUserSub,
+	getSessionKey,
+	resolveSessionSecret,
+	type SessionPayload,
+	verifySessionCookie,
+} from "./session.js";
 export {
 	DESCRIPTION_ANNOTATION,
 	listTemplateMaps,

@@ -13,9 +13,11 @@ import fastify, {
 	type FastifyRequest,
 } from "fastify";
 import {
+	createSessionCookie,
 	DEFAULT_NAMESPACE,
 	extractTokenFromCookie,
 	extractUserIdentity,
+	getSessionKey,
 	hasRequiredRole,
 	hasRequiredScope,
 	initK8sContext,
@@ -24,6 +26,7 @@ import {
 	parseWorkspaceApis,
 	requestContextStore,
 	resolveNamespace,
+	verifySessionCookie,
 	verifyToken,
 } from "~/k8s/index.js";
 import { createMcpServer } from "~/mcp/server.js";
@@ -84,6 +87,57 @@ export const CORS_HEADERS = new Proxy({} as Record<string, string>, {
 		};
 	},
 });
+
+/** Sets all CORS response headers on a Fastify reply. */
+function setCorsHeaders(reply: { header(key: string, value: string): void }) {
+	for (const [k, v] of Object.entries(CORS_HEADERS)) {
+		reply.header(k, v);
+	}
+}
+
+/** Extracts display name from CSS content (from a Name comment) or derives from id. */
+function themeDisplayName(id: string, cssContent?: string): string {
+	let name = id
+		.split("-")
+		.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+		.join(" ");
+	if (cssContent) {
+		const match = cssContent.match(/\/\*\s*Name:\s*([^*]+)\*\//i);
+		if (match) name = match[1].trim();
+	}
+	return name;
+}
+
+/** Scans a directory for .css theme files, adding unseen themes to the list. */
+function scanThemeDir(
+	dir: string,
+	seenIds: Set<string>,
+	themes: Array<{ id: string; name: string }>,
+) {
+	if (!fs.existsSync(dir)) return;
+	for (const file of fs.readdirSync(dir)) {
+		if (!file.endsWith(".css")) continue;
+		const id = file.slice(0, -4);
+		if (seenIds.has(id)) continue;
+		seenIds.add(id);
+		let cssContent: string | undefined;
+		try {
+			cssContent = fs.readFileSync(path.join(dir, file), "utf-8");
+		} catch (_) {}
+		themes.push({ id, name: themeDisplayName(id, cssContent) });
+	}
+}
+
+/** Reads a CSS theme file from a directory with path traversal protection. */
+function readThemeCssFile(dir: string, id: string): string | null {
+	const resolved = path.normalize(
+		path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir),
+	);
+	const filePath = path.normalize(path.join(resolved, `${id}.css`));
+	if (!filePath.startsWith(resolved)) return null;
+	if (!fs.existsSync(filePath)) return null;
+	return fs.readFileSync(filePath, "utf-8");
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -632,9 +686,7 @@ export async function createFastifyApp(options?: {
 	// CORS and path traversal hook
 	app.addHook("onRequest", (request, reply, done) => {
 		if (request.method === "OPTIONS") {
-			for (const [k, v] of Object.entries(CORS_HEADERS)) {
-				reply.header(k, v);
-			}
+			setCorsHeaders(reply);
 			reply.status(204).send();
 			return;
 		}
@@ -650,7 +702,7 @@ export async function createFastifyApp(options?: {
 	await app.register(
 		async (api) => {
 			// Global hooks for token parsing
-			api.addHook("preHandler", async (request, _reply) => {
+			api.addHook("preHandler", async (request, reply) => {
 				if (!config.auth.enabled) {
 					return;
 				}
@@ -676,7 +728,30 @@ export async function createFastifyApp(options?: {
 
 				let jwtPayload: any;
 				let authError: Error | null = null;
-				if (token) {
+
+				// Check nocr_sess session cookie before JWT verification
+				const sessKey = getSessionKey();
+				if (!token && sessKey) {
+					const sessCookie = extractTokenFromCookie(
+						request.headers.cookie,
+						"nocr_sess",
+					);
+					if (sessCookie) {
+						const sessPayload = verifySessionCookie(sessCookie, sessKey);
+						if (sessPayload) {
+							jwtPayload = {
+								sub: sessPayload.sub,
+								realm_access: { roles: sessPayload.roles },
+							};
+							(request as any).sessionAuthenticated = true;
+							logger.debug("Authenticated via session cookie for user {sub}", {
+								sub: sessPayload.sub,
+							});
+						}
+					}
+				}
+
+				if (!jwtPayload && token) {
 					try {
 						let expectedAudience: string | undefined;
 						try {
@@ -684,6 +759,21 @@ export async function createFastifyApp(options?: {
 							expectedAudience = `${proto}://${host}${basePrefix}`;
 						} catch (_) {}
 						jwtPayload = await verifyToken(token, expectedAudience);
+
+						// Mint root-scoped nocr_sess on successful JWT verification
+						if (jwtPayload && sessKey) {
+							const sessCookie = createSessionCookie(
+								jwtPayload,
+								sessKey,
+								config.auth.sessionTtlSeconds,
+								config.auth.subJsonPath,
+								config.auth.rolesJsonPath,
+							);
+							reply.header(
+								"Set-Cookie",
+								`nocr_sess=${sessCookie}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${config.auth.sessionTtlSeconds}`,
+							);
+						}
 					} catch (err) {
 						authError = err instanceof Error ? err : new Error(String(err));
 						logger.warn("Token verification failed: {error}", {
@@ -724,9 +814,7 @@ export async function createFastifyApp(options?: {
 					const metadataUrl = `${proto}://${host}${basePrefix}/.well-known/oauth-protected-resource`;
 
 					reply.status(401);
-					for (const [k, v] of Object.entries(CORS_HEADERS)) {
-						reply.header(k, v);
-					}
+					setCorsHeaders(reply);
 					reply.header(
 						"WWW-Authenticate",
 						`Bearer resource_metadata="${metadataUrl}"`,
@@ -762,9 +850,7 @@ export async function createFastifyApp(options?: {
 						)
 					) {
 						reply.status(403);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send(
 							`Forbidden: Missing required scope: ${requiredScope}`,
 						);
@@ -780,9 +866,7 @@ export async function createFastifyApp(options?: {
 						)
 					) {
 						reply.status(403);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send(
 							`Forbidden: Missing required role: ${requiredRole}`,
 						);
@@ -816,9 +900,7 @@ export async function createFastifyApp(options?: {
 						)
 					) {
 						reply.status(403);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send(
 							`Forbidden: Missing required scope: ${requiredScope}`,
 						);
@@ -837,9 +919,7 @@ export async function createFastifyApp(options?: {
 						)
 					) {
 						reply.status(403);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send(
 							`Forbidden: Missing required role: ${requiredRole}`,
 						);
@@ -857,9 +937,7 @@ export async function createFastifyApp(options?: {
 				const { workspaceId } = request.params as { workspaceId: string };
 				if (!workspaceId) {
 					reply.status(400);
-					for (const [k, v] of Object.entries(CORS_HEADERS)) {
-						reply.header(k, v);
-					}
+					setCorsHeaders(reply);
 					return reply.send("Workspace ID is required");
 				}
 
@@ -872,9 +950,7 @@ export async function createFastifyApp(options?: {
 						);
 					} catch (err) {
 						reply.status(401);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send(
 							`Unauthorized: ${err instanceof Error ? err.message : String(err)}`,
 						);
@@ -891,9 +967,7 @@ export async function createFastifyApp(options?: {
 
 					if (res.items.length === 0) {
 						reply.status(404);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send(`Workspace "${workspaceId}" not found`);
 					}
 
@@ -902,17 +976,13 @@ export async function createFastifyApp(options?: {
 
 					if (config.auth.enabled && podSub !== userSub) {
 						reply.status(403);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send("Forbidden: You do not own this workspace");
 					}
 
 					if (pod.status?.phase !== "Running") {
 						reply.status(503);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send(
 							`Workspace is not running (status: ${pod.status?.phase || "Unknown"})`,
 						);
@@ -921,9 +991,7 @@ export async function createFastifyApp(options?: {
 					const podIP = pod.status?.podIP;
 					if (!podIP) {
 						reply.status(503);
-						for (const [k, v] of Object.entries(CORS_HEADERS)) {
-							reply.header(k, v);
-						}
+						setCorsHeaders(reply);
 						return reply.send("Workspace IP address not assigned yet");
 					}
 
@@ -1011,9 +1079,7 @@ export async function createFastifyApp(options?: {
 						error: err,
 					});
 					reply.status(500);
-					for (const [k, v] of Object.entries(CORS_HEADERS)) {
-						reply.header(k, v);
-					}
+					setCorsHeaders(reply);
 					return reply.send(
 						`Internal Server Error: ${err instanceof Error ? err.message : String(err)}`,
 					);
@@ -1038,9 +1104,7 @@ export async function createFastifyApp(options?: {
 						scopesSupported.add("mcp");
 					}
 
-					for (const [k, v] of Object.entries(CORS_HEADERS)) {
-						reply.header(k, v);
-					}
+					setCorsHeaders(reply);
 					return {
 						resource: resourceUrl,
 						authorization_servers: authIssuer ? [authIssuer] : [],
@@ -1055,9 +1119,7 @@ export async function createFastifyApp(options?: {
 				_request: FastifyRequest,
 				reply: FastifyReply,
 			) => {
-				for (const [k, v] of Object.entries(CORS_HEADERS)) {
-					reply.header(k, v);
-				}
+				setCorsHeaders(reply);
 				return { status: "ok" };
 			};
 			api.get("/healthz", healthHandler);
@@ -1068,9 +1130,7 @@ export async function createFastifyApp(options?: {
 				_request: FastifyRequest,
 				reply: FastifyReply,
 			) => {
-				for (const [k, v] of Object.entries(CORS_HEADERS)) {
-					reply.header(k, v);
-				}
+				setCorsHeaders(reply);
 
 				try {
 					const { DEFAULT_NAMESPACE, MODE, resolveNamespace } = await import(
@@ -1105,6 +1165,10 @@ export async function createFastifyApp(options?: {
 					"Set-Cookie",
 					`nocr_token=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
 				);
+				reply.header(
+					"Set-Cookie",
+					`nocr_sess=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+				);
 
 				return reply.send("Logged out");
 			};
@@ -1115,15 +1179,13 @@ export async function createFastifyApp(options?: {
 
 			// 5. Themes endpoints
 			api.get("/api/themes", async (_request, reply) => {
-				for (const [k, v] of Object.entries(CORS_HEADERS)) {
-					reply.header(k, v);
-				}
+				setCorsHeaders(reply);
 				try {
-					const themesDir = config.ui.themesDir;
 					const themes: Array<{ id: string; name: string }> = [
 						{ id: "default", name: "Claude" },
 					];
 
+					// Source 1: ConfigMap (highest priority)
 					const themesConfigMap = config.ui.themesConfigMap;
 					if (themesConfigMap) {
 						try {
@@ -1136,51 +1198,31 @@ export async function createFastifyApp(options?: {
 							const data = cm.data || {};
 							for (const [file, content] of Object.entries(data)) {
 								if (file.endsWith(".css")) {
-									const id = file.substring(0, file.length - 4);
-									let name = id
-										.split("-")
-										.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-										.join(" ");
-									const match = content.match(/\/\*\s*Name:\s*([^*]+)\*\//i);
-									if (match) {
-										name = match[1].trim();
-									}
-									themes.push({ id, name });
+									const id = file.slice(0, -4);
+									themes.push({ id, name: themeDisplayName(id, content) });
 								}
 							}
 							return themes;
 						} catch (_) {}
 					}
 
+					const seenIds = new Set(themes.map((t) => t.id));
+
+					// Source 2: Custom themes directory
+					const themesDir = config.ui.themesDir;
 					const resolvedDir = path.normalize(
 						path.isAbsolute(themesDir)
 							? themesDir
 							: path.join(process.cwd(), themesDir),
 					);
+					scanThemeDir(resolvedDir, seenIds, themes);
 
-					if (fs.existsSync(resolvedDir)) {
-						const files = fs.readdirSync(resolvedDir);
-						for (const file of files) {
-							if (file.endsWith(".css")) {
-								const id = file.substring(0, file.length - 4);
-								let name = id
-									.split("-")
-									.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-									.join(" ");
-								try {
-									const content = fs.readFileSync(
-										path.join(resolvedDir, file),
-										"utf-8",
-									);
-									const match = content.match(/\/\*\s*Name:\s*([^*]+)\*\//i);
-									if (match) {
-										name = match[1].trim();
-									}
-								} catch (_) {}
-								themes.push({ id, name });
-							}
-						}
+					// Source 3: Built-in themes (lowest priority)
+					const builtinDir = config.ui.builtinThemesDir;
+					if (builtinDir) {
+						scanThemeDir(builtinDir, seenIds, themes);
 					}
+
 					return themes;
 				} catch (err) {
 					reply.status(500);
@@ -1189,9 +1231,7 @@ export async function createFastifyApp(options?: {
 			});
 
 			api.get("/api/themes/:themeId", async (request, reply) => {
-				for (const [k, v] of Object.entries(CORS_HEADERS)) {
-					reply.header(k, v);
-				}
+				setCorsHeaders(reply);
 
 				const { themeId } = request.params as { themeId: string };
 				const id = themeId.endsWith(".css") ? themeId.slice(0, -4) : themeId;
@@ -1207,6 +1247,7 @@ export async function createFastifyApp(options?: {
 				}
 
 				try {
+					// Source 1: ConfigMap
 					const themesConfigMap = config.ui.themesConfigMap;
 					if (themesConfigMap) {
 						try {
@@ -1216,8 +1257,7 @@ export async function createFastifyApp(options?: {
 								name: themesConfigMap,
 								namespace: ns,
 							});
-							const data = cm.data || {};
-							const content = data[`${id}.css`];
+							const content = cm.data?.[`${id}.css`];
 							if (content !== undefined) {
 								reply.type("text/css; charset=utf-8");
 								return reply.send(content);
@@ -1225,28 +1265,25 @@ export async function createFastifyApp(options?: {
 						} catch (_) {}
 					}
 
-					const themesDir = config.ui.themesDir;
-					const resolvedDir = path.normalize(
-						path.isAbsolute(themesDir)
-							? themesDir
-							: path.join(process.cwd(), themesDir),
-					);
-
-					const filePath = path.normalize(path.join(resolvedDir, `${id}.css`));
-
-					if (!filePath.startsWith(resolvedDir)) {
-						reply.status(403);
-						return reply.send("Forbidden");
+					// Source 2: Custom themes directory
+					const cssContent = readThemeCssFile(config.ui.themesDir, id);
+					if (cssContent !== null) {
+						reply.type("text/css; charset=utf-8");
+						return reply.send(cssContent);
 					}
 
-					if (!fs.existsSync(filePath)) {
-						reply.status(404);
-						return reply.send("Theme not found");
+					// Source 3: Built-in themes
+					const builtinDir = config.ui.builtinThemesDir;
+					if (builtinDir) {
+						const builtinContent = readThemeCssFile(builtinDir, id);
+						if (builtinContent !== null) {
+							reply.type("text/css; charset=utf-8");
+							return reply.send(builtinContent);
+						}
 					}
 
-					const content = fs.readFileSync(filePath, "utf-8");
-					reply.type("text/css; charset=utf-8");
-					return reply.send(content);
+					reply.status(404);
+					return reply.send("Theme not found");
 				} catch (err) {
 					reply.status(500);
 					return reply.send(err instanceof Error ? err.message : String(err));
@@ -1258,9 +1295,7 @@ export async function createFastifyApp(options?: {
 				_request: FastifyRequest,
 				reply: FastifyReply,
 			) => {
-				for (const [k, v] of Object.entries(CORS_HEADERS)) {
-					reply.header(k, v);
-				}
+				setCorsHeaders(reply);
 				try {
 					const { DEFAULT_NAMESPACE, MODE, evaluatePermissions } = await import(
 						"~/k8s/index.js"
@@ -1337,9 +1372,7 @@ export async function createFastifyApp(options?: {
 					reply.header(key, value);
 				});
 
-				for (const [k, v] of Object.entries(CORS_HEADERS)) {
-					reply.header(k, v);
-				}
+				setCorsHeaders(reply);
 				reply.header("X-Accel-Buffering", "no");
 
 				if (res.body) {
@@ -1414,15 +1447,11 @@ export async function createFastifyApp(options?: {
 				try {
 					const html = loadUiHtml(DIST_DIR, basePrefix);
 					reply.type("text/html; charset=utf-8");
-					for (const [k, v] of Object.entries(CORS_HEADERS)) {
-						reply.header(k, v);
-					}
+					setCorsHeaders(reply);
 					return reply.send(html);
 				} catch (err) {
 					reply.status(500);
-					for (const [k, v] of Object.entries(CORS_HEADERS)) {
-						reply.header(k, v);
-					}
+					setCorsHeaders(reply);
 					return reply.send(err instanceof Error ? err.message : String(err));
 				}
 			};
@@ -1485,9 +1514,7 @@ export async function createFastifyApp(options?: {
 							return (request as any).tmpUpstream || "http://localhost:3000";
 						},
 						onResponse: (request: any, reply: any, res: any) => {
-							for (const [k, v] of Object.entries(CORS_HEADERS)) {
-								reply.header(k, v);
-							}
+							setCorsHeaders(reply);
 							const token = (request as any).token;
 							const workspaceId = (request as any).workspaceId;
 							if (token && workspaceId) {

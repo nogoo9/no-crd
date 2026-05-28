@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.4.0] — 2026-05-28
+
+### Added
+
+- **Local Filesystem Templates**: Pod templates can now be loaded from YAML/JSON files in a local directory (`TEMPLATES_DIR`), in addition to Kubernetes ConfigMaps. Templates support both YAML (default, k8s-native) and JSON with auto-detection. ([ADR-001](docs/decisions/ADR-001-template-file-format.md))
+- **Built-In Templates**: 2 default pod templates (`default-agent-workspace`, `workspace-terminal`) are shipped with the npm package and available out of the box. Disable with `BUILTIN_TEMPLATES=false`.
+- **Built-In Themes (3-Source Merge)**: 10 CSS themes are bundled with the package. The `/api/themes` endpoint now merges themes from ConfigMap → custom directory → built-in, deduplicated by id. ([ADR-004](docs/decisions/ADR-004-three-source-theme-merge.md))
+- **Stateless Session Cookies**: HMAC-SHA256 signed `nocr_sess` cookies with configurable TTL (default 30 min, sliding window) to keep workspace sessions alive independently of JWT lifetime. ([ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md))
+- **Peer Discovery for Session Key**: Multi-replica deployments automatically share the session signing key via pod-to-pod discovery using existing RBAC permissions. ([ADR-003](docs/decisions/ADR-003-peer-discovery-session-key.md))
+- **Session Cookie Coverage for All Endpoints**: The `nocr_sess` session cookie is now scoped to `Path=/` covering MCP API calls, not just proxy routes. No `refresh_token` is stored client-side. ([ADR-005](docs/decisions/ADR-005-ui-proactive-oidc-refresh.md))
+
+### Changed
+
+- **Proxy Auth Flow**: The routing proxy now checks `nocr_sess` session cookies before falling back to JWT validation, reducing OIDC provider load and improving latency for authenticated requests.
+- **Logout Endpoint**: Now clears both `nocr_token` and `nocr_sess` cookies for all active workspace paths.
+- **WebSocket Upgrades**: WebSocket upgrade handler now supports session cookie authentication alongside JWT tokens.
 
 ## [0.3.0] — 2026-05-28
 
