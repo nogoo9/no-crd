@@ -10,6 +10,8 @@ const __dirname = dirname(__filename);
  * Tries `../dir` first (from dist/), then `../../dir` (from src/ in dev).
  */
 function resolveBuiltinDir(dirName: string): string {
+	const fromCurr = join(__dirname, dirName);
+	if (existsSync(fromCurr)) return fromCurr;
 	const fromDist = join(__dirname, "..", dirName);
 	if (existsSync(fromDist)) return fromDist;
 	const fromSrc = join(__dirname, "..", "..", dirName);

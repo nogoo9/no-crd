@@ -68,7 +68,18 @@ nocrd9 --runtime deno --transport http --port 3050
 nocrd9 --runtime node --transport stdio
 
 # Run with HTTPS / custom TLS certificates
-nocrd9 --transport http --port 3443 --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
+bun run src/server-entry.ts --tls-cert cert.pem --tls-key key.pem
+```
+
+### Run via Docker
+
+The official container image is published to GitHub Container Registry (GHCR) as [`ghcr.io/nogoo9/no-crd`](https://github.com/nogoo9/no-crd/pkgs/container/no-crd). You can run the MCP server in a container by mounting your local Kubernetes config:
+
+```bash
+docker run -d -p 3000:3000 \
+  -v "$HOME/.kube/config:/app/.kube/config:ro" \
+  -e KUBECONFIG=/app/.kube/config \
+  ghcr.io/nogoo9/no-crd:latest
 ```
 
 ### 🦕 Bun & Deno Kubernetes Certificate Compatibility
@@ -607,6 +618,17 @@ Exposes the standardized metadata endpoint `GET /.well-known/oauth-protected-res
 - Required scopes.
 
 This allows client interfaces (and MCP clients) to automatically discover security requirements and handle dynamic OAuth authentication flows.
+
+### 4. Embedded Web UI & Dashboard Themes
+
+When the server runs in HTTP/SSE transport mode, the visual **React Pod Manager UI Dashboard** is served directly at root `/` (e.g. `http://localhost:3000/`).
+- **Dashboard Themes**: The UI includes a system/light/dark toggle and supports custom visual themes.
+- **Three-Source Theme Merge Engine**: CSS stylesheets are dynamically scanned and merged from:
+  1. **Kubernetes ConfigMap** (`THEMES_CONFIGMAP` environment variable).
+  2. **Custom Local Directory** (`THEMES_DIR` environment variable, defaults to `themes/`).
+  3. **Built-In Catalog** (pre-baked styles: Dracula, Nord, Stripe, Slack, Vercel, Apple, Superhuman, Notion, and Antigravity).
+
+Duplicate theme IDs are resolved according to priority: ConfigMap > Local Directory > Built-In Catalog. For detailed customization guidelines and CSS templates, see the [Dashboard UI Guide](docs/ui-guide.md).
 
 ---
 

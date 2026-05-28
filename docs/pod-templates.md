@@ -65,6 +65,60 @@ You can define spawner-specific annotations on the template `ConfigMap` to injec
 
 ---
 
+## 📂 Local & Built-In Templates
+
+In addition to cluster-level Kubernetes `ConfigMap` templates, `@nogoo9/no-crd` supports loading templates from local file filesystems. This enables simple template management alongside the codebase or mounting templates dynamically via volumes:
+
+1. **Custom Templates Directory**: Configured by setting the `TEMPLATES_DIR` environment variable to an absolute path.
+2. **Built-In Catalog**: Loaded automatically from the bundled `templates/` directory (enabled by default; can be disabled by setting the environment variable `BUILTIN_TEMPLATES=false`).
+
+Local and built-in templates support both YAML (`.yaml`, `.yml`) and JSON (`.json`) formats.
+
+<!-- 
+PROMPT FOR FUTURE AGENTS:
+This Mermaid diagram describes the template resolution and merge pipeline. It illustrates:
+1. The three sources of templates: Kubernetes ConfigMaps, custom local folder, and built-in assets.
+2. The precedence order (1 > 2 > 3) and how name collisions are resolved via shadowing.
+To regenerate or extend, maintain this visual structure and list any new template providers (e.g. databases, HTTP endpoints) as parallel branches.
+-->
+```mermaid
+graph TD
+    Client[MCP Client / API] --> Registry[Template Registry]
+    Registry --> S1["1. Kubernetes ConfigMaps (Namespace)"]
+    Registry --> S2["2. Custom Directory (TEMPLATES_DIR)"]
+    Registry --> S3["3. Built-In Catalog (templates/)"]
+
+    S1 -->|Priority 1: Shadows Collisions| Merge[Merged Templates List]
+    S2 -->|Priority 2: Added if Name Unseen| Merge
+    S3 -->|Priority 3: Added if Name Unseen| Merge
+```
+
+### File Structure Example
+
+```yaml
+metadata:
+  name: local-python-env
+  annotations:
+    nogoo9/description: "Local python development container"
+    nogoo9/tag: "python"
+spec:
+  containers:
+    - name: workspace
+      image: python:3.11-alpine
+      command: ["sleep", "infinity"]
+```
+
+### Template Precedence & Merging
+
+When calling `list_templates` or spawning/retrieving a template, the template registry resolves names in the following order:
+1. **Kubernetes ConfigMaps** (in the cluster namespace)
+2. **Custom Templates Directory** (`TEMPLATES_DIR`)
+3. **Built-In Templates** (the `templates/` directory)
+
+If templates in different sources share the same name, the source with the higher priority will shadow/mask the lower-priority template.
+
+---
+
 ## 👤 Dynamic Template Variable `${{user}}`
 
 To support multi-tenant workspaces where storage directories, S3 folders, or resource paths must be isolated per user, the template engine supports the dynamic template variable `${{user}}`.

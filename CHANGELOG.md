@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Proxy Auth Flow**: The routing proxy now checks `nocr_sess` session cookies before falling back to JWT validation, reducing OIDC provider load and improving latency for authenticated requests.
 - **Logout Endpoint**: Now clears both `nocr_token` and `nocr_sess` cookies for all active workspace paths.
 - **WebSocket Upgrades**: WebSocket upgrade handler now supports session cookie authentication alongside JWT tokens.
+- **Server Modularization**: Refactored the monolithic 1,600+ line server file into clean, modular sub-modules (`mcp.ts`, `proxy.ts`, `static.ts`, `themes.ts`, `auth.ts`, `helpers.ts`, `ws-proxy.ts`) to improve codebase readability, test isolation, and maintainability.
+- **Packaged UI Asset Resolution**: Corrected compiled JS path resolution for `DIST_DIR` to use `__dirname` instead of `join(__dirname, "..")` and hardened `resolveBuiltinDir` in `src/config.ts` to locate assets under flat directory layouts (like Docker containers).
+- **NPM Publish Safety Guard**: Integrated `"prepublishOnly": "bun run build"` in `package.json` to ensure visual frontend assets are always built fresh on release packaging.
 
 ## [0.3.0] — 2026-05-28
 

@@ -55,6 +55,7 @@
 		"run:deno": "deno run --allow-all dist/server-entry.js",
 		"run:node": "node dist/server-entry.js",
 		"build": "bun build src/index.ts --outfile dist/index.js --target node --minify && bun build src/server-entry.ts --outfile dist/server-entry.js --target node --minify && bun build src/cli.ts --outfile dist/cli.js --target node --minify && bun run scripts/build-ui.ts",
+		"prepublishOnly": "bun run build",
 		"setup": "bun run src/cli.ts",
 		"lint": "biome check . && bun run scripts/check-imports.ts",
 		"format": "biome check --write --unsafe .",

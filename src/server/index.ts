@@ -29,7 +29,7 @@ const DIST_DIR = __dirname.startsWith("/$bunfs/root")
 	? dirname(process.execPath)
 	: __filename.endsWith(".ts")
 		? join(__dirname, "../../dist")
-		: join(__dirname, "..");
+		: __dirname;
 
 const logger = getLogger(["nogoo9", "server"]);
 

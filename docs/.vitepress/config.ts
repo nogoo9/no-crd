@@ -98,10 +98,17 @@ export default withMermaid(
 							text: "ADR-005: Endpoint Coverage",
 							link: "/decisions/ADR-005-ui-proactive-oidc-refresh",
 						},
+						{
+							text: "ADR-006: Asset Resolution",
+							link: "/decisions/ADR-006-packaged-ui-asset-resolution",
+						},
 					],
 				},
 			],
-			socialLinks: [{ icon: "github", link: "https://github.com/nogoo9/no-crd" }],
+			socialLinks: [
+				{ icon: "github", link: "https://github.com/nogoo9/no-crd" },
+				{ icon: "npm", link: "https://www.npmjs.com/package/@nogoo9/no-crd" }
+			],
 		},
 	}),
 );

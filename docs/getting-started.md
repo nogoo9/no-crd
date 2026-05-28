@@ -4,38 +4,18 @@
 
 ## Architecture Topology
 
-```mermaid
-graph TD
-    subgraph Client Space
-        Agent[AI Agent / MCP Client]
-        UI[Pod Manager UI Dashboard]
-    end
-
-    subgraph no-crd MCP Server Gateway
-        MCP[MCP Server Entrypoint]
-        Proxy[HTTP Routing Proxy]
-        Auth[Auth Engine: RBAC & ABAC]
-    end
-
-    subgraph Kubernetes Cluster
-        K8s[Kubernetes API Server]
-        PodA[Tenant A Workspace Pod]
-        PodB[Tenant B Workspace Pod]
-    end
-
-    Agent -->|JSON-RPC via SSE/Stdio| MCP
-    UI -->|HTTP / WebSockets| Proxy
-    MCP -->|Verify token claims| Auth
-    Proxy -->|Verify owner match| Auth
-    Auth -->|1. RBAC Check: Scope & Role| Auth
-    Auth -->|2. ABAC Check: Owner Label| Auth
-    MCP -->|Authorized Pod Actions| K8s
-    Proxy -->|Route HTTP traffic| PodA
-    K8s -->|Orchestrate| PodA
-    K8s -->|Orchestrate| PodB
-```
+<!-- 
+PROMPT FOR FUTURE AGENTS:
+This image is a professional software architecture diagram for 'nogoo9-no-crd'.
+Prompt used for generation:
+"A professional and modern software architecture diagram for a system called 'nogoo9-no-crd'. The diagram is laid out horizontally in a sleek dark theme with three clean columns or spaces: 1. Client Space (left): showing boxes for 'AI Agent / MCP Client' and 'Pod Manager UI Dashboard'. 2. MCP Server Gateway (middle): showing boxes for 'MCP Server Entrypoint', 'HTTP Routing Proxy', and 'Auth Engine: RBAC & ABAC'. 3. Kubernetes Cluster (right): showing 'Kubernetes API Server', 'Tenant A Workspace Pod', and 'Tenant B Workspace Pod'. Clear, glow-effect arrows connect them: Agent connects to MCP Entrypoint; UI connects to Routing Proxy; both query the Auth Engine; MCP Entrypoint sends commands to Kubernetes API; Routing Proxy forwards traffic directly to Tenant Pods; Kubernetes API Server orchestrates the Tenant Pods. Premium design with soft gradient glows, clean sans-serif typography, and subtle tech aesthetics."
+To regenerate or refine, use the generate_image tool with this prompt.
+-->
+![Architecture Topology](/architecture_diagram.png)
 
 ## Installation
+
+The package is published and available on npm: [@nogoo9/no-crd](https://www.npmjs.com/package/@nogoo9/no-crd).
 
 Add the package to your project or install globally:
 
@@ -45,7 +25,18 @@ bun install @nogoo9/no-crd
 
 ## Running the MCP Server
 
-You can run the server using Bun, Deno, or Node.js from the source file `src/server-entry.ts` or by using the global CLI.
+You can run the server using Bun, Deno, or Node.js from the source file `src/server-entry.ts`, run via Docker, or by using the global CLI.
+
+### Using Docker
+
+The official container image is published on GitHub Container Registry (GHCR) as [`ghcr.io/nogoo9/no-crd`](https://github.com/nogoo9/no-crd/pkgs/container/no-crd). You can run the server in a container by mounting your local Kubernetes configuration:
+
+```bash
+docker run -d -p 3000:3000 \
+  -v "$HOME/.kube/config:/app/.kube/config:ro" \
+  -e KUBECONFIG=/app/.kube/config \
+  ghcr.io/nogoo9/no-crd:latest
+```
 
 ### Using Bun (Recommended)
 

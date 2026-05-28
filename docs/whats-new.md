@@ -3,6 +3,16 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.4.0
+
+- **Local & Built-In Templates**: Added support for reading workspace Pod templates from a local directory (`TEMPLATES_DIR` environment variable) or using the built-in catalog in `templates/`. These are merged seamlessly with cluster-level ConfigMap templates, with ConfigMaps taking higher priority in case of name collisions.
+- **Three-Source Theme Merge Engine**: Implemented a visual theme provider. Themes are dynamically scanned and merged from three layers: cluster ConfigMaps (`THEMES_CONFIGMAP`), custom directories (`THEMES_DIR`), and built-in fallback themes.
+- **Robust Packaged UI Asset Resolution**: Hardened path resolution (`DIST_DIR`) and asset loading (`resolveBuiltinDir`) in both flat and nested environments. This guarantees that running from compiled bundles, published npm packages (`nocrd9`), and Docker containers will correctly resolve static UI assets, templates, and themes out of the box.
+- **Server & Routes Modularization**: Refactored the core HTTP/HTTPS server in `src/server/` into sub-modules (`mcp.ts`, `proxy.ts`, `static.ts`, `themes.ts`, `auth.ts`) to improve codebase legibility, test isolation, and route organization.
+- **NPM Publish Safety Hook**: Added `"prepublishOnly": "bun run build"` in `package.json` to prevent publishing packages with missing or stale frontend assets.
+
+---
+
 ## What's New in v0.3.0
 
 - **GitHub Actions Security Tooling**: Standardized workflows with `actionlint` and `zizmor` security scanning, enforced strict job-level least-privilege permissions, and SHA-pinned Github Actions.

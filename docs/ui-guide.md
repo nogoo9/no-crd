@@ -102,7 +102,32 @@ The dashboard includes:
 
 ## 5. Custom Themes System
 
-The dashboard supports custom theme stylesheets loaded dynamically at runtime. By mounting a folder of CSS files or utilizing a ConfigMap, you can customize the complete visual appearance of the dashboard.
+The dashboard supports custom theme stylesheets loaded dynamically at runtime. Themes are scanned, merged, and prioritized dynamically from three distinct layers (the **Three-Source Theme Merge Engine**):
+
+1. **Kubernetes ConfigMap (`THEMES_CONFIGMAP` environment variable)**: Directly queried from the cluster. Allows adding and modifying dashboard styling dynamically without mounting filesystem volumes.
+2. **Custom Local Directory (`THEMES_DIR` environment variable)**: Scans a local filesystem folder (e.g. `/mnt/custom-themes`) containing CSS files.
+3. **Built-In Catalog**: Fallback themes bundled directly inside the package distribution (e.g. Vercel, Slack, Dracula, Nord, Stripe, Antigravity).
+
+If a theme ID exists in multiple layers, the higher-priority layer takes precedence (ConfigMap > Local Directory > Built-In Catalog).
+
+<!-- 
+PROMPT FOR FUTURE AGENTS:
+This Mermaid diagram describes the three-source theme merging and prioritization hierarchy:
+1. Sources are ConfigMap, custom folder, and built-in themes.
+2. Precedence is 1 > 2 > 3. Duplicate theme IDs from lower priority sources are ignored.
+To regenerate or extend, maintain this visual structure and list any new theme sources (e.g. database-backed themes) as parallel branches.
+-->
+```mermaid
+graph TD
+    Client[Dashboard UI Request] --> Merger[Theme Merge Engine]
+    Merger --> ConfigMap["1. ConfigMap (THEMES_CONFIGMAP)"]
+    Merger --> LocalDir["2. Local Directory (THEMES_DIR)"]
+    Merger --> BuiltIn["3. Built-In Themes"]
+
+    ConfigMap -->|Priority 1: Shadows Collisions| UI[Active Themes List]
+    LocalDir -->|Priority 2: Added if ID Unseen| UI
+    BuiltIn -->|Priority 3: Added if ID Unseen| UI
+```
 
 ### How to Write a Theme
 
