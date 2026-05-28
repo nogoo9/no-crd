@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: open-webui
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "Open WebUI - User-friendly WebUI for LLMs"
+    nogoo9/tag: "chat"
+    nogoo9/workspace-port: "8080"
+    nogoo9/workspace-path: "/"
+    nogoo9/api.chat.port: "8080"
+    nogoo9/api.chat.path: "/"
+    nogoo9/api.chat.desc: "Open WebUI Portal"
+data:
+  spec: |
+    containers:
+      - name: agent
+        image: nogoo9-registry.localhost:5001/open-webui/open-webui:main
+        env:
+          - name: WEBUI_SECRET_KEY
+            value: "no-crd-secret-key-change-me"
+        volumeMounts:
+          - name: workspace
+            mountPath: /app/backend/data
+    volumes:
+      - name: workspace
+        emptyDir: {}
