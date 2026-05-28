@@ -129,6 +129,8 @@ The server can be configured via environment variables or CLI flags:
 | `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | - | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
 | `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | - | String | User role required for read operations. If not set, read role check is bypassed. |
 | `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | - | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
+| - | `PROXY_SESSION_SECRET` | - | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
+| - | `PROXY_SESSION_TTL` | `1800` | Number | Session cookie expiration lifetime in seconds (sliding window duration). |
 
 ### 🖥️ UI & Themes Configuration
 
