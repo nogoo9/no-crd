@@ -23,7 +23,7 @@ async function main() {
 		mcpServers: {
 			nogoo9: {
 				command: "node",
-				args: [join(workspaceRoot, "dist/index.js")],
+				args: [join(workspaceRoot, "dist/server-entry.js")],
 				env: {
 					...process.env,
 					TRANSPORT: "stdio",
