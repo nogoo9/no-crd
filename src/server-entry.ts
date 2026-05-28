@@ -13,7 +13,7 @@ import {
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { initK8sContext } from "~/k8s/index.js";
 import { createMcpServer } from "~/mcp/server.js";
-import { startHttpServer } from "~/server.js";
+import { startHttpServer } from "~/server/index.js";
 import { registerUiApp } from "~/ui/index.js";
 import { config } from "./config.js";
 

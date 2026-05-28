@@ -1,28 +1,9 @@
-import {
-	afterEach,
-	beforeEach,
-	describe,
-	expect,
-	mock,
-	spyOn,
-	test,
-} from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 // Capture registered tools in a Map to avoid bracket notation lint issues
 const registeredTools = new Map<string, (...args: any[]) => any>();
 
-mock.module("@modelcontextprotocol/ext-apps/server", () => {
-	return {
-		registerAppTool: (
-			_server: any,
-			name: string,
-			_schema: any,
-			handler: any,
-		) => {
-			registeredTools.set(name, handler);
-		},
-	};
-});
+import * as extApps from "@modelcontextprotocol/ext-apps/server";
 
 // Mock K8s dependencies
 const coreApi = {
@@ -44,8 +25,16 @@ const k8sContext = {
 import { registerPodTools } from "./pods.js";
 
 describe("Pods MCP Tools", () => {
+	let registerSpy: any;
+
 	beforeEach(() => {
 		registeredTools.clear();
+		registerSpy = spyOn(extApps, "registerAppTool").mockImplementation(
+			(_server: any, name: string, _schema: any, handler: any) => {
+				registeredTools.set(name, handler);
+				return {} as any;
+			},
+		);
 		// Register pod tools
 		registerPodTools({} as any, k8sContext, [
 			"list_pods",
@@ -65,6 +54,7 @@ describe("Pods MCP Tools", () => {
 	});
 
 	afterEach(() => {
+		registerSpy.mockRestore();
 		spyOn(coreApi, "listNamespacedPod").mockRestore();
 		spyOn(coreApi, "readNamespacedPod").mockRestore();
 		spyOn(coreApi, "deleteNamespacedPod").mockRestore();

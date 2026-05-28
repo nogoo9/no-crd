@@ -5,6 +5,8 @@ import { Readable } from "node:stream";
 import * as k8s from "@kubernetes/client-node";
 import { initK8sContext, type K8sContext } from "~/k8s/index.js";
 
+mock.restore();
+
 let listenMock: any = null;
 
 mock.module("fastify", () => {
@@ -44,12 +46,12 @@ mock.module("fastify", () => {
 						destUrl += qs;
 					}
 
-					const requestHeaders: any = Object.create(null);
-					for (const [k, v] of Object.entries(req.headers)) {
-						if (k !== "__proto__" && k !== "constructor" && k !== "prototype") {
-							requestHeaders[k] = v;
-						}
-					}
+					const requestHeaders = Object.fromEntries(
+						Object.entries(req.headers).filter(
+							([k]) =>
+								k !== "__proto__" && k !== "constructor" && k !== "prototype",
+						),
+					);
 					const rewriteRequestHeaders =
 						replyOpts.rewriteRequestHeaders || ((_: any, h: any) => h);
 					const finalHeaders = rewriteRequestHeaders(req, requestHeaders);
@@ -78,16 +80,19 @@ mock.module("fastify", () => {
 								: undefined,
 						})
 						.then(async (res) => {
-							const responseHeaders: any = Object.create(null);
+							const responseHeadersEntries: [string, string][] = [];
 							res.headers.forEach((v, k) => {
 								if (
 									k !== "__proto__" &&
 									k !== "constructor" &&
 									k !== "prototype"
 								) {
-									responseHeaders[k] = v;
+									responseHeadersEntries.push([k, v]);
 								}
 							});
+							const responseHeaders = Object.fromEntries(
+								responseHeadersEntries,
+							);
 							const rewriteHeaders =
 								replyOpts.rewriteHeaders || ((h: any) => h);
 							const finalResponseHeaders = rewriteHeaders(responseHeaders, req);
@@ -130,7 +135,7 @@ mock.module("fastify", () => {
 	return fastifyMock;
 });
 
-import { globalApp, handleWebRequest, resetMcpServer } from "./server.js";
+import { globalApp, handleWebRequest, resetMcpServer } from "./index.js";
 
 const mockCreateSelfSubjectAccessReview = mock();
 const mockAuthApi = {
@@ -150,6 +155,12 @@ describe("HTTP/SSE Server - Stateful and Stateless MCP Tool Calls", () => {
 	let originalMakeApiClient: any;
 
 	beforeEach(async () => {
+		delete process.env.AUTH_ENABLED;
+		delete process.env.JWT_VERIFICATION_REQUIRED;
+		delete process.env.AUTH_REQUIRED_READ_SCOPE;
+		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
+		delete process.env.BASE_URL;
+
 		mockCreateSelfSubjectAccessReview.mockReset();
 		mockReadNamespacedConfigMap.mockReset();
 		testKc = new k8s.KubeConfig();
@@ -192,6 +203,11 @@ users:
 	});
 
 	afterEach(async () => {
+		delete process.env.AUTH_ENABLED;
+		delete process.env.JWT_VERIFICATION_REQUIRED;
+		delete process.env.AUTH_REQUIRED_READ_SCOPE;
+		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
+		delete process.env.BASE_URL;
 		await resetMcpServer();
 	});
 
@@ -300,6 +316,7 @@ users:
 		expect(postResp.headers.get("Content-Type")).toContain("application/json");
 
 		const postRespBody = (await postResp.json()) as any;
+		console.log("postRespBody: ", JSON.stringify(postRespBody));
 		expect(postRespBody.result).toBeDefined();
 		expect(postRespBody.result.tools).toBeDefined();
 	});
@@ -1162,7 +1179,7 @@ users:
 
 		process.env.HOST = "127.0.0.1";
 		try {
-			const { startHttpServer } = await import("./server.js");
+			const { startHttpServer } = await import("./index.js");
 			await startHttpServer(k8sContext);
 			expect(passedOptions).not.toBeNull();
 			expect(passedOptions.host).toBe("127.0.0.1");
@@ -1181,7 +1198,7 @@ users:
 		process.env.CORS_MAX_AGE = "86400";
 
 		try {
-			const { createFastifyApp } = await import("./server.js");
+			const { createFastifyApp } = await import("./index.js");
 			const app = await createFastifyApp();
 			const resp = await app.inject({
 				method: "OPTIONS",
@@ -1211,7 +1228,7 @@ users:
 	});
 
 	test("createFastifyApp passes ca option to https server configuration", async () => {
-		const { createFastifyApp } = await import("./server.js");
+		const { createFastifyApp } = await import("./index.js");
 		const app = await createFastifyApp({
 			cert: "FAKE_CERT",
 			key: "FAKE_KEY",
