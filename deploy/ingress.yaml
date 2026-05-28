@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: no-crd-mcp
+  namespace: nogoo9
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "no-crd-mcp"
+spec:
+  rules:
+    - host: no-crd.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: no-crd-mcp
+                port:
+                  number: 3000
+  tls:
+    - hosts:
+        - no-crd.local
+      secretName: no-crd-tls

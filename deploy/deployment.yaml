@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: no-crd-mcp
+  namespace: nogoo9
+  labels:
+    app.kubernetes.io/name: no-crd
+    app.kubernetes.io/part-of: nogoo9
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nogoo9-mcp
+  template:
+    metadata:
+      labels:
+        app: nogoo9-mcp
+    spec:
+      serviceAccountName: no-crd-mcp
+      containers:
+        - name: mcp
+          image: ghcr.io/nogoo9/no-crd:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
+          env:
+            # Server Mode & Transports
+            - name: TRANSPORT
+              value: "http"
+            - name: PORT
+              value: "3000"
+            - name: NAMESPACE
+              value: "nogoo9"
+            - name: MODE
+              value: "cluster"
+            - name: STATELESS
+              value: "true"
+
+            # Session Cookie & Key Settings
+            # Cascade: PROXY_SESSION_SECRET -> Secret "nogoo9-session-key" -> Sibling Peer Discovery -> Random
+            # - name: PROXY_SESSION_SECRET
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: no-crd-secrets
+            #       key: session-secret
+
+            # Authentication / OIDC Configuration (Optional)
+            - name: AUTH_ENABLED
+              value: "false"
+            # - name: JWKS_URI
+            #   value: "https://your-oidc-issuer.com/protocol/openid-connect/certs"
+            # - name: AUTH_ISSUER
+            #   value: "https://your-oidc-issuer.com"
+            # - name: OAUTH_CLIENT_ID
+            #   value: "no-crd-mcp"
+            # - name: OAUTH_DISCOVERY_URL
+            #   value: "https://your-oidc-issuer.com/.well-known/openid-configuration"
+
+            # Themes Catalog & Merge (ConfigMap, Directory, Shipped built-ins)
+            - name: THEMES_CONFIGMAP
+              value: "mcp-themes"
+            - name: THEMES_DIR
+              value: "/app/themes"
+            - name: TEMPLATES_DIR
+              value: "/app/templates"
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

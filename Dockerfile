@@ -28,6 +28,14 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+LABEL org.opencontainers.image.title="no-crd" \
+      org.opencontainers.image.description="Agent-driven, on-demand pod orchestration in Kubernetes (k8s/k3s) without Custom Resource Definitions" \
+      org.opencontainers.image.authors="eterna2" \
+      org.opencontainers.image.source="https://github.com/nogoo9/no-crd" \
+      org.opencontainers.image.url="https://github.com/nogoo9/no-crd" \
+      org.opencontainers.image.documentation="https://nogoo9.github.io/no-crd/" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
 # Copy compiled bundle JS, UI assets, static documentation, themes, and templates
 COPY --from=builder /app/dist/server-entry.js /app/server-entry.js
 COPY --from=builder /app/dist/ui /app/ui
