@@ -8,6 +8,7 @@ This directory contains standard Kubernetes manifests for deploying the `no-crd`
 - [`serviceaccount.yaml`](file:///home/eterna2/github/nogoo9-no-crd/deploy/serviceaccount.yaml): Defines the `no-crd-mcp` ServiceAccount.
 - [`rbac.yaml`](file:///home/eterna2/github/nogoo9-no-crd/deploy/rbac.yaml): Configures ClusterRole & ClusterRoleBinding with necessary RBAC permissions (pods, secrets, configmaps, serviceaccounts).
 - [`deployment.yaml`](file:///home/eterna2/github/nogoo9-no-crd/deploy/deployment.yaml): The main Deployment spec running `ghcr.io/nogoo9/no-crd:latest` with configured probes, resources, and environment variable slots for OIDC auth and themes.
+- [`webcontainer-template.yaml`](file:///home/eterna2/github/nogoo9-no-crd/deploy/webcontainer-template.yaml): ConfigMap manifest to register the WebContainers Guide & Sandbox workspace pod template.
 - [`service.yaml`](file:///home/eterna2/github/nogoo9-no-crd/deploy/service.yaml): Creates a ClusterIP Service mapping port 3000.
 - [`ingress.yaml`](file:///home/eterna2/github/nogoo9-no-crd/deploy/ingress.yaml): Example Ingress resource configuration for Nginx Ingress Controller with WebSocket upgrade support.
 
@@ -23,9 +24,10 @@ This directory contains standard Kubernetes manifests for deploying the `no-crd`
 2. **Configure Authentication (Optional)**:
    By default, `AUTH_ENABLED` is set to `"false"`. To enable OIDC auth, uncomment and fill in the OIDC variables in `deployment.yaml`.
 
-3. **Deploy the Service and Ingress**:
+3. **Deploy the Service, Template, and Ingress**:
    ```bash
    kubectl apply -f deployment.yaml
+   kubectl apply -f webcontainer-template.yaml
    kubectl apply -f service.yaml
    kubectl apply -f ingress.yaml
    ```

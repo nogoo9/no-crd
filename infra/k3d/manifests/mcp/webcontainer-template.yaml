@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webcontainer-guide
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "WebContainers (Node.js in-browser) guide and sandbox"
+    nogoo9/tag: "webcontainers"
+    nogoo9/workspace-port: "5678"
+    nogoo9/workspace-path: "/"
+    nogoo9/api.guide.port: "5678"
+    nogoo9/api.guide.path: "/"
+    nogoo9/api.guide.desc: "WebContainers Sandbox"
+data:
+  spec: |
+    containers:
+      - name: agent
+        image: nogoo9-registry.localhost:5001/bun:latest
+        command:
+          - /bin/sh
+          - -c
+          - >-
+            bun -e "
+            const html = \`<!DOCTYPE html>
+            <html>
+            <head>
+              <title>WebContainers Guide Introduction</title>
+              <style>
+                body { font-family: system-ui, sans-serif; background: #121214; color: #e1e1e6; padding: 2rem; max-width: 800px; margin: 0 auto; }
+                pre { background: #1a1a1e; padding: 1rem; border-radius: 6px; overflow: auto; border: 1px solid #2a2a30; font-family: monospace; font-size: 14px; line-height: 1.5; color: #50fa7b; }
+                h1 { color: #f8f8f2; border-bottom: 1px solid #2a2a30; padding-bottom: 0.5rem; }
+                .status { color: #8be9fd; font-weight: bold; }
+              </style>
+            </head>
+            <body>
+              <h1>WebContainers Guide & Sandbox</h1>
+              <p>This sandbox runs Node.js entirely inside your browser using WebAssembly via StackBlitz WebContainers.</p>
+              <div class='status'>System Status:</div>
+              <pre id='output'>Initializing WebContainer API...</pre>
+              <script type='module'>
+                import { WebContainer } from 'https://esm.sh/@webcontainer/api';
+                const output = document.getElementById('output');
+                
+                function log(msg) {
+                  output.textContent += '\\n' + msg;
+                  console.log(msg);
+                }
+
+                try {
+                  log('Booting WebContainer instance...');
+                  const webcontainerInstance = await WebContainer.boot();
+                  log('WebContainer booted successfully! 🚀');
+                  
+                  log('Mounting files (index.js)...');
+                  await webcontainerInstance.mount({
+                    'index.js': {
+                      file: {
+                        contents: 'console.log(\x22Hello from WebContainers running inside your browser via Kubernetes!\x22);'
+                      }
+                    }
+                  });
+                  log('Mounted index.js successfully.');
+                  
+                  log('Spawning process: node index.js');
+                  const process = await webcontainerInstance.spawn('node', ['index.js']);
+                  
+                  process.output.pipeTo(new WritableStream({
+                    write(data) {
+                      log('[output]: ' + data);
+                    }
+                  }));
+                  
+                  const code = await process.exit;
+                  log('Process exited with code: ' + code);
+                } catch (err) {
+                  log('Error: ' + err.message);
+                  console.error(err);
+                }
+              </script>
+            </body>
+            </html>\`;
+            Bun.serve({
+              port: 5678,
+              fetch(req) {
+                return new Response(html, {
+                  headers: {
+                    'Content-Type': 'text/html',
+                    'Cross-Origin-Embedder-Policy': 'require-corp',
+                    'Cross-Origin-Opener-Policy': 'same-origin'
+                  }
+                });
+              }
+            });
+            console.log('WebContainers Guide listening on :5678');"
+            > /workspace/webcontainer.log 2>&1
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+    volumes:
+      - name: workspace
+        emptyDir: {}
