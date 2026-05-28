@@ -1,0 +1,21 @@
+metadata:
+  name: workspace-terminal
+  annotations:
+    nogoo9/description: "Interactive web terminal in the workspace sandbox"
+    nogoo9/tag: terminal
+    nogoo9/workspace-port: "7681"
+    nogoo9/workspace-path: "/"
+    nogoo9/api.terminal.port: "7681"
+    nogoo9/api.terminal.path: "/"
+    nogoo9/api.terminal.desc: "ttyd Web Terminal"
+spec:
+  containers:
+    - name: agent
+      image: tsl0922/ttyd:latest
+      command: ["ttyd", "-W", "-p", "7681", "/bin/sh"]
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+  volumes:
+    - name: workspace
+      emptyDir: {}

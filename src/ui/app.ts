@@ -3,7 +3,7 @@ import { App } from "@modelcontextprotocol/ext-apps";
 
 // Initialize the MCP App client bridge
 const app = new App(
-	{ name: "nogoo9-pod-manager", version: "0.3.0" },
+	{ name: "nogoo9-pod-manager", version: "0.4.0" },
 	{ tools: {} },
 );
 
@@ -843,14 +843,45 @@ function closeLogsModal() {
 	if (logsModal) logsModal.classList.add("hidden");
 }
 
+function sanitizeId(str: string): string {
+	return str
+		.toLowerCase()
+		.replace(/[^a-z0-9-]/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "");
+}
+
 // Spawn Modal functions
 async function openSpawnModal(tmplName: string) {
 	if (spawnTemplateTitle)
 		spawnTemplateTitle.textContent = `Template: ${tmplName}`;
 	if (spawnTemplateRef) spawnTemplateRef.value = tmplName;
 	if (workspaceIdInput) {
-		workspaceIdInput.value = "";
-		workspaceIdInput.placeholder = `ws-${tmplName}-${Math.floor(Math.random() * 1000)}`;
+		const payload = getJwtPayload();
+		const userId = payload
+			? payload.sub || payload.identity || payload.name
+			: undefined;
+		const sanitizedUser = userId ? sanitizeId(String(userId)) : "";
+		const prefix = sanitizedUser ? `${sanitizedUser}-` : "ws-";
+		const rand = Math.floor(1000 + Math.random() * 9000);
+		let generatedId = `${prefix}${tmplName}-${rand}`;
+
+		// If too long, truncate the sanitized user prefix part first to keep template name and rand intact
+		if (generatedId.length > 55) {
+			const suffix = `${tmplName}-${rand}`;
+			const allowedUserLen = 55 - suffix.length - 1; // -1 for the extra hyphen
+			if (allowedUserLen > 0) {
+				const truncatedUser = sanitizedUser
+					.slice(0, allowedUserLen)
+					.replace(/-$/, "");
+				generatedId = truncatedUser ? `${truncatedUser}-${suffix}` : suffix;
+			} else {
+				generatedId = suffix.slice(0, 55);
+			}
+		}
+
+		workspaceIdInput.value = generatedId;
+		workspaceIdInput.placeholder = generatedId;
 	}
 	if (workspaceNameInput) {
 		workspaceNameInput.value = "";
@@ -902,6 +933,11 @@ async function openSpawnModal(tmplName: string) {
 
 				div.appendChild(label);
 				div.appendChild(input);
+				const note = document.createElement("span");
+				note.className = "text-[10px] text-amber-500 font-sans mt-1 block";
+				note.textContent =
+					"⚠️ Note: This secret will be visible to all. We will implement a proper secret management later.";
+				div.appendChild(note);
 				contextInputs.appendChild(div);
 			}
 		} else {

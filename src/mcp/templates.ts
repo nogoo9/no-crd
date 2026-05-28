@@ -15,15 +15,19 @@ import {
 	extractUserIdentity,
 	getAccessibleNamespaces,
 	type K8sContext,
+	type LocalTemplate,
+	listLocalTemplates,
 	listTemplateMaps,
 	MODE,
 	mergeContainersByName,
 	mergeTopLevel,
 	type PodCreateArgs,
 	PodSpecSchema,
+	parseSpecString,
 	parseTemplateRef,
 	parseWorkspaceApis,
 	ResourceQuantity,
+	readLocalTemplate,
 	readTemplateMap,
 	requestContextStore,
 	resolveNamespace,
@@ -96,6 +100,85 @@ async function listAccessibleNamespaces(
 	coreApi: k8s.CoreV1Api,
 ): Promise<string[]> {
 	return getAccessibleNamespaces(coreApi, MODE, DEFAULT_NAMESPACE);
+}
+
+/**
+ * Extracts template metadata from a {@link LocalTemplate} into the same shape
+ * used by ConfigMap-based templates in tool responses.
+ */
+function localTemplateToMeta(
+	tmpl: LocalTemplate,
+	ns: string,
+): {
+	name: string;
+	namespace: string;
+	description: string;
+	tag: string;
+	requiredContext: string[];
+	workspacePath: string;
+	workspaceType: string;
+	apis: ReturnType<typeof parseWorkspaceApis>;
+} {
+	const a = tmpl.annotations;
+	const reqRaw = a["nogoo9/required-context"];
+	return {
+		name: tmpl.name,
+		namespace: ns,
+		description: a[DESCRIPTION_ANNOTATION] ?? "",
+		tag: a[TAG_ANNOTATION] ?? "",
+		requiredContext: reqRaw
+			? reqRaw
+					.split(",")
+					.map((s) => s.trim())
+					.filter(Boolean)
+			: [],
+		workspacePath:
+			a["nogoo9/workspace-path"] ?? a["nogoo9/preview-path"] ?? "/",
+		workspaceType:
+			a["nogoo9/workspace-type"] ?? a["nogoo9/preview-type"] ?? "html",
+		apis: parseWorkspaceApis(a),
+	};
+}
+
+/**
+ * Collects local + built-in templates (if configured), returning them
+ * as {@link LocalTemplate} entries.
+ */
+function collectLocalTemplates(): LocalTemplate[] {
+	const results: LocalTemplate[] = [];
+	const k8sCfg = config.k8s;
+
+	if (k8sCfg.templatesDir) {
+		results.push(...listLocalTemplates(k8sCfg.templatesDir));
+	}
+	if (k8sCfg.builtinTemplates) {
+		const builtins = listLocalTemplates(k8sCfg.builtinTemplatesDir);
+		// Only add built-ins that don't collide with custom dir templates
+		const existingNames = new Set(results.map((t) => t.name));
+		for (const b of builtins) {
+			if (!existingNames.has(b.name)) {
+				results.push(b);
+			}
+		}
+	}
+	return results;
+}
+
+/**
+ * Tries to find a local or built-in template by name.
+ * Checks custom TEMPLATES_DIR first, then built-in dir.
+ */
+function findLocalTemplate(name: string): LocalTemplate | null {
+	const k8sCfg = config.k8s;
+	if (k8sCfg.templatesDir) {
+		const found = readLocalTemplate(k8sCfg.templatesDir, name);
+		if (found) return found;
+	}
+	if (k8sCfg.builtinTemplates) {
+		const found = readLocalTemplate(k8sCfg.builtinTemplatesDir, name);
+		if (found) return found;
+	}
+	return null;
 }
 
 const nsParam = z
@@ -291,7 +374,9 @@ export function registerTemplateResources(
 					namespace: ns,
 				});
 				try {
+					// 1. ConfigMap templates (highest priority)
 					const maps = await listTemplateMaps(k8sContext.coreApi, ns);
+					const seenNames = new Set<string>();
 					const templates = maps.map((cm) => {
 						const reqContextRaw =
 							cm.metadata?.annotations?.["nogoo9/required-context"];
@@ -310,8 +395,10 @@ export function registerTemplateResources(
 							annotations["nogoo9/workspace-type"] ??
 							annotations["nogoo9/preview-type"] ??
 							"html";
+						const tmplName = cm.metadata?.name ?? "";
+						seenNames.add(tmplName);
 						return {
-							name: cm.metadata?.name ?? "",
+							name: tmplName,
 							namespace: ns,
 							description: annotations[DESCRIPTION_ANNOTATION] ?? "",
 							tag: annotations[TAG_ANNOTATION] ?? "",
@@ -321,6 +408,16 @@ export function registerTemplateResources(
 							apis: parseWorkspaceApis(annotations),
 						};
 					});
+
+					// 2. Local + built-in templates (lower priority, skip name collisions)
+					const localTemplates = collectLocalTemplates();
+					for (const lt of localTemplates) {
+						if (!seenNames.has(lt.name)) {
+							seenNames.add(lt.name);
+							templates.push(localTemplateToMeta(lt, ns));
+						}
+					}
+
 					logger.debug("Successfully found {count} templates", {
 						count: templates.length,
 					});
@@ -413,7 +510,7 @@ export function registerTemplateResources(
 				);
 				try {
 					const cm = await readTemplateMap(k8sContext.coreApi, ns, name);
-					const spec = JSON.parse(cm.data?.spec ?? "{}") as Record<
+					const spec = parseSpecString(cm.data?.spec ?? "{}") as Record<
 						string,
 						unknown
 					>;
@@ -468,6 +565,37 @@ export function registerTemplateResources(
 						},
 					};
 				} catch (err) {
+					// Fallback to local/built-in templates
+					const localTmpl = findLocalTemplate(name);
+					if (localTmpl) {
+						const meta = localTemplateToMeta(localTmpl, ns);
+						return {
+							content: [
+								{
+									type: "text" as const,
+									text: JSON.stringify(
+										{
+											metadata: {
+												name: localTmpl.name,
+												namespace: ns,
+												annotations: localTmpl.annotations,
+												labels: localTmpl.labels ?? {},
+											},
+											spec: localTmpl.spec,
+										},
+										null,
+										2,
+									),
+								},
+							],
+							structuredContent: {
+								...meta,
+								labels: localTmpl.labels ?? {},
+								annotations: localTmpl.annotations,
+								spec: localTmpl.spec,
+							},
+						};
+					}
 					logger.error(
 						"Failed to read template {name} from namespace {namespace}: {error}",
 						{
@@ -912,11 +1040,27 @@ export function registerTemplateResources(
 						k8sContext.coreApi,
 						tmplNs,
 						tmplName,
-					);
-					const raw = cm.data?.spec;
+					).catch(() => null);
+
+					let raw: string | undefined;
+					let _tmplAnnotations: Record<string, string> = {};
+					if (cm?.data?.spec) {
+						raw = cm.data.spec;
+						_tmplAnnotations = cm.metadata?.annotations ?? {};
+					} else {
+						// Fallback to local/built-in templates
+						const localTmpl = findLocalTemplate(tmplName);
+						if (localTmpl) {
+							raw = JSON.stringify(localTmpl.spec);
+							_tmplAnnotations = localTmpl.annotations;
+						}
+					}
+
 					if (!raw) {
-						const err = new Error(`Template "${templateRef}" has no data.spec`);
-						logger.error("Template invalid: {error}", { error: err });
+						const err = new Error(
+							`Template "${templateRef}" not found in ConfigMaps, local templates, or built-in templates`,
+						);
+						logger.error("Template not found: {error}", { error: err });
 						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
 					}
 
@@ -934,7 +1078,9 @@ export function registerTemplateResources(
 
 					// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable replacement
 					const interpolatedRaw = raw.replaceAll("${{user}}", templateUser);
-					const parsedSpec = PodSpecSchema.parse(JSON.parse(interpolatedRaw));
+					const parsedSpec = PodSpecSchema.parse(
+						parseSpecString(interpolatedRaw),
+					);
 					const merged: PodCreateArgs = topLevelOverrides
 						? (mergeTopLevel(parsedSpec, topLevelOverrides) as PodCreateArgs)
 						: parsedSpec;

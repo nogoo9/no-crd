@@ -1,3 +1,24 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+/**
+ * Resolves a built-in asset directory relative to the compiled source location.
+ * Tries `../dir` first (from dist/), then `../../dir` (from src/ in dev).
+ */
+function resolveBuiltinDir(dirName: string): string {
+	const fromCurr = join(__dirname, dirName);
+	if (existsSync(fromCurr)) return fromCurr;
+	const fromDist = join(__dirname, "..", dirName);
+	if (existsSync(fromDist)) return fromDist;
+	const fromSrc = join(__dirname, "..", "..", dirName);
+	if (existsSync(fromSrc)) return fromSrc;
+	return fromDist;
+}
+
 /**
  * Consolidated and typed configuration interface for the nogoo9-no-crd application.
  * Evaluates environment variables dynamically via getters so that modifications made
@@ -56,6 +77,9 @@ export const config = {
 				? Number(process.env.DEFAULT_WORKSPACE_PORT)
 				: undefined,
 			registryUrl: process.env.REGISTRY_URL,
+			templatesDir: process.env.TEMPLATES_DIR || "",
+			builtinTemplates: process.env.BUILTIN_TEMPLATES !== "false",
+			builtinTemplatesDir: resolveBuiltinDir("templates"),
 		};
 	},
 	get auth() {
@@ -84,6 +108,9 @@ export const config = {
 			requiredWriteScope: process.env.AUTH_REQUIRED_WRITE_SCOPE,
 			requiredReadRole: process.env.AUTH_REQUIRED_READ_ROLE,
 			requiredWriteRole: process.env.AUTH_REQUIRED_WRITE_ROLE,
+			sessionTtlSeconds: Number(process.env.PROXY_SESSION_TTL) || 1800,
+			sessionSecret:
+				process.env.PROXY_SESSION_SECRET || process.env.JWT_SECRET || "",
 		};
 	},
 	get ui() {
@@ -91,6 +118,7 @@ export const config = {
 			enabled: process.env.UI_ENABLED !== "false",
 			themesDir: process.env.THEMES_DIR || "themes",
 			themesConfigMap: process.env.THEMES_CONFIGMAP,
+			builtinThemesDir: resolveBuiltinDir("themes"),
 			docsDir: process.env.DOCS_DIR,
 			oauth: {
 				discoveryUrl: process.env.OAUTH_DISCOVERY_URL || "",

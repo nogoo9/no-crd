@@ -3,6 +3,22 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.4.0
+
+- **Local & Built-In Templates**: Added support for reading workspace Pod templates from a local directory (`TEMPLATES_DIR` environment variable) or using the built-in catalog in `templates/`. These are merged seamlessly with cluster-level ConfigMap templates, with ConfigMaps taking higher priority in case of name collisions.
+- **Three-Source Theme Merge Engine**: Implemented a visual theme provider. Themes are dynamically scanned and merged from three layers: cluster ConfigMaps (`THEMES_CONFIGMAP`), custom directories (`THEMES_DIR`), and built-in fallback themes.
+- **Robust Packaged UI Asset Resolution**: Hardened path resolution (`DIST_DIR`) and asset loading (`resolveBuiltinDir`) in both flat and nested environments. This guarantees that running from compiled bundles, published npm packages (`nocrd9`), and Docker containers will correctly resolve static UI assets, templates, and themes out of the box.
+- **Server & Routes Modularization**: Refactored the core HTTP/HTTPS server in `src/server/` into sub-modules (`mcp.ts`, `proxy.ts`, `static.ts`, `themes.ts`, `auth.ts`) to improve codebase legibility, test isolation, and route organization.
+- **NPM Publish Safety Hook**: Added `"prepublishOnly": "bun run build"` in `package.json` to prevent publishing packages with missing or stale frontend assets.
+- **Open WebUI Workspace Sandboxing**: Replaced browser-based WebContainers guide with a containerized `open-webui` template supporting persistent SQLite data mappings and local k3d registry bootstrap.
+- **Workspace ID Auto-Generation**: Spawn modal automatically generates valid DNS-1123 compliant workspace resource IDs, prefixed with a sanitized user OIDC identity from the JWT payload and safely truncated to prevent length issues.
+- **Dynamic Context Warnings**: Added dynamic validation for required context variables, including a visible warning note to caution users that plain-text secrets will be visible in the pod spec.
+- **MCP Server Metadata Description (`server.json`)**: Added a standard `server.json` file to describe server capabilities, parameters, and environment variables for automated registry publishing and CI/CD.
+- **Directory Layout Restructuring**: Renamed the `deploy/` directory to `kubernetes/manifest/` to align with future Helm charts and package organization.
+- **YAML Pod Spec Parser**: Fixed the `spawn_workspace` spec parser to run `parseSpecString` instead of raw `JSON.parse`, enabling YAML templates to load successfully without crashing on non-JSON start characters.
+
+---
+
 ## What's New in v0.3.0
 
 - **GitHub Actions Security Tooling**: Standardized workflows with `actionlint` and `zizmor` security scanning, enforced strict job-level least-privilege permissions, and SHA-pinned Github Actions.

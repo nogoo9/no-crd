@@ -55,6 +55,10 @@ docker pull tsl0922/ttyd:latest || true
 docker tag tsl0922/ttyd:latest localhost:5001/tsl0922/ttyd:latest
 docker push localhost:5001/tsl0922/ttyd:latest
 
+docker pull ghcr.io/open-webui/open-webui:main || true
+docker tag ghcr.io/open-webui/open-webui:main localhost:5001/open-webui/open-webui:main
+docker push localhost:5001/open-webui/open-webui:main
+
 
 echo "==> Building and pushing @nogoo9/kube-mcp image..."
 docker build -f "$WORKSPACE_ROOT/Dockerfile" -t localhost:5001/kube-mcp:latest "$WORKSPACE_ROOT"

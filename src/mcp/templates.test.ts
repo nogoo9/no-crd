@@ -1,27 +1,8 @@
-import {
-	afterEach,
-	beforeEach,
-	describe,
-	expect,
-	mock,
-	spyOn,
-	test,
-} from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 const registeredTools = new Map<string, (...args: any[]) => any>();
 
-mock.module("@modelcontextprotocol/ext-apps/server", () => {
-	return {
-		registerAppTool: (
-			_server: any,
-			name: string,
-			_schema: any,
-			handler: any,
-		) => {
-			registeredTools.set(name, handler);
-		},
-	};
-});
+import * as extApps from "@modelcontextprotocol/ext-apps/server";
 
 const coreApi = {
 	readNamespacedConfigMap: async () => ({}),
@@ -38,8 +19,16 @@ const k8sContext = {
 import { registerTemplateResources } from "./templates.js";
 
 describe("Templates MCP Tools", () => {
+	let registerSpy: any;
+
 	beforeEach(() => {
 		registeredTools.clear();
+		registerSpy = spyOn(extApps, "registerAppTool").mockImplementation(
+			(_server: any, name: string, _schema: any, handler: any) => {
+				registeredTools.set(name, handler);
+				return {} as any;
+			},
+		);
 		registerTemplateResources({} as any, k8sContext, [
 			"create_pod_from_template",
 		]);
@@ -48,6 +37,7 @@ describe("Templates MCP Tools", () => {
 	});
 
 	afterEach(() => {
+		registerSpy.mockRestore();
 		if ((coreApi as any).readNamespacedConfigMap?.mockRestore) {
 			spyOn(coreApi, "readNamespacedConfigMap" as any).mockRestore();
 		}

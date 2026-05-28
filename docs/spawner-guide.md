@@ -10,16 +10,14 @@ This guide covers the spawner architecture, tool configurations, supported lifec
 
 When an agent invokes `spawn_workspace`, the spawner processes the request, loads the referenced template ConfigMap, applies annotations, and injects runtime configurations before committing the pod to the Kubernetes API.
 
-```mermaid
-graph TD
-    Agent[AI Agent / Client] -->|1. spawn_workspace| Spawner[MCP Spawner Tool]
-    Spawner -->|2. Read Template| ConfigMap[ConfigMap Template]
-    Spawner -->|3. Evaluate Annotations| Injector[Spec Injector]
-    Injector -->|Injects Init Containers| Pod[Spawned Pod]
-    Injector -->|Injects IAM Role SA| Pod
-    Injector -->|Injects preStop Hook| Pod
-    Spawner -->|4. Deploy Pod| K8s[Kubernetes API]
-```
+<!-- 
+PROMPT FOR FUTURE AGENTS:
+This image is a professional architectural flow diagram for the Workspace Spawner subsystem.
+Prompt used for generation:
+"A clean, professional software flow diagram illustrating the 'Workspace Spawner Architecture' for a Kubernetes sandboxing system. Dark theme with soft glowing gradient accents. The diagram shows: 1. AI Agent / Client calling 'spawn_workspace' tool on the MCP Spawner Tool; 2. MCP Spawner Tool reading from 'ConfigMap Template'; 3. Spawner evaluating annotations and passing data to the 'Spec Injector'; 4. Spec Injector dynamically injecting: 'Init Containers', 'IAM Role ServiceAccount', and 'preStop Hooks' into the Pod spec; 5. Spawner deploying the final Pod to the Kubernetes API. Modern UI style with clean rounded boxes, glowing arrows, and clear visual layout."
+To regenerate or refine, use the generate_image tool with this prompt.
+-->
+![Workspace Spawner Architecture](/spawner_architecture.png)
 
 ---
 

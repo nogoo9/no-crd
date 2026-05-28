@@ -1,0 +1,30 @@
+metadata:
+  name: default-agent-workspace
+  annotations:
+    nogoo9/description: "Default agent workspace with HTTP echo server"
+    nogoo9/tag: default
+    nogoo9/workspace-port: "5678"
+    nogoo9/workspace-path: "/"
+    nogoo9/api.echo.port: "5678"
+    nogoo9/api.echo.path: "/"
+    nogoo9/api.echo.desc: "HTTP Echo Server"
+spec:
+  containers:
+    - name: agent
+      image: oven/bun:latest
+      command:
+        - /bin/sh
+        - -c
+        - >-
+          bun -e "Bun.serve({ port: 5678, fetch(req) {
+          const text = process.env.ECHO_TEXT || 'hello';
+          console.log(new Date().toISOString() + ' Request received');
+          return new Response(text); } });
+          console.log('Listening on :5678');"
+          > /workspace/echo.log 2>&1
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+  volumes:
+    - name: workspace
+      emptyDir: {}

@@ -25,6 +25,7 @@ export default withMermaid(
 				{ text: "Home", link: "/" },
 				{ text: "Guide", link: "/getting-started" },
 				{ text: "What's New", link: "/whats-new" },
+				{ text: "Decisions", link: "/decisions/" },
 				{ text: "API Reference", link: "/api/" },
 			],
 			sidebar: [
@@ -66,12 +67,48 @@ export default withMermaid(
 					text: "Reference Documentation",
 					items: [
 						{ text: "Kubernetes RBAC Mapping", link: "/permissions" },
-						{ text: "Bun WebSocket Proxy Design", link: "/bun-websocket-proxy" },
+						{
+							text: "Bun WebSocket Proxy Design",
+							link: "/bun-websocket-proxy",
+						},
 						{ text: "API Reference (TypeDoc)", link: "/api/" },
 					],
 				},
+				{
+					text: "Architecture Decisions",
+					items: [
+						{ text: "Overview", link: "/decisions/" },
+						{
+							text: "ADR-001: Template File Format",
+							link: "/decisions/ADR-001-template-file-format",
+						},
+						{
+							text: "ADR-002: Session Cookies",
+							link: "/decisions/ADR-002-stateless-session-cookies",
+						},
+						{
+							text: "ADR-003: Peer Discovery",
+							link: "/decisions/ADR-003-peer-discovery-session-key",
+						},
+						{
+							text: "ADR-004: Theme Merge",
+							link: "/decisions/ADR-004-three-source-theme-merge",
+						},
+						{
+							text: "ADR-005: Endpoint Coverage",
+							link: "/decisions/ADR-005-ui-proactive-oidc-refresh",
+						},
+						{
+							text: "ADR-006: Asset Resolution",
+							link: "/decisions/ADR-006-packaged-ui-asset-resolution",
+						},
+					],
+				},
 			],
-			socialLinks: [{ icon: "github", link: "https://github.com/nogoo9/no-crd" }],
+			socialLinks: [
+				{ icon: "github", link: "https://github.com/nogoo9/no-crd" },
+				{ icon: "npm", link: "https://www.npmjs.com/package/@nogoo9/no-crd" }
+			],
 		},
 	}),
 );

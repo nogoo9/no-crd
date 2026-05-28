@@ -29,9 +29,10 @@ It provides JupyterHub-like dynamic pod lifecycle management but is completely a
 - **No CRDs Required:** Runs directly against core Kubernetes resources (Pods, ConfigMaps, ServiceAccounts). Highly portable, secure, and compatible with restricted/managed environments (EKS, GKE, K3s).
 - **Agent Sandbox Spawner:** Specialized spawner tools that automate workspace provisioning with context validation, init containers, IAM roles, pre-stop hooks, and lifecycle sync.
 - **ConfigMap-Based Templates:** Store, version, and load reusable pod templates stored as standard Kubernetes ConfigMaps.
+- **Local Filesystem Templates:** Bake YAML/JSON pod templates into Docker images or mount them from host paths — with built-in defaults shipped in the package.
 - **Isomorphic Multi-Runtime SDK:** Imports seamlessly as a composable programmatic SDK or MCP server running under Node.js, Bun, or Deno.
-- **Workspace Routing Proxy:** Built-in reverse proxy routing that dynamically pipes traffic to running container IPs with secure user token ownership verification and path-scoped session cookie (`nocr_token`) support.
-- **Embedded Web UI App:** Exposes an interactive web-based Pod Manager interface featuring a light/dark theme toggle, client-side PKCE OIDC login, and workspace file preview rendering (supporting HTML sandboxed iframes and custom Markdown rendering).
+- **Workspace Routing Proxy:** Built-in reverse proxy routing that dynamically pipes traffic to running container IPs with secure user token ownership verification, path-scoped session cookies (`nocr_token` and `nocr_sess`), and automatic HMAC-signed session management for short-lived token resilience.
+- **Embedded Web UI App:** Exposes an interactive web-based Pod Manager interface featuring a light/dark theme toggle, client-side PKCE OIDC login with proactive silent token refresh, and workspace file preview rendering (supporting HTML sandboxed iframes and custom Markdown rendering).
 
 ---
 
@@ -67,7 +68,18 @@ nocrd9 --runtime deno --transport http --port 3050
 nocrd9 --runtime node --transport stdio
 
 # Run with HTTPS / custom TLS certificates
-nocrd9 --transport http --port 3443 --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
+bun run src/server-entry.ts --tls-cert cert.pem --tls-key key.pem
+```
+
+### Run via Docker
+
+The official container image is published to GitHub Container Registry (GHCR) as [`ghcr.io/nogoo9/no-crd`](https://github.com/nogoo9/no-crd/pkgs/container/no-crd). You can run the MCP server in a container by mounting your local Kubernetes config:
+
+```bash
+docker run -d -p 3000:3000 \
+  -v "$HOME/.kube/config:/app/.kube/config:ro" \
+  -e KUBECONFIG=/app/.kube/config \
+  ghcr.io/nogoo9/no-crd:latest
 ```
 
 ### 🦕 Bun & Deno Kubernetes Certificate Compatibility
@@ -133,6 +145,8 @@ The server and command-line utility are configurable using CLI options or enviro
 | `--disable-permission-checks` | `DISABLE_PERMISSION_CHECKS` | `false` | `true`, `false` | Disable Kubernetes RBAC permission checks and assume all tools are enabled. |
 | `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | `3000` | Number | Default target port inside the workspace pods to proxy traffic to. |
 | - | `REGISTRY_URL` | - | URL string | Target container registry URL to query for images (e.g. `http://localhost:5001`). |
+| - | `TEMPLATES_DIR` | - | Path string | Path to local directory containing pod template files (YAML/JSON). See [ADR-001](docs/decisions/ADR-001-template-file-format.md). |
+| - | `BUILTIN_TEMPLATES` | `true` | `true`, `false` | Set to `false` to disable built-in templates shipped with the package. |
 
 ### 🔑 Authentication Configuration
 
@@ -156,6 +170,8 @@ The server and command-line utility are configurable using CLI options or enviro
 | `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | - | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
 | `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | - | String | User role required for read operations. If not set, read role check is bypassed. |
 | `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | - | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
+| - | `PROXY_SESSION_SECRET` | - | String | HMAC-SHA256 signing key for stateless session cookies (`nocr_sess`). Auto-generated if not set. See [ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md). |
+| - | `PROXY_SESSION_TTL` | `1800` | Number (seconds) | Session cookie TTL (sliding window). Default 30 minutes. |
 
 ### 🖥️ UI & Themes Configuration
 
@@ -457,7 +473,13 @@ Runs the compiled bundle using Node.js:
 
 ## 📑 Workspace Templates & Spawner Annotations
 
-Templates in `@nogoo9/no-crd` are stored as standard Kubernetes `ConfigMaps` in your target namespace. This allows you to define, version, and share reusable sandbox environments without writing custom operators or CRDs.
+Templates in `@nogoo9/no-crd` can be loaded from **three sources** (highest to lowest priority):
+
+1. **Kubernetes ConfigMaps** — labeled with `nogoo9/pod-template: "true"` (original mechanism)
+2. **Custom local directory** — set via `TEMPLATES_DIR` env var (YAML or JSON files)
+3. **Built-in templates** — shipped with the npm package (disable with `BUILTIN_TEMPLATES=false`)
+
+See [ADR-001](docs/decisions/ADR-001-template-file-format.md) for format details.
 
 ### 1. How to Define a Template
 
@@ -586,6 +608,7 @@ If `AUTH_ENABLED` is true:
 - The proxy requires a valid Bearer token in the `Authorization` header or a `?token=` query parameter.
 - The workspace pod's `nogoo9/user-sub` label must match the JWT's subject claim, preventing unauthorized access to other users' workspaces.
 - The proxy target port inside the workspace pod defaults to `3000` or can be overridden via pod annotation `nogoo9/workspace-port` or the `DEFAULT_WORKSPACE_PORT` environment variable.
+- A **stateless signed session cookie** (`nocr_sess`) is minted on first successful JWT validation, enabling workspace traffic to survive short-lived token expiry. See [ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md) and [ADR-003](docs/decisions/ADR-003-peer-discovery-session-key.md) for design details.
 
 ### 3. OAuth Resource Discovery (RFC 9728)
 
@@ -595,6 +618,17 @@ Exposes the standardized metadata endpoint `GET /.well-known/oauth-protected-res
 - Required scopes.
 
 This allows client interfaces (and MCP clients) to automatically discover security requirements and handle dynamic OAuth authentication flows.
+
+### 4. Embedded Web UI & Dashboard Themes
+
+When the server runs in HTTP/SSE transport mode, the visual **React Pod Manager UI Dashboard** is served directly at root `/` (e.g. `http://localhost:3000/`).
+- **Dashboard Themes**: The UI includes a system/light/dark toggle and supports custom visual themes.
+- **Three-Source Theme Merge Engine**: CSS stylesheets are dynamically scanned and merged from:
+  1. **Kubernetes ConfigMap** (`THEMES_CONFIGMAP` environment variable).
+  2. **Custom Local Directory** (`THEMES_DIR` environment variable, defaults to `themes/`).
+  3. **Built-In Catalog** (pre-baked styles: Dracula, Nord, Stripe, Slack, Vercel, Apple, Superhuman, Notion, and Antigravity).
+
+Duplicate theme IDs are resolved according to priority: ConfigMap > Local Directory > Built-In Catalog. For detailed customization guidelines and CSS templates, see the [Dashboard UI Guide](docs/ui-guide.md).
 
 ---
 

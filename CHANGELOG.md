@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.4.0] — 2026-05-29
+
+### Added
+
+- **Local Filesystem Templates**: Pod templates can now be loaded from YAML/JSON files in a local directory (`TEMPLATES_DIR`), in addition to Kubernetes ConfigMaps. Templates support both YAML (default, k8s-native) and JSON with auto-detection. ([ADR-001](docs/decisions/ADR-001-template-file-format.md))
+- **Built-In Templates**: 2 default pod templates (`default-agent-workspace`, `workspace-terminal`) are shipped with the npm package and available out of the box. Disable with `BUILTIN_TEMPLATES=false`.
+- **Built-In Themes (3-Source Merge)**: 10 CSS themes are bundled with the package. The `/api/themes` endpoint now merges themes from ConfigMap → custom directory → built-in, deduplicated by id. ([ADR-004](docs/decisions/ADR-004-three-source-theme-merge.md))
+- **Stateless Session Cookies**: HMAC-SHA256 signed `nocr_sess` cookies with configurable TTL (default 30 min, sliding window) to keep workspace sessions alive independently of JWT lifetime. ([ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md))
+- **Peer Discovery for Session Key**: Multi-replica deployments automatically share the session signing key via pod-to-pod discovery using existing RBAC permissions. ([ADR-003](docs/decisions/ADR-003-peer-discovery-session-key.md))
+- **Session Cookie Coverage for All Endpoints**: The `nocr_sess` session cookie is now scoped to `Path=/` covering MCP API calls, not just proxy routes. No `refresh_token` is stored client-side. ([ADR-005](docs/decisions/ADR-005-ui-proactive-oidc-refresh.md))
+- **Open WebUI Workspace Template**: Replaced browser-based WebContainers guide with a containerized `open-webui` template supporting persistent SQLite data mappings and local k3d registry bootstrap.
+- **Workspace ID Auto-Generation in UI**: The spawn modal now automatically generates valid Kubernetes resource IDs, prefixed with a sanitized user OIDC identity from the JWT payload and safely truncated to prevent DNS length issues.
+- **Dynamic Context Warnings in Spawn Modal**: Added dynamic validation for required context variables, including a visible warning note to caution users that plain-text secrets will be visible in the pod spec.
+- **MCP Server Metadata Description (`server.json`)**: Added a standard `server.json` file to describe server capabilities, parameters, and environment variables for automated registry publishing and CI/CD.
+
+### Changed
+
+- **Proxy Auth Flow**: The routing proxy now checks `nocr_sess` session cookies before falling back to JWT validation, reducing OIDC provider load and improving latency for authenticated requests.
+- **Logout Endpoint**: Now clears both `nocr_token` and `nocr_sess` cookies for all active workspace paths.
+- **WebSocket Upgrades**: WebSocket upgrade handler now supports session cookie authentication alongside JWT tokens.
+- **Server Modularization**: Refactored the monolithic 1,600+ line server file into clean, modular sub-modules (`mcp.ts`, `proxy.ts`, `static.ts`, `themes.ts`, `auth.ts`, `helpers.ts`, `ws-proxy.ts`) to improve codebase readability, test isolation, and maintainability.
+- **Packaged UI Asset Resolution**: Corrected compiled JS path resolution for `DIST_DIR` to use `__dirname` instead of `join(__dirname, "..")` and hardened `resolveBuiltinDir` in `src/config.ts` to locate assets under flat directory layouts (like Docker containers).
+- **NPM Publish Safety Guard**: Integrated `"prepublishOnly": "bun run build"` in `package.json` to ensure visual frontend assets are always built fresh on release packaging.
+- **Directory Layout Restructuring**: Renamed the `deploy/` directory to `kubernetes/manifest/` to align with future Helm charts and package organization.
+- **YAML Pod Spec Parser**: Fixed the `spawn_workspace` spec parser to run `parseSpecString` instead of raw `JSON.parse`, enabling YAML templates to load successfully without crashing on non-JSON start characters.
 
 ## [0.3.0] — 2026-05-28
 

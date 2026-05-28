@@ -1,9 +1,9 @@
 {
 	"name": "@nogoo9/no-crd",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"license": "Apache-2.0",
 	"description": "Agent-driven, on-demand pod orchestration in Kubernetes (k8s/k3s) without Custom Resource Definitions (CRDs)",
-	"author": "nogoo9",
+	"author": "eterna2",
 	"homepage": "https://nogoo9.github.io/no-crd/",
 	"repository": {
 		"type": "git",
@@ -30,6 +30,7 @@
 		"dist/ui/index.html",
 		"src",
 		"themes",
+		"templates",
 		"deno.json",
 		"mcp_servers.json"
 	],
@@ -54,8 +55,9 @@
 		"run:deno": "deno run --allow-all dist/server-entry.js",
 		"run:node": "node dist/server-entry.js",
 		"build": "bun build src/index.ts --outfile dist/index.js --target node --minify && bun build src/server-entry.ts --outfile dist/server-entry.js --target node --minify && bun build src/cli.ts --outfile dist/cli.js --target node --minify && bun run scripts/build-ui.ts",
+		"prepublishOnly": "bun run build",
 		"setup": "bun run src/cli.ts",
-		"lint": "biome check .",
+		"lint": "biome check . && bun run scripts/check-imports.ts",
 		"format": "biome check --write --unsafe .",
 		"check": "biome check --write --unsafe .",
 		"typecheck": "tsc --noEmit",
@@ -77,6 +79,7 @@
 		"@modelcontextprotocol/ext-apps": "^1.7.2",
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"fastify": "^5.8.5",
+		"js-yaml": "^4.1.0",
 		"jsonpath-plus": "^10.4.0",
 		"zod": "^4.4.3"
 	},

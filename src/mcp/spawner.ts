@@ -13,6 +13,7 @@ import {
 	MODE,
 	type PodCreateArgs,
 	PodSpecSchema,
+	parseSpecString,
 	parseTemplateRef,
 	parseWorkspaceApis,
 	provisionServiceAccount,
@@ -641,7 +642,7 @@ export function registerSpawnerTools(
 							.replaceAll(VAR_WORKSPACE_ID, id)
 							.replaceAll(VAR_WORKSPACE, id);
 						parsedSpec = PodSpecSchema.parse(
-							JSON.parse(interpolatedRaw),
+							parseSpecString(interpolatedRaw),
 						) as PodCreateArgs;
 
 						annotations = {};
