@@ -87,6 +87,7 @@ Slash-command workflows and always-on rules live in `.agents/`. **Always use the
 | `/test-local` | `.agents/workflows/test-local.md` | Full local gate (no infra) — format, typecheck, all package tests |
 | `/security` | `.agents/workflows/security.md` | SAST scan via Semgrep on changed files — mandatory before every push |
 | `/zizmor` | `.agents/workflows/zizmor.md` | Security scan of GitHub Actions workflows — check for security misconfigurations |
+| `/gha-security` | `.agents/workflows/gha-security.md` | Verify SHA-pinned actions and run zizmor on GitHub Actions workflows |
 | `/setup-skills` | `.agents/workflows/setup-skills.md` | Install required AI agent skills after cloning (skills are gitignored) |
 | `/setup-env` | `.agents/workflows/setup-env.md` | Full environment check — verifies Bun, Node, Moon, Deno, Docker, kubectl, k3d, Git, installs deps, runs smoke tests |
 
@@ -99,3 +100,4 @@ Slash-command workflows and always-on rules live in `.agents/`. **Always use the
 | `.agents/rules/code-design.md` | `always_on` | Think before coding, simplicity first, surgical changes, goal-driven execution. |
 | `.agents/rules/commit.md` | `model_decision` | When user asks to commit/stage, run `/commit` workflow. Never use `git commit --no-verify`. |
 | `.agents/rules/publishing.md` | `model_decision` | When modifying package configuration, build scripts, or preparing a release/publishing step. |
+| `.agents/rules/gha-security.md` | `model_decision` | When modifying `.github/workflows/` files, run `/gha-security` to verify SHA pins and zizmor. |
