@@ -3,6 +3,11 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.5.3
+
+- **Production-Safe UI Transport**: Removed the hardcoded `http://localhost:3000/mcp` fallback from the dashboard's HTTP transport client. The UI now exclusively uses the same-origin relative path derived from `BASE_URL`, eliminating `ERR_CONNECTION_REFUSED` errors and startup delays when deployed behind an ingress or reverse proxy.
+- **Subpath-Aware Logout**: The UI logout button now correctly prefixes the `/logout` fetch call with `BASE_URL`, fixing silent 404 failures when the server is hosted under a subpath (e.g., `/gateway/no-crd`).
+
 ## What's New in v0.5.2
 
 - **Graceful Error Handling**: MCP tool handlers (`current_namespace`, `get_capabilities`) no longer crash on authentication failures or K8s API timeouts. All error paths now return structured `errorResult` responses that the UI can render gracefully.
