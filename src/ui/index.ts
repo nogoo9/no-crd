@@ -7,7 +7,7 @@ import {
 } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 
 const logger = getLogger(["nogoo9", "ui"]);
 

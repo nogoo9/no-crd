@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path, { join } from "node:path";
 import fastifyStatic from "@fastify/static";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 import {
 	CORS_HEADERS,
 	getBasePrefix,

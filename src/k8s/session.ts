@@ -1,7 +1,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 import type * as k8s from "@kubernetes/client-node";
 import { getLogger } from "@logtape/logtape";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 
 const logger = getLogger(["nogoo9", "session"]);
 

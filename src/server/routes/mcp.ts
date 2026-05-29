@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { ANNOTATION_KEYS, config } from "~/config.js";
+import { ANNOTATION_KEYS, config } from "~/config/index.js";
 import {
 	getBasePrefix,
 	getRequestHostAndProto,

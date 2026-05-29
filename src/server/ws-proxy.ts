@@ -1,6 +1,6 @@
 import net from "node:net";
 import { getLogger } from "@logtape/logtape";
-import { ANNOTATION_KEYS, config } from "~/config.js";
+import { ANNOTATION_KEYS, config } from "~/config/index.js";
 import {
 	DEFAULT_NAMESPACE,
 	extractTokenFromCookie,

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { FastifyRequest } from "fastify";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 
 export function getBasePrefix(): string {
 	const raw = config.server.baseUrl;

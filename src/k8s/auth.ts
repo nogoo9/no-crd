@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { getLogger } from "@logtape/logtape";
 import { JSONPath } from "jsonpath-plus";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 
 const logger = getLogger(["nogoo9", "k8s-auth"]);
 

@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 import {
 	readThemeCssFile,
 	scanThemeDir,
