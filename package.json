@@ -67,7 +67,7 @@
 		"test:lifecycle": "bun run scripts/test-lifecycle.ts",
 		"test:mcp-cli": "bun run scripts/test-mcp-cli.ts",
 		"test:antigravity": "bun run scripts/run-antigravity-test.ts",
-		"update:permissions": "bun run scripts/update-permissions-docs.ts",
+		"update:permissions": "bun run scripts/update-docs.ts",
 		"build:docs": "bun run update:permissions && nice -n 19 env UV_THREADPOOL_SIZE=2 NODE_OPTIONS='--max-old-space-size=1536' typedoc",
 		"docs:dev": "bun run build:docs && nice -n 19 env UV_THREADPOOL_SIZE=2 NODE_OPTIONS='--max-old-space-size=1536' vitepress dev docs --port 5183",
 		"docs:build": "bun run build:docs && nice -n 19 env UV_THREADPOOL_SIZE=2 NODE_OPTIONS='--max-old-space-size=1536' vitepress build docs"

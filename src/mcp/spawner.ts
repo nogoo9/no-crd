@@ -2,7 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { config } from "~/config.js";
+import { ANNOTATION_KEYS, config } from "~/config.js";
 import {
 	applySpawnerAnnotations,
 	createPodFromArgs,
@@ -125,7 +125,7 @@ export function registerSpawnerTools(
 						authEnabled,
 					},
 				);
-				let labelSelector = "nogoo9/type=workspace";
+				let labelSelector = `${ANNOTATION_KEYS.TYPE}=workspace`;
 				if (authEnabled) {
 					if (!activeJwtPayload) {
 						const err = new Error(
@@ -141,7 +141,7 @@ export function registerSpawnerTools(
 							config.auth.subJsonPath,
 						);
 						logger.debug("Extracted user identity subject: {sub}", { sub });
-						labelSelector += `,nogoo9/user-sub=${sub}`;
+						labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
 					} catch (err) {
 						logger.error("Failed to extract user identity: {error}", {
 							error: err,
@@ -157,11 +157,15 @@ export function registerSpawnerTools(
 					const workspaces = res.items.map((pod) => {
 						const ann = pod.metadata?.annotations ?? {};
 						return {
-							id: pod.metadata?.labels?.["nogoo9/workspace-id"] ?? "unknown",
+							id:
+								pod.metadata?.labels?.[ANNOTATION_KEYS.WORKSPACE_ID] ??
+								"unknown",
 							name:
-								ann["nogoo9/workspace-name"] ?? pod.metadata?.name ?? "unknown",
+								ann[ANNOTATION_KEYS.WORKSPACE_NAME] ??
+								pod.metadata?.name ??
+								"unknown",
 							status: pod.status?.phase ?? "Unknown",
-							templateRef: ann["nogoo9/template-ref"],
+							templateRef: ann[ANNOTATION_KEYS.TEMPLATE_REF],
 							apis: parseWorkspaceApis(ann),
 						};
 					});
@@ -232,7 +236,7 @@ export function registerSpawnerTools(
 						authEnabled,
 					},
 				);
-				let labelSelector = `nogoo9/type=workspace,nogoo9/workspace-id=${id}`;
+				let labelSelector = `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}`;
 				if (authEnabled) {
 					if (!activeJwtPayload) {
 						const err = new Error(
@@ -261,7 +265,7 @@ export function registerSpawnerTools(
 							config.auth.subJsonPath,
 						);
 						logger.debug("Extracted user identity subject: {sub}", { sub });
-						labelSelector += `,nogoo9/user-sub=${sub}`;
+						labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
 					} catch (err) {
 						logger.error("Failed to extract user identity: {error}", {
 							error: err,
@@ -308,27 +312,27 @@ export function registerSpawnerTools(
 					const pod = res.items[0];
 					const annotations = pod.metadata?.annotations ?? {};
 					const userSub =
-						pod.metadata?.labels?.["nogoo9/user-sub"] ??
-						annotations["nogoo9/user-sub"] ??
+						pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB] ??
+						annotations[ANNOTATION_KEYS.USER_SUB] ??
 						"";
 					const workspacePath =
-						annotations["nogoo9/workspace-path"] ??
-						annotations["nogoo9/preview-path"] ??
+						annotations[ANNOTATION_KEYS.WORKSPACE_PATH] ??
+						annotations[ANNOTATION_KEYS.PREVIEW_PATH] ??
 						"/";
 					const workspaceType =
-						annotations["nogoo9/workspace-type"] ??
-						annotations["nogoo9/preview-type"] ??
+						annotations[ANNOTATION_KEYS.WORKSPACE_TYPE] ??
+						annotations[ANNOTATION_KEYS.PREVIEW_TYPE] ??
 						"html";
 					const apis = parseWorkspaceApis(annotations);
 					const details = {
 						id,
 						name:
-							annotations["nogoo9/workspace-name"] ??
+							annotations[ANNOTATION_KEYS.WORKSPACE_NAME] ??
 							pod.metadata?.name ??
 							"unknown",
 						status: pod.status?.phase ?? "Unknown",
 						podIP: pod.status?.podIP ?? "",
-						port: annotations["nogoo9/workspace-port"] ?? "",
+						port: annotations[ANNOTATION_KEYS.WORKSPACE_PORT] ?? "",
 						workspacePath,
 						workspaceType,
 						previewPath: workspacePath,
@@ -336,7 +340,7 @@ export function registerSpawnerTools(
 						userSub,
 						annotations,
 						labels: pod.metadata?.labels ?? {},
-						templateRef: annotations["nogoo9/template-ref"],
+						templateRef: annotations[ANNOTATION_KEYS.TEMPLATE_REF],
 						apis,
 						spec: pod.spec,
 					};
@@ -412,7 +416,7 @@ export function registerSpawnerTools(
 						authEnabled,
 					},
 				);
-				let labelSelector = `nogoo9/type=workspace,nogoo9/workspace-id=${id}`;
+				let labelSelector = `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}`;
 				if (authEnabled) {
 					if (!activeJwtPayload) {
 						const err = new Error("Unauthorized: jwtPayload required");
@@ -426,7 +430,7 @@ export function registerSpawnerTools(
 							config.auth.subJsonPath,
 						);
 						logger.debug("Extracted user identity subject: {sub}", { sub });
-						labelSelector += `,nogoo9/user-sub=${sub}`;
+						labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
 					} catch (err) {
 						logger.error("Failed to extract user identity: {error}", {
 							error: err,
@@ -556,7 +560,7 @@ export function registerSpawnerTools(
 				try {
 					const existingPods = await k8sContext.coreApi.listNamespacedPod({
 						namespace: ns,
-						labelSelector: `nogoo9/type=workspace,nogoo9/workspace-id=${id}`,
+						labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}`,
 					});
 					if (existingPods.items && existingPods.items.length > 0) {
 						const err = new Error(`Workspace with ID "${id}" already exists`);
@@ -705,7 +709,7 @@ export function registerSpawnerTools(
 						return errorResult(k8sContext.kc, errorObj, { id, podName: "" });
 					}
 
-					const roleArn = annotations["nogoo9/iam-role-arn"];
+					const roleArn = annotations[ANNOTATION_KEYS.IAM_ROLE_ARN];
 					if (roleArn) {
 						logger.debug(
 							"Provisioning ServiceAccount with IAM role ARN {roleArn}",
@@ -721,22 +725,22 @@ export function registerSpawnerTools(
 					}
 					parsedSpec.labels = {
 						...(parsedSpec.labels || {}),
-						"nogoo9/type": "workspace",
-						"nogoo9/workspace-id": id,
-						"nogoo9/managed-by": "nogoo9-spawner",
-						"nogoo9/user-sub": userSub,
+						[ANNOTATION_KEYS.TYPE]: "workspace",
+						[ANNOTATION_KEYS.WORKSPACE_ID]: id,
+						[ANNOTATION_KEYS.MANAGED_BY]: "nogoo9-spawner",
+						[ANNOTATION_KEYS.USER_SUB]: userSub,
 					};
 					const displayName = name || id;
 					parsedSpec.annotations = {
 						...annotations,
 						...(parsedSpec.annotations || {}),
-						"nogoo9/workspace-name": displayName,
+						[ANNOTATION_KEYS.WORKSPACE_NAME]: displayName,
 					};
 					if (templateRef) {
-						parsedSpec.annotations["nogoo9/template-ref"] = templateRef;
+						parsedSpec.annotations[ANNOTATION_KEYS.TEMPLATE_REF] = templateRef;
 					}
 					if (authEnabled) {
-						parsedSpec.annotations["nogoo9/user-sub"] = userSub;
+						parsedSpec.annotations[ANNOTATION_KEYS.USER_SUB] = userSub;
 					}
 					const podName = `ws-${userSub.replace(/[^a-z0-9-]/gi, "").slice(0, 10)}-${id}`;
 					logger.info(

@@ -1,6 +1,6 @@
 import net from "node:net";
 import { getLogger } from "@logtape/logtape";
-import { config } from "~/config.js";
+import { ANNOTATION_KEYS, config } from "~/config.js";
 import {
 	DEFAULT_NAMESPACE,
 	extractTokenFromCookie,
@@ -153,7 +153,7 @@ export function registerUpgradeHandler(
 		try {
 			const res = await k8sCtx.coreApi.listNamespacedPod({
 				namespace: ns,
-				labelSelector: `nogoo9/type=workspace,nogoo9/workspace-id=${workspaceId}`,
+				labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${workspaceId}`,
 			});
 
 			if (res.items.length === 0) {
@@ -167,7 +167,7 @@ export function registerUpgradeHandler(
 			}
 
 			const pod = res.items[0];
-			const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
+			const podSub = pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB];
 
 			if (config.auth.enabled && podSub !== userSub) {
 				logger.warn("WebSocket upgrade failed: Forbidden owner mismatch");
@@ -199,7 +199,7 @@ export function registerUpgradeHandler(
 			podIP = ip;
 
 			const targetPortAnnotation =
-				pod.metadata?.annotations?.["nogoo9/workspace-port"];
+				pod.metadata?.annotations?.[ANNOTATION_KEYS.WORKSPACE_PORT];
 			port = String(
 				targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000",
 			);

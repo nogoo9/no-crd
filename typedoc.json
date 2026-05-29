@@ -1,7 +1,7 @@
 {
 	"entryPoints": [
 		"src/index.ts",
-		"src/server.ts",
+		"src/server/index.ts",
 		"src/cli.ts",
 		"src/k8s/index.ts",
 		"src/mcp/server.ts"

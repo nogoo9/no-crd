@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { config } from "~/config.js";
+import { ANNOTATION_KEYS, config } from "~/config.js";
 import {
 	createSessionCookie,
 	DEFAULT_NAMESPACE,
@@ -263,7 +263,7 @@ export function registerAuthHooks(
 		try {
 			const res = await k8sCtx.coreApi.listNamespacedPod({
 				namespace: ns,
-				labelSelector: `nogoo9/type=workspace,nogoo9/workspace-id=${workspaceId}`,
+				labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${workspaceId}`,
 			});
 
 			if (res.items.length === 0) {
@@ -273,7 +273,7 @@ export function registerAuthHooks(
 			}
 
 			const pod = res.items[0];
-			const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
+			const podSub = pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB];
 
 			if (config.auth.enabled && podSub !== userSub) {
 				reply.status(403);
@@ -297,7 +297,7 @@ export function registerAuthHooks(
 			}
 
 			const targetPortAnnotation =
-				pod.metadata?.annotations?.["nogoo9/workspace-port"];
+				pod.metadata?.annotations?.[ANNOTATION_KEYS.WORKSPACE_PORT];
 			let port =
 				targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000";
 

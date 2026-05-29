@@ -1,16 +1,17 @@
 import type * as k8s from "@kubernetes/client-node";
 import { getLogger } from "@logtape/logtape";
+import { ANNOTATION_KEYS } from "~/config/index.js";
 
 const logger = getLogger(["nogoo9", "k8s-templates"]);
 
 /** Kubernetes label selector indicating a ConfigMap is a pod template. */
-export const TEMPLATE_LABEL = "nogoo9/pod-template=true";
+export const TEMPLATE_LABEL = `${ANNOTATION_KEYS.POD_TEMPLATE}=true`;
 /** Kubernetes label key indicating a ConfigMap is a pod template. */
-export const TEMPLATE_LABEL_KEY = "nogoo9/pod-template";
+export const TEMPLATE_LABEL_KEY = ANNOTATION_KEYS.POD_TEMPLATE;
 /** ConfigMap annotation key holding the description text of the template. */
-export const DESCRIPTION_ANNOTATION = "nogoo9/description";
+export const DESCRIPTION_ANNOTATION = ANNOTATION_KEYS.DESCRIPTION;
 /** ConfigMap annotation key holding the tag/version info of the template. */
-export const TAG_ANNOTATION = "nogoo9/tag";
+export const TAG_ANNOTATION = ANNOTATION_KEYS.TAG;
 
 /**
  * Lists all template ConfigMap resources located in the target namespace.

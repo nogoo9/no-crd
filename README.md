@@ -103,6 +103,7 @@ When running the MCP server or proxy under **Bun** (versions before the fix in [
 ## ⚙️ Configuration & Environment Variables
 
 The server and command-line utility are configurable using CLI options or environment variables.
+<!-- CONFIG_TABLES_START -->
 
 ### 🔌 Server Configuration
 
@@ -111,7 +112,7 @@ The server and command-line utility are configurable using CLI options or enviro
 | `-t, --transport` | `TRANSPORT` | `http` | `http`, `stdio`, `both` | Server transport mode. `both` fires up both transports simultaneously. |
 | `-p, --port` | `PORT` | `3000` | Number | HTTP server port for SSE transport. |
 | `-H, --host` | `HOST` | `0.0.0.0` | String | Host interface to bind the HTTP/SSE server to. |
-| `--base-url` | `BASE_URL` | - | Path string | Base URL path prefix for hosting behind a reverse proxy (e.g. `/gateway/no-crd`). |
+| `--base-url` | `BASE_URL` | `""` | Path string | Base URL path prefix for hosting behind a reverse proxy (e.g. `/gateway/no-crd`). |
 | - | `STATELESS` | `false` | `true`, `false` | Enable stateless request handling (no session affinity). |
 | `-l, --log-level` | `LOG_LEVEL` | `info` | `debug`, `info`, `warning`, `error`, `fatal` | Logging verbosity filter. |
 | - | `LOG_FILE` | `nogoo9-mcp.log` | String | Output file path for file logging. |
@@ -123,7 +124,7 @@ The server and command-line utility are configurable using CLI options or enviro
 | `--tls-cert` | `TLS_CERT` | - | Path string | Path to TLS certificate file to enable HTTPS. |
 | `--tls-key` | `TLS_KEY` | - | Path string | Path to TLS private key file to enable HTTPS. |
 | `--tls-ca` | `TLS_CA` | - | Path string | Path to TLS CA certificate file for HTTPS client/verification. |
-| - | `NODE_TLS_REJECT_UNAUTHORIZED` | `1` (true) | `0` (false), `1` (true) | Set to `0` to bypass TLS verification (for development/testing only). |
+| - | `NODE_TLS_REJECT_UNAUTHORIZED` | `true` | `0 (false)`, `1 (true)` | Set to `0` to bypass TLS verification (for development/testing only). |
 
 ### 🌐 CORS Configuration
 
@@ -143,7 +144,7 @@ The server and command-line utility are configurable using CLI options or enviro
 | `-m, --mode` | `MODE` | `cluster` | `cluster`, `namespaced` | Kubernetes access scope. `namespaced` locks operations to a single namespace. |
 | `-n, --namespace` | `NAMESPACE`, `DEFAULT_NAMESPACE` | `nogoo9` | String | Default Kubernetes namespace for operations. |
 | `--disable-permission-checks` | `DISABLE_PERMISSION_CHECKS` | `false` | `true`, `false` | Disable Kubernetes RBAC permission checks and assume all tools are enabled. |
-| `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | `3000` | Number | Default target port inside the workspace pods to proxy traffic to. |
+| `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | - | Number | Default target port inside the workspace pods to proxy traffic to. |
 | - | `REGISTRY_URL` | - | URL string | Target container registry URL to query for images (e.g. `http://localhost:5001`). |
 | - | `TEMPLATES_DIR` | - | Path string | Path to local directory containing pod template files (YAML/JSON). See [ADR-001](docs/decisions/ADR-001-template-file-format.md). |
 | - | `BUILTIN_TEMPLATES` | `true` | `true`, `false` | Set to `false` to disable built-in templates shipped with the package. |
@@ -154,15 +155,15 @@ The server and command-line utility are configurable using CLI options or enviro
 |---|---|---|---|---|
 | `--auth-enabled` | `AUTH_ENABLED` | `false` | `true`, `false` | Enables JWT token authentication on MCP tools and route proxy. |
 | - | `JWT_VERIFICATION_REQUIRED` | `true` | `true`, `false` | Enable/disable JWT signature verification (signature checks). |
-| `--jwt-secret` | `JWT_SECRET` | - | String | Symmetric HMAC-SHA256 secret for token verification. |
-| `--jwt-public-key` | `JWT_PUBLIC_KEY` | - | String | PEM encoded RSA/ECDSA public key for asymmetric token verification. |
-| `--jwks-uri` | `JWKS_URI` | - | URL string | Remote JWKS endpoint URL to dynamically retrieve verification keys. |
+| - | `JWT_SECRET` | - | String | Symmetric HMAC-SHA256 secret for token verification. |
+| - | `JWT_PUBLIC_KEY` | - | String | PEM encoded RSA/ECDSA public key for asymmetric token verification. |
+| - | `JWKS_URI` | - | URL string | Remote JWKS endpoint URL to dynamically retrieve verification keys. |
 | - | `INTROSPECTION_ENDPOINT`, `JWT_INTROSPECTION_ENDPOINT` | - | URL string | Endpoint for token introspection/validation. |
 | - | `OAUTH_CLIENT_ID` | - | String | OAuth client ID for auth configuration. |
 | - | `OAUTH_CLIENT_SECRET` | - | String | OAuth client secret for auth configuration. |
 | - | `JWT_AUDIENCE` | - | String | Expected token audience. Falls back to `OAUTH_CLIENT_ID` if set. |
-| `--auth-issuer` | `AUTH_ISSUER`, `JWT_ISSUER` | `""` | URL string | Identifier URL for the Authorization Server advertised in metadata discovery. |
-| `--auth-sub-jsonpath` | `AUTH_SUB_JSONPATH` | `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. |
+| - | `AUTH_ISSUER`, `JWT_ISSUER` | `""` | URL string | Identifier URL for the Authorization Server advertised in metadata discovery. |
+| - | `AUTH_SUB_JSONPATH` | `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. |
 | `--auth-scope-jsonpath` | `AUTH_SCOPE_JSONPATH` | `$.scope` | JSONPath | Payload path to extract scopes claim from JWT payload. |
 | `--auth-roles-jsonpath` | `AUTH_ROLES_JSONPATH`, `AUTH_ADMIN_JSONPATH` | `$.realm_access.roles` | JSONPath | Payload path to extract user roles from JWT payload. |
 | - | `AUTH_ADMIN_ROLE` | `nogoo9-admin` | String | Role name signifying administrator access. |
@@ -170,8 +171,8 @@ The server and command-line utility are configurable using CLI options or enviro
 | `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | - | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
 | `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | - | String | User role required for read operations. If not set, read role check is bypassed. |
 | `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | - | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
-| - | `PROXY_SESSION_SECRET` | - | String | HMAC-SHA256 signing key for stateless session cookies (`nocr_sess`). Auto-generated if not set. See [ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md). |
-| - | `PROXY_SESSION_TTL` | `1800` | Number (seconds) | Session cookie TTL (sliding window). Default 30 minutes. |
+| - | `PROXY_SESSION_TTL` | `1800` | Number | Session cookie expiration lifetime in seconds (sliding window duration). |
+| - | `PROXY_SESSION_SECRET` | `""` | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 
 ### 🖥️ UI & Themes Configuration
 
@@ -180,10 +181,13 @@ The server and command-line utility are configurable using CLI options or enviro
 | - | `UI_ENABLED` | `true` | `true`, `false` | Enables the embedded HTML Pod Manager UI resource. |
 | - | `THEMES_DIR` | `themes` | Path string | Local directory path containing custom CSS UI themes. |
 | - | `THEMES_CONFIGMAP` | - | String | Name of Kubernetes ConfigMap containing custom UI theme configurations. |
-| - | `DOCS_DIR` | `/app/docs` (Docker) or `docs/.vitepress/dist` (Local) | Path string | Base directory from which static documentation files are served. |
+| - | `DOCS_DIR` | `/app/docs (Docker) or docs/.vitepress/dist (Local)` | Path string | Base directory from which static documentation files are served. |
 | - | `OAUTH_DISCOVERY_URL` | `""` | URL string | Discovery URL for the OAuth authorization server used by the UI client. |
 | - | `OAUTH_CLIENT_ID` | `""` | String | OAuth client ID for UI authorization. |
-| - | `OAUTH_LOGIN_METHOD` | `"redirect"` | `redirect`, `popup` | Login interaction mode for UI OAuth client. |
+| - | `OAUTH_LOGIN_METHOD` | `redirect` | `redirect`, `popup` | Login interaction mode for UI OAuth client. |
+
+
+<!-- CONFIG_TABLES_END -->
 
 ---
 
@@ -535,17 +539,34 @@ data:
 
 The spawner inspects `ConfigMap` metadata annotations (and custom inline annotations passed during `spawn_workspace`) to customize the workspace lifecycle:
 
-| Annotation | Type | Description |
+<!-- TEMPLATE_ANNOTATIONS_TABLE_START -->
+
+| Annotation / Label Key | Type | Description |
 |---|---|---|
-| `nogoo9/description` | String | A short explanation of what the template is configured to do. |
-| `nogoo9/tag` | String | A tag/version associated with the template environment. |
-| `nogoo9/required-context` | Comma-separated list | List of variable keys that **must** be supplied in the `context` parameter when spawning the workspace. |
-| `nogoo9/iam-role-arn` | AWS IAM Role ARN | Automatically provisions a target-namespace Kubernetes `ServiceAccount` annotated with `eks.amazonaws.com/role-arn` and binds it to the Pod. |
-| `nogoo9/init-image` | Container Image | The image to run in the dynamic `spawner-init` initContainer (requires `nogoo9/init-command`). |
-| `nogoo9/init-command` | Shell Command | The command to run inside the initContainer. The container shares volume mounts and receives all `context` vars as environment variables. |
-| `nogoo9/pre-stop-command` | Shell Command | A command run in a Kubernetes `preStop` lifecycle exec hook when the workspace is stopped. |
-| `nogoo9/pre-stop-sidecar-image` | Container Image | Optional. If specified alongside `pre-stop-command`, the pre-stop hook executes in a dedicated sidecar running this image instead of the main container. |
-| `nogoo9/default-grace-period` | Number (seconds) | Overrides the Pod's `terminationGracePeriodSeconds` (defaults to `60` if pre-stop is defined) to ensure cleanup commands have sufficient time to finish. |
+| `nogoo9/pod-template` | Label (`"true"`) | Identifies a Kubernetes `ConfigMap` as a reusable pod template. |
+| `nogoo9/type` | Label (`"workspace"`) | Applied automatically by the spawner to identify running agent workspace pods. |
+| `nogoo9/workspace-id` | Label | Identifies the unique agent session / workspace ID associated with the running pod. |
+| `nogoo9/user-sub` | Label / Annotation | Represents the authenticated user subject (owner) of the workspace pod, used for access control validation and ServiceAccount labeling. |
+| `nogoo9/description` | Annotation (String) | A friendly, human-readable summary of the template's purpose and contents. |
+| `nogoo9/tag` | Annotation (String) | A version or tag associated with the template environment (e.g. `node-20`). |
+| `nogoo9/required-context` | Annotation (Comma-separated) | Validates that target environment variables are provided in the tool call's `context` parameter (e.g. `GITHUB_TOKEN,DATABASE_URL`). |
+| `nogoo9/iam-role-arn` | Annotation (AWS Role ARN) | Instructs the spawner to provision a dedicated Kubernetes `ServiceAccount` annotated for EKS IAM Role mapping (IRSA). |
+| `nogoo9/init-image` | Annotation (Image string) | The container image to run in the dynamic `spawner-init` init-container. |
+| `nogoo9/init-command` | Annotation (Shell command) | The shell command to run in the init-container. It automatically shares the main container's volume mounts. |
+| `nogoo9/pre-stop-command` | Annotation (Shell command) | A shell command executed in a Kubernetes `preStop` lifecycle exec hook when the workspace is terminated (e.g. to save/push state). |
+| `nogoo9/pre-stop-sidecar-image` | Annotation (Image string) | If specified alongside `pre-stop-command`, runs the pre-stop command inside a dedicated sidecar container instead of the main container. |
+| `nogoo9/default-grace-period` | Annotation (Number in seconds) | Overrides the Pod's `terminationGracePeriodSeconds` (defaults to `60` if a pre-stop command is defined) to give cleanup commands time to finish. |
+| `nogoo9/workspace-port` | Annotation (Number) | The port inside the container to proxy traffic to. Defaults to `DEFAULT_WORKSPACE_PORT` or `3000`. |
+| `nogoo9/workspace-path` | Annotation (String) | The default URL subpath mapping for the workspace web interface (defaults to `/`). |
+| `nogoo9/workspace-type` | Annotation (String) | The format specification of the main entry point (e.g. `iframe`, `novnc`). |
+| `nogoo9/preview-path` | Annotation (String) | The default folder or file subpath to render in the UI files preview tab. |
+| `nogoo9/preview-type` | Annotation (String) | Fallback preview rendering mode for the preview tab (e.g. `markdown`, `html`). |
+| `nogoo9/api.<api-name>.port` | Annotation (Number) | Defines an additional HTTP service port exposed by the workspace. |
+| `nogoo9/api.<api-name>.path` | Annotation (String) | Defines the subpath routing prefix for this specific API (e.g. `/terminal`). |
+| `nogoo9/api.<api-name>.desc` | Annotation (String) | A short description of this additional API, shown in the UI interface. |
+| `nogoo9/api.<api-name>.method` | Annotation (String) | Comma-separated list of supported HTTP methods (e.g. `GET,POST`, `*`, defaults to any method). |
+
+<!-- TEMPLATE_ANNOTATIONS_TABLE_END -->
 
 
 ---

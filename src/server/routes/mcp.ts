@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { config } from "~/config.js";
+import { ANNOTATION_KEYS, config } from "~/config.js";
 import {
 	getBasePrefix,
 	getRequestHostAndProto,
@@ -65,10 +65,10 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 			const k8sCtx = deps.getK8sContext();
 			const res = await k8sCtx.coreApi.listNamespacedPod({
 				namespace: ns,
-				labelSelector: "nogoo9/type=workspace",
+				labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace`,
 			});
 			const workspaceIds = res.items
-				.map((pod: any) => pod.metadata?.labels?.["nogoo9/workspace-id"])
+				.map((pod: any) => pod.metadata?.labels?.[ANNOTATION_KEYS.WORKSPACE_ID])
 				.filter(Boolean);
 
 			for (const id of workspaceIds) {

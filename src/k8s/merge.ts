@@ -2,19 +2,19 @@ import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger(["nogoo9", "k8s-merge"]);
 
-type EnvVarType = { name: string; value?: string; valueFrom?: unknown };
-type ContainerType = {
+export type EnvVarType = { name: string; value?: string; valueFrom?: unknown };
+export type ContainerType = {
 	name: string;
 	image?: string;
 	env?: EnvVarType[];
 	[key: string]: unknown;
 };
-type ContainerOverrideType = {
+export type ContainerOverrideType = {
 	name: string;
 	env?: EnvVarType[];
 	[key: string]: unknown;
 };
-type TopLevelArgsType = {
+export type TopLevelArgsType = {
 	labels?: Record<string, string>;
 	annotations?: Record<string, string>;
 	[key: string]: unknown;
