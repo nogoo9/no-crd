@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Remove Hardcoded `localhost:3000` Fallback**: The UI HTTP fallback transport no longer tries `http://localhost:3000/mcp` — it only uses the same-origin path derived from `BASE_URL`. This eliminates connection errors and startup delays in production and k3d ingress deployments.
 - **Logout Endpoint Missing `basePath`**: The UI logout fetch call now correctly includes the `BASE_URL` prefix, fixing 404 errors when the server is deployed behind a subpath reverse proxy.
 - **Infinite Refresh Loop on 401**: The UI no longer calls `window.location.reload()` when the MCP endpoint returns `401 Unauthorized`. Previously, the reload raced with the OIDC `triggerRedirect()`, causing the page to loop endlessly without ever reaching the IdP. The login overlay is now shown instead, allowing the OIDC flow to redirect normally.
+- **"Already Connected" on Second Session** ([ADR-012](/decisions/ADR-012-per-session-mcp-server-factory)): The MCP server no longer throws `"already connected transport, call close()"` when a second client session connects. Each session now gets its own `McpServer` instance, following the official MCP SDK factory pattern. The shared `globalMcpServer` singleton has been removed.
 
 ## [0.5.2] — 2026-05-29
 
