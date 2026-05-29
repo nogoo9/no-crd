@@ -97,11 +97,13 @@ async function getMcpServerAndTransport(req: Request): Promise<{
 	}
 
 	logger.info("Creating new stateful session transport.");
-	// Reuse eagerly-created server, or create if not available (e.g. tests)
-	const server = globalMcpServer ?? (await createMcpServer(getK8sContext()));
-	if (!globalMcpServer) {
-		registerUiApp(server, DIST_DIR);
-	}
+	// Always create a fresh MCP server per session. A McpServer can only be
+	// connected to one transport — reusing globalMcpServer here would throw
+	// "already connected" on the second session. The eagerly-created
+	// globalMcpServer (from startHttpServer) is only used for startup
+	// validation; each session gets its own instance.
+	const server = await createMcpServer(getK8sContext());
+	registerUiApp(server, DIST_DIR);
 
 	const transport = new WebStandardStreamableHTTPServerTransport({
 		sessionIdGenerator: () => uuidv7(),
