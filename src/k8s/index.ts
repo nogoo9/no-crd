@@ -49,6 +49,7 @@ export {
 } from "./merge.js";
 export {
 	checkPermission,
+	clearPermissionCache,
 	evaluatePermissions,
 	type PermissionReport,
 	type RbacPermission,

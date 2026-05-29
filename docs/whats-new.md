@@ -3,7 +3,14 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.5.2
+
+- **Graceful Error Handling**: MCP tool handlers (`current_namespace`, `get_capabilities`) no longer crash on authentication failures or K8s API timeouts. All error paths now return structured `errorResult` responses that the UI can render gracefully.
+- **Server Startup Resilience**: The MCP server now boots even when RBAC permission evaluation fails at startup (e.g., K8s API temporarily unreachable during pod initialization). It degrades to diagnostic tools only (`check_permissions`, `get_capabilities`, `current_namespace`, `list_templates`, `get_template`, `list_registry_images`) and operators can use these tools to troubleshoot.
+- **Permission Denial Test Matrix**: Comprehensive test coverage for 6 RBAC denial scenarios, ensuring every combination of permission grants/denials results in correct tool gating without server crashes.
+
 ## What's New in v0.5.1
+
 
 - **Graceful ConfigMap Template Fallback** ([ADR-010](/decisions/ADR-010-graceful-configmap-template-fallback)): Template tools now degrade gracefully when the service account lacks `configmaps` RBAC permissions. `list_templates` catches ConfigMap errors and continues to return local/built-in templates with a warning. `spawn_workspace` falls back to local templates when ConfigMap reads fail.
 - **Template Read Tools Always Available**: `list_templates` and `get_template` are no longer gated behind ConfigMap permissions — they are unconditionally registered, ensuring agents always have access to the local and built-in template catalog even in minimal RBAC deployments.

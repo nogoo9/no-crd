@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { config } from "~/config/index.js";
 import {
+	errorResult,
 	evaluatePermissions,
 	extractAdminRole,
 	type K8sContext,
@@ -11,7 +12,7 @@ import {
 	verifyAccessOrThrow,
 } from "~/k8s/index.js";
 
-const _logger = getLogger(["nogoo9", "mcp-namespace"]);
+const logger = getLogger(["nogoo9", "mcp-namespace"]);
 
 const APP_URI = "ui://nogoo9/app";
 
@@ -87,20 +88,30 @@ export function registerNamespaceTools(
 			outputSchema: CurrentNamespaceOutputSchema.shape,
 			_meta: { ui: { resourceUri: APP_URI } },
 		},
-		async ({
-			jwtPayload,
-		}): Promise<{
-			content: Array<{ type: "text"; text: string }>;
-			structuredContent: z.infer<typeof CurrentNamespaceOutputSchema>;
-		}> => {
+		async ({ jwtPayload }) => {
 			const authEnabled = config.auth.enabled;
 			const store = requestContextStore.getStore();
 			const activeJwtPayload = jwtPayload || store?.jwtPayload;
 			if (authEnabled) {
 				if (!activeJwtPayload) {
-					throw new Error("Unauthorized: jwtPayload required");
+					const err = new Error("Unauthorized: jwtPayload required");
+					logger.error("Authentication failed: {error}", { error: err });
+					return errorResult(k8sContext.kc, err, {
+						namespace: "",
+						mode: "",
+					});
 				}
-				verifyAccessOrThrow(activeJwtPayload, "read");
+				try {
+					verifyAccessOrThrow(activeJwtPayload, "read");
+				} catch (err) {
+					logger.error("Access verification failed: {error}", {
+						error: err,
+					});
+					return errorResult(k8sContext.kc, err, {
+						namespace: "",
+						mode: "",
+					});
+				}
 			}
 			return {
 				content: [
@@ -213,12 +224,7 @@ export function registerNamespaceTools(
 			outputSchema: GetCapabilitiesOutputSchema.shape,
 			_meta: { ui: { resourceUri: APP_URI } },
 		},
-		async ({
-			jwtPayload,
-		}): Promise<{
-			content: Array<{ type: "text"; text: string }>;
-			structuredContent: z.infer<typeof GetCapabilitiesOutputSchema>;
-		}> => {
+		async ({ jwtPayload }) => {
 			const authEnabled = config.auth.enabled;
 			const store = requestContextStore.getStore();
 			const activeJwtPayload = jwtPayload || store?.jwtPayload;
@@ -236,28 +242,41 @@ export function registerNamespaceTools(
 				}
 			}
 
-			const report = await evaluatePermissions(
-				k8sContext,
-				defaultNamespace,
-				mode,
-			);
+			try {
+				const report = await evaluatePermissions(
+					k8sContext,
+					defaultNamespace,
+					mode,
+				);
 
-			const capabilities = {
-				enabledTools: report.enabledTools,
-				managedOnly: config.k8s.managedOnly,
-				authEnabled,
-				isAdmin,
-			};
+				const capabilities = {
+					enabledTools: report.enabledTools,
+					managedOnly: config.k8s.managedOnly,
+					authEnabled,
+					isAdmin,
+				};
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text: JSON.stringify(capabilities, null, 2),
-					},
-				],
-				structuredContent: capabilities,
-			};
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text: JSON.stringify(capabilities, null, 2),
+						},
+					],
+					structuredContent: capabilities,
+				};
+			} catch (err) {
+				logger.error(
+					"Failed to evaluate permissions for get_capabilities: {error}",
+					{ error: err },
+				);
+				return errorResult(k8sContext.kc, err, {
+					enabledTools: [],
+					managedOnly: config.k8s.managedOnly,
+					authEnabled,
+					isAdmin,
+				});
+			}
 		},
 	);
 }
