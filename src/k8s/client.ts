@@ -10,7 +10,7 @@ import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger(["nogoo9", "k8s-client"]);
 
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 
 // ─── Types & Configuration ───────────────────────────────────────────────────
 

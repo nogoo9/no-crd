@@ -65,6 +65,8 @@ deno run --allow-all src/server-entry.ts
 
 The server can be configured via environment variables or CLI flags:
 
+<!-- CONFIG_TABLES_START -->
+
 ### 🔌 Server Configuration
 
 | CLI Option | Environment Variable | Default | Allowed Values | Description |
@@ -72,7 +74,7 @@ The server can be configured via environment variables or CLI flags:
 | `-t, --transport` | `TRANSPORT` | `http` | `http`, `stdio`, `both` | Server transport mode. `both` fires up both transports simultaneously. |
 | `-p, --port` | `PORT` | `3000` | Number | HTTP server port for SSE transport. |
 | `-H, --host` | `HOST` | `0.0.0.0` | String | Host interface to bind the HTTP/SSE server to. |
-| `--base-url` | `BASE_URL` | - | Path string | Base URL path prefix for hosting behind a reverse proxy (e.g. `/gateway/no-crd`). |
+| `--base-url` | `BASE_URL` | `""` | Path string | Base URL path prefix for hosting behind a reverse proxy (e.g. `/gateway/no-crd`). |
 | - | `STATELESS` | `false` | `true`, `false` | Enable stateless request handling (no session affinity). |
 | `-l, --log-level` | `LOG_LEVEL` | `info` | `debug`, `info`, `warning`, `error`, `fatal` | Logging verbosity filter. |
 | - | `LOG_FILE` | `nogoo9-mcp.log` | String | Output file path for file logging. |
@@ -84,7 +86,7 @@ The server can be configured via environment variables or CLI flags:
 | `--tls-cert` | `TLS_CERT` | - | Path string | Path to TLS certificate file to enable HTTPS. |
 | `--tls-key` | `TLS_KEY` | - | Path string | Path to TLS private key file to enable HTTPS. |
 | `--tls-ca` | `TLS_CA` | - | Path string | Path to TLS CA certificate file for HTTPS client/verification. |
-| - | `NODE_TLS_REJECT_UNAUTHORIZED` | `1` (true) | `0` (false), `1` (true) | Set to `0` to bypass TLS verification (for development/testing only). |
+| - | `NODE_TLS_REJECT_UNAUTHORIZED` | `true` | `0 (false)`, `1 (true)` | Set to `0` to bypass TLS verification (for development/testing only). |
 
 ### 🌐 CORS Configuration
 
@@ -104,8 +106,10 @@ The server can be configured via environment variables or CLI flags:
 | `-m, --mode` | `MODE` | `cluster` | `cluster`, `namespaced` | Kubernetes access scope. `namespaced` locks operations to a single namespace. |
 | `-n, --namespace` | `NAMESPACE`, `DEFAULT_NAMESPACE` | `nogoo9` | String | Default Kubernetes namespace for operations. |
 | `--disable-permission-checks` | `DISABLE_PERMISSION_CHECKS` | `false` | `true`, `false` | Disable Kubernetes RBAC permission checks and assume all tools are enabled. |
-| `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | `3000` | Number | Default target port inside the workspace pods to proxy traffic to. |
+| `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | - | Number | Default target port inside the workspace pods to proxy traffic to. |
 | - | `REGISTRY_URL` | - | URL string | Target container registry URL to query for images (e.g. `http://localhost:5001`). |
+| - | `TEMPLATES_DIR` | - | Path string | Path to local directory containing pod template files (YAML/JSON). See [ADR-001](./decisions/ADR-001-template-file-format.md). |
+| - | `BUILTIN_TEMPLATES` | `true` | `true`, `false` | Set to `false` to disable built-in templates shipped with the package. |
 
 ### 🔑 Authentication Configuration
 
@@ -113,15 +117,15 @@ The server can be configured via environment variables or CLI flags:
 |---|---|---|---|---|
 | `--auth-enabled` | `AUTH_ENABLED` | `false` | `true`, `false` | Enables JWT token authentication on MCP tools and route proxy. |
 | - | `JWT_VERIFICATION_REQUIRED` | `true` | `true`, `false` | Enable/disable JWT signature verification (signature checks). |
-| `--jwt-secret` | `JWT_SECRET` | - | String | Symmetric HMAC-SHA256 secret for token verification. |
-| `--jwt-public-key` | `JWT_PUBLIC_KEY` | - | String | PEM encoded RSA/ECDSA public key for asymmetric token verification. |
-| `--jwks-uri` | `JWKS_URI` | - | URL string | Remote JWKS endpoint URL to dynamically retrieve verification keys. |
+| - | `JWT_SECRET` | - | String | Symmetric HMAC-SHA256 secret for token verification. |
+| - | `JWT_PUBLIC_KEY` | - | String | PEM encoded RSA/ECDSA public key for asymmetric token verification. |
+| - | `JWKS_URI` | - | URL string | Remote JWKS endpoint URL to dynamically retrieve verification keys. |
 | - | `INTROSPECTION_ENDPOINT`, `JWT_INTROSPECTION_ENDPOINT` | - | URL string | Endpoint for token introspection/validation. |
 | - | `OAUTH_CLIENT_ID` | - | String | OAuth client ID for auth configuration. |
 | - | `OAUTH_CLIENT_SECRET` | - | String | OAuth client secret for auth configuration. |
 | - | `JWT_AUDIENCE` | - | String | Expected token audience. Falls back to `OAUTH_CLIENT_ID` if set. |
-| `--auth-issuer` | `AUTH_ISSUER`, `JWT_ISSUER` | `""` | URL string | Identifier URL for the Authorization Server advertised in metadata discovery. |
-| `--auth-sub-jsonpath` | `AUTH_SUB_JSONPATH` | `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. |
+| - | `AUTH_ISSUER`, `JWT_ISSUER` | `""` | URL string | Identifier URL for the Authorization Server advertised in metadata discovery. |
+| - | `AUTH_SUB_JSONPATH` | `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. |
 | `--auth-scope-jsonpath` | `AUTH_SCOPE_JSONPATH` | `$.scope` | JSONPath | Payload path to extract scopes claim from JWT payload. |
 | `--auth-roles-jsonpath` | `AUTH_ROLES_JSONPATH`, `AUTH_ADMIN_JSONPATH` | `$.realm_access.roles` | JSONPath | Payload path to extract user roles from JWT payload. |
 | - | `AUTH_ADMIN_ROLE` | `nogoo9-admin` | String | Role name signifying administrator access. |
@@ -129,8 +133,8 @@ The server can be configured via environment variables or CLI flags:
 | `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | - | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
 | `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | - | String | User role required for read operations. If not set, read role check is bypassed. |
 | `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | - | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
-| - | `PROXY_SESSION_SECRET` | - | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 | - | `PROXY_SESSION_TTL` | `1800` | Number | Session cookie expiration lifetime in seconds (sliding window duration). |
+| - | `PROXY_SESSION_SECRET` | `""` | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 
 ### 🖥️ UI & Themes Configuration
 
@@ -139,7 +143,10 @@ The server can be configured via environment variables or CLI flags:
 | - | `UI_ENABLED` | `true` | `true`, `false` | Enables the embedded HTML Pod Manager UI resource. |
 | - | `THEMES_DIR` | `themes` | Path string | Local directory path containing custom CSS UI themes. |
 | - | `THEMES_CONFIGMAP` | - | String | Name of Kubernetes ConfigMap containing custom UI theme configurations. |
-| - | `DOCS_DIR` | `/app/docs` (Docker) or `docs/.vitepress/dist` (Local) | Path string | Base directory from which static documentation files are served. |
+| - | `DOCS_DIR` | `/app/docs (Docker) or docs/.vitepress/dist (Local)` | Path string | Base directory from which static documentation files are served. |
 | - | `OAUTH_DISCOVERY_URL` | `""` | URL string | Discovery URL for the OAuth authorization server used by the UI client. |
 | - | `OAUTH_CLIENT_ID` | `""` | String | OAuth client ID for UI authorization. |
-| - | `OAUTH_LOGIN_METHOD` | `"redirect"` | `redirect`, `popup` | Login interaction mode for UI OAuth client. |
+| - | `OAUTH_LOGIN_METHOD` | `redirect` | `redirect`, `popup` | Login interaction mode for UI OAuth client. |
+
+
+<!-- CONFIG_TABLES_END -->

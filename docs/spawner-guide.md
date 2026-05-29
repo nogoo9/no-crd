@@ -25,15 +25,34 @@ To regenerate or refine, use the generate_image tool with this prompt.
 
 Pod templates and inline specifications can declare special annotations that direct the Spawner to inject extra features, security configurations, and lifecycle hooks into the spawned workspace pod:
 
-| Annotation Key | Type | Description |
+<!-- TEMPLATE_ANNOTATIONS_TABLE_START -->
+
+| Annotation / Label Key | Type | Description |
 |---|---|---|
-| `nogoo9/required-context` | `string` (comma-separated) | Validates that target environment variables are provided in the tool call's `context` parameter (e.g. `GITHUB_TOKEN,DATABASE_URL`). |
-| `nogoo9/iam-role-arn` | `string` | Instructs the spawner to provision a dedicated `ServiceAccount` bound to this AWS/GCP IAM Role ARN and assign it to the pod. |
-| `nogoo9/init-image` | `string` | The container image to use for a spawned init-container (e.g. `alpine`, `git`). |
-| `nogoo9/init-command` | `string` | The shell command to run in the init-container. It automatically shares the main container's volume mounts. |
-| `nogoo9/pre-stop-command` | `string` | A shell command to execute in the workspace before termination (e.g., to commit state or push logs). |
-| `nogoo9/pre-stop-sidecar-image` | `string` | If specified, runs the `pre-stop-command` inside a dedicated sidecar container instead of the main workspace container. |
-| `nogoo9/default-grace-period` | `number` | The termination grace period in seconds to assign to the pod (defaults to `60` if a pre-stop command is present). |
+| `nogoo9/pod-template` | Label (`"true"`) | Identifies a Kubernetes `ConfigMap` as a reusable pod template. |
+| `nogoo9/type` | Label (`"workspace"`) | Applied automatically by the spawner to identify running agent workspace pods. |
+| `nogoo9/workspace-id` | Label | Identifies the unique agent session / workspace ID associated with the running pod. |
+| `nogoo9/user-sub` | Label / Annotation | Represents the authenticated user subject (owner) of the workspace pod, used for access control validation and ServiceAccount labeling. |
+| `nogoo9/description` | Annotation (String) | A friendly, human-readable summary of the template's purpose and contents. |
+| `nogoo9/tag` | Annotation (String) | A version or tag associated with the template environment (e.g. `node-20`). |
+| `nogoo9/required-context` | Annotation (Comma-separated) | Validates that target environment variables are provided in the tool call's `context` parameter (e.g. `GITHUB_TOKEN,DATABASE_URL`). |
+| `nogoo9/iam-role-arn` | Annotation (AWS Role ARN) | Instructs the spawner to provision a dedicated Kubernetes `ServiceAccount` annotated for EKS IAM Role mapping (IRSA). |
+| `nogoo9/init-image` | Annotation (Image string) | The container image to run in the dynamic `spawner-init` init-container. |
+| `nogoo9/init-command` | Annotation (Shell command) | The shell command to run in the init-container. It automatically shares the main container's volume mounts. |
+| `nogoo9/pre-stop-command` | Annotation (Shell command) | A shell command executed in a Kubernetes `preStop` lifecycle exec hook when the workspace is terminated (e.g. to save/push state). |
+| `nogoo9/pre-stop-sidecar-image` | Annotation (Image string) | If specified alongside `pre-stop-command`, runs the pre-stop command inside a dedicated sidecar container instead of the main container. |
+| `nogoo9/default-grace-period` | Annotation (Number in seconds) | Overrides the Pod's `terminationGracePeriodSeconds` (defaults to `60` if a pre-stop command is defined) to give cleanup commands time to finish. |
+| `nogoo9/workspace-port` | Annotation (Number) | The port inside the container to proxy traffic to. Defaults to `DEFAULT_WORKSPACE_PORT` or `3000`. |
+| `nogoo9/workspace-path` | Annotation (String) | The default URL subpath mapping for the workspace web interface (defaults to `/`). |
+| `nogoo9/workspace-type` | Annotation (String) | The format specification of the main entry point (e.g. `iframe`, `novnc`). |
+| `nogoo9/preview-path` | Annotation (String) | The default folder or file subpath to render in the UI files preview tab. |
+| `nogoo9/preview-type` | Annotation (String) | Fallback preview rendering mode for the preview tab (e.g. `markdown`, `html`). |
+| `nogoo9/api.<api-name>.port` | Annotation (Number) | Defines an additional HTTP service port exposed by the workspace. |
+| `nogoo9/api.<api-name>.path` | Annotation (String) | Defines the subpath routing prefix for this specific API (e.g. `/terminal`). |
+| `nogoo9/api.<api-name>.desc` | Annotation (String) | A short description of this additional API, shown in the UI interface. |
+| `nogoo9/api.<api-name>.method` | Annotation (String) | Comma-separated list of supported HTTP methods (e.g. `GET,POST`, `*`, defaults to any method). |
+
+<!-- TEMPLATE_ANNOTATIONS_TABLE_END -->
 
 ---
 

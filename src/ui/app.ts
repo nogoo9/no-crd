@@ -3,7 +3,7 @@ import { App } from "@modelcontextprotocol/ext-apps";
 
 // Initialize the MCP App client bridge
 const app = new App(
-	{ name: "nogoo9-pod-manager", version: "0.4.0" },
+	{ name: "nogoo9-pod-manager", version: "0.4.1" },
 	{ tools: {} },
 );
 

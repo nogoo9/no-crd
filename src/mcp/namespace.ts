@@ -2,7 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 import {
 	evaluatePermissions,
 	type K8sContext,

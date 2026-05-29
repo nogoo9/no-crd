@@ -15,7 +15,7 @@ import { initK8sContext } from "~/k8s/index.js";
 import { createMcpServer } from "~/mcp/server.js";
 import { startHttpServer } from "~/server/index.js";
 import { registerUiApp } from "~/ui/index.js";
-import { config } from "./config.js";
+import { config } from "./config/index.js";
 
 const TRANSPORT = config.server.transport;
 

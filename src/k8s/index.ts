@@ -39,13 +39,18 @@ export {
 	readLocalTemplate,
 } from "./local-templates.js";
 export {
+	type ContainerOverrideType,
+	type ContainerType,
+	type EnvVarType,
 	mergeContainersByName,
 	mergeTopLevel,
+	type TopLevelArgsType,
 } from "./merge.js";
 export {
 	checkPermission,
 	evaluatePermissions,
 	type PermissionReport,
+	type RbacPermission,
 	REQUIRED_PERMISSIONS,
 } from "./permissions.js";
 export {

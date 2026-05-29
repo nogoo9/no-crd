@@ -4,7 +4,7 @@ import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 import {
 	createPodFromArgs,
 	DEFAULT_NAMESPACE,

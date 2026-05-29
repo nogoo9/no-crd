@@ -1,5 +1,6 @@
 import type * as k8s from "@kubernetes/client-node";
 import { getLogger } from "@logtape/logtape";
+import { ANNOTATION_KEYS } from "~/config/index.js";
 import { getK8sError } from "./errors.js";
 import type { PodCreateArgs } from "./schemas.js";
 
@@ -64,12 +65,12 @@ export async function provisionServiceAccount(
 			namespace: ns,
 			annotations: {
 				"eks.amazonaws.com/role-arn": roleArn,
-				...(userSub ? { "nogoo9/user-sub": userSub } : {}),
+				...(userSub ? { [ANNOTATION_KEYS.USER_SUB]: userSub } : {}),
 			},
 			labels: {
-				"nogoo9/workspace-id": workspaceId,
-				"nogoo9/managed-by": "nogoo9-spawner",
-				...(userSub ? { "nogoo9/user-sub": userSub } : {}),
+				[ANNOTATION_KEYS.WORKSPACE_ID]: workspaceId,
+				[ANNOTATION_KEYS.MANAGED_BY]: "nogoo9-spawner",
+				...(userSub ? { [ANNOTATION_KEYS.USER_SUB]: userSub } : {}),
 			},
 		},
 	};
@@ -209,21 +210,24 @@ export function parseWorkspaceApis(
 
 	for (const [key, value] of Object.entries(annotations)) {
 		if (key === "__proto__" || key === "constructor") continue;
-		const match = key.match(/^nogoo9\/api\.([^.]+)\.(port|path|desc|method)$/);
-		if (match) {
-			const [_, apiName, field] = match;
-			if (!apisMap.has(apiName)) {
-				apisMap.set(apiName, { name: apiName, path: "/" });
-			}
-			const api = apisMap.get(apiName)!;
-			if (field === "port") {
-				api.port = value;
-			} else if (field === "path") {
-				api.path = value;
-			} else if (field === "desc") {
-				api.desc = value;
-			} else if (field === "method") {
-				api.method = value;
+		if (key.startsWith(ANNOTATION_KEYS.PORT_PREFIX)) {
+			const rest = key.substring(ANNOTATION_KEYS.PORT_PREFIX.length);
+			const match = rest.match(/^([^.]+)\.(port|path|desc|method)$/);
+			if (match) {
+				const [_, apiName, field] = match;
+				if (!apisMap.has(apiName)) {
+					apisMap.set(apiName, { name: apiName, path: "/" });
+				}
+				const api = apisMap.get(apiName)!;
+				if (field === "port") {
+					api.port = value;
+				} else if (field === "path") {
+					api.path = value;
+				} else if (field === "desc") {
+					api.desc = value;
+				} else if (field === "method") {
+					api.method = value;
+				}
 			}
 		}
 	}

@@ -3,6 +3,12 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { authSchema } from "./config/auth.js";
+import { corsSchema } from "./config/cors.js";
+import { k8sSchema } from "./config/k8s.js";
+import { serverSchema } from "./config/server.js";
+import { tlsSchema } from "./config/tls.js";
+import { uiSchema } from "./config/ui.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,43 +18,74 @@ const targetFile = isSource
 	? join(__dirname, "server-entry.ts")
 	: join(__dirname, "server-entry.js");
 
+function getCliSuffix(schemaKey: string, allowed: any): string {
+	if (schemaKey === "namespace") return " <name>";
+	if (schemaKey === "host") return " <hostname>";
+	if (schemaKey === "logLevel") return " <level>";
+	if (allowed === "Number" || schemaKey === "port") return " <number>";
+	if (
+		schemaKey.toLowerCase().includes("path") ||
+		schemaKey.toLowerCase().includes("cert") ||
+		schemaKey.toLowerCase().includes("key") ||
+		schemaKey.toLowerCase().includes("ca")
+	)
+		return " <path>";
+	if (schemaKey.toLowerCase().includes("scope")) return " <scope>";
+	if (schemaKey.toLowerCase().includes("role")) return " <role>";
+	if (schemaKey.toLowerCase().includes("origin")) return " <origin>";
+	if (schemaKey.toLowerCase().includes("methods")) return " <methods>";
+	if (schemaKey.toLowerCase().includes("headers")) return " <headers>";
+	if (
+		schemaKey.toLowerCase().includes("seconds") ||
+		schemaKey.toLowerCase().includes("age") ||
+		schemaKey === "maxAge"
+	)
+		return " <seconds>";
+	return " <type>";
+}
+
 /**
  * Prints a helpful usage command-line guide showing all supported options
  * for running the nogoo9-no-crd CLI binary.
  */
 function printHelp(): void {
-	console.log(`
-Usage: nocrd9 [options]
+	console.log(`Usage: nocrd9 [options]
 
 Lightweight CLI tool to configure and start the nogoo9 MCP server.
 
-Options:
-  -t, --transport <type>     Transport mode: http, stdio, both (default: http)
-  -m, --mode <type>          Kubernetes access mode: cluster, namespaced (default: cluster)
-  -n, --namespace <name>     Kubernetes namespace to target (default: nogoo9)
-  -p, --port <number>        HTTP server port (default: 3000)
-  -H, --host <hostname>      HTTP server host to bind to (default: 0.0.0.0)
-  -l, --log-level <level>    Logging level: debug, info, warning, error, fatal (default: info)
-  -r, --runtime <type>       JS/TS runtime engine to use: bun, deno, node (default: bun)
-  --tls-cert <path>          Path to TLS certificate file for HTTPS
-  --tls-key <path>           Path to TLS private key file for HTTPS
-  --tls-ca <path>            Path to TLS CA certificate file for HTTPS
-  --disable-permission-checks Disable Kubernetes RBAC permission checks
-  --cors-origin <origin>     CORS Allowed Origin (default: *)
-  --cors-methods <methods>   CORS Allowed Methods (default: GET, POST, OPTIONS)
-  --cors-headers <headers>   CORS Allowed Headers (default: Content-Type, Authorization, mcp-protocol-version)
-  --cors-allow-credentials   Enable CORS Access-Control-Allow-Credentials (default: false)
-  --cors-expose-headers <headers> CORS Exposed Headers (default: mcp-session-id)
-  --cors-max-age <seconds>   CORS Access-Control-Max-Age header
-  --auth-required-read-scope <scope>  OAuth scope required for read operations
-  --auth-required-write-scope <scope> OAuth scope operations require write scope
-  --auth-scope-jsonpath <path>        JSONPath to extract scope claims from JWT payload (default: $.scope)
-  --auth-required-read-role <role>    User role required for read operations
-  --auth-required-write-role <role>   User role required for write operations
-  --auth-roles-jsonpath <path>        JSONPath to extract roles from JWT payload (default: $.realm_access.roles)
-  -c, --check-permissions    Run Kubernetes RBAC permissions diagnostics and exit
-  -h, --help                 Show this help message
-`);
+Options:`);
+
+	const schemas = [
+		serverSchema,
+		tlsSchema,
+		corsSchema,
+		k8sSchema,
+		authSchema,
+		uiSchema,
+	];
+	for (const schema of schemas) {
+		for (const [schemaKey, item] of Object.entries(schema)) {
+			if (item.cli && item.cli !== "-") {
+				const suffix =
+					typeof item.defaultVal === "boolean"
+						? ""
+						: getCliSuffix(schemaKey, item.allowed);
+				const defaultStr =
+					item.defaultVal !== undefined ? ` (default: ${item.defaultVal})` : "";
+				const cliStr = `  ${item.cli}${suffix}`;
+				const cleanDesc = item.description.replace(/`/g, "");
+				console.log(`${cliStr.padEnd(29)} ${cleanDesc}${defaultStr}`);
+			}
+		}
+	}
+
+	console.log(
+		`${"  -r, --runtime <type>".padEnd(29)} JS/TS runtime engine to use: bun, deno, node (default: bun)`,
+	);
+	console.log(
+		`${"  -c, --check-permissions".padEnd(29)} Run Kubernetes RBAC permissions diagnostics and exit`,
+	);
+	console.log(`${"  -h, --help".padEnd(29)} Show this help message`);
 }
 
 /**
@@ -57,86 +94,59 @@ Options:
  * process with the resolved configuration variables and runtime environment.
  */
 async function main(): Promise<void> {
-	let transport = "http";
-	let mode = "cluster";
-	let namespace = "nogoo9";
-	let port = "3000";
-	let host = "0.0.0.0";
-	let logLevel = "info";
+	const schemas = [
+		serverSchema,
+		tlsSchema,
+		corsSchema,
+		k8sSchema,
+		authSchema,
+		uiSchema,
+	];
+	const cliFlagsMap = new Map<string, { schemaKey: string; item: any }>();
+	const resolvedValues = new Map<string, any>();
+
+	// Initialize with defaults and process.env overrides
+	for (const schema of schemas) {
+		for (const [schemaKey, item] of Object.entries(schema)) {
+			if (!item.env) continue;
+			const envKeys = Array.isArray(item.env) ? item.env : [item.env];
+			const primaryEnvKey = envKeys[0];
+			if (!primaryEnvKey) continue;
+
+			// Priority 1: process.env
+			let val: any;
+			for (const envKey of envKeys) {
+				if (process.env[envKey] !== undefined) {
+					val = process.env[envKey];
+				}
+			}
+
+			// Priority 2: schema defaultVal
+			if (val === undefined) {
+				val = item.defaultVal;
+			}
+
+			resolvedValues.set(primaryEnvKey, val);
+
+			// Map CLI flags
+			if (item.cli && item.cli !== "-") {
+				const flags = item.cli.split(",").map((f: string) => f.trim());
+				for (const flag of flags) {
+					cliFlagsMap.set(flag, { schemaKey, item });
+				}
+			}
+		}
+	}
+
 	let runtime = "bun";
-	let tlsCert: string | undefined;
-	let tlsKey: string | undefined;
-	let tlsCa: string | undefined;
 	let checkPermissionsOnly = false;
-	let disablePermissionChecks = false;
-	let corsOrigin = "*";
-	let corsMethods = "GET, POST, OPTIONS";
-	let corsHeaders = "Content-Type, Authorization, mcp-protocol-version";
-	let corsAllowCredentials = "false";
-	let corsExposeHeaders = "mcp-session-id";
-	let corsMaxAge: string | undefined;
-	let authRequiredReadScope: string | undefined;
-	let authRequiredWriteScope: string | undefined;
-	let authScopeJsonpath = "$.scope";
-	let authRequiredReadRole: string | undefined;
-	let authRequiredWriteRole: string | undefined;
-	let authRolesJsonpath = "$.realm_access.roles";
 
 	const args = process.argv;
 	for (let i = 2; i < args.length; i++) {
 		const arg = args[i];
 
-		if (arg === "-t" || arg === "--transport") {
-			const val = args[++i];
-			if (!val || !["http", "stdio", "both"].includes(val)) {
-				console.error(
-					`Error: Invalid transport type "${val}". Must be: http, stdio, both.`,
-				);
-				process.exit(1);
-			}
-			transport = val;
-		} else if (arg === "-m" || arg === "--mode") {
-			const val = args[++i];
-			if (!val || !["cluster", "namespaced"].includes(val)) {
-				console.error(
-					`Error: Invalid mode "${val}". Must be: cluster, namespaced.`,
-				);
-				process.exit(1);
-			}
-			mode = val;
-		} else if (arg === "-n" || arg === "--namespace") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing namespace value.");
-				process.exit(1);
-			}
-			namespace = val;
-		} else if (arg === "-p" || arg === "--port") {
-			const val = args[++i];
-			if (!val || Number.isNaN(Number(val))) {
-				console.error(`Error: Invalid port value "${val}".`);
-				process.exit(1);
-			}
-			port = val;
-		} else if (arg === "-H" || arg === "--host") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing host value.");
-				process.exit(1);
-			}
-			host = val;
-		} else if (arg === "-l" || arg === "--log-level") {
-			const val = args[++i];
-			if (
-				!val ||
-				!["debug", "info", "warning", "error", "fatal"].includes(val)
-			) {
-				console.error(
-					`Error: Invalid log-level "${val}". Must be: debug, info, warning, error, fatal.`,
-				);
-				process.exit(1);
-			}
-			logLevel = val;
+		if (arg === "-c" || arg === "--check-permissions") {
+			checkPermissionsOnly = true;
 		} else if (arg === "-r" || arg === "--runtime") {
 			const val = args[++i];
 			if (!val || !["bun", "deno", "node"].includes(val)) {
@@ -146,119 +156,52 @@ async function main(): Promise<void> {
 				process.exit(1);
 			}
 			runtime = val;
-		} else if (arg === "--tls-cert") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --tls-cert path value.");
-				process.exit(1);
-			}
-			tlsCert = val;
-		} else if (arg === "--tls-key") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --tls-key path value.");
-				process.exit(1);
-			}
-			tlsKey = val;
-		} else if (arg === "--tls-ca") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --tls-ca path value.");
-				process.exit(1);
-			}
-			tlsCa = val;
-		} else if (arg === "-c" || arg === "--check-permissions") {
-			checkPermissionsOnly = true;
-		} else if (arg === "--disable-permission-checks") {
-			disablePermissionChecks = true;
-		} else if (arg === "--cors-origin") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --cors-origin value.");
-				process.exit(1);
-			}
-			corsOrigin = val;
-		} else if (arg === "--cors-methods") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --cors-methods value.");
-				process.exit(1);
-			}
-			corsMethods = val;
-		} else if (arg === "--cors-headers") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --cors-headers value.");
-				process.exit(1);
-			}
-			corsHeaders = val;
-		} else if (arg === "--cors-allow-credentials") {
-			corsAllowCredentials = "true";
-		} else if (arg === "--cors-expose-headers") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --cors-expose-headers value.");
-				process.exit(1);
-			}
-			corsExposeHeaders = val;
-		} else if (arg === "--cors-max-age") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --cors-max-age value.");
-				process.exit(1);
-			}
-			corsMaxAge = val;
-		} else if (arg === "--auth-required-read-scope") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --auth-required-read-scope value.");
-				process.exit(1);
-			}
-			authRequiredReadScope = val;
-		} else if (arg === "--auth-required-write-scope") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --auth-required-write-scope value.");
-				process.exit(1);
-			}
-			authRequiredWriteScope = val;
-		} else if (arg === "--auth-scope-jsonpath") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --auth-scope-jsonpath value.");
-				process.exit(1);
-			}
-			authScopeJsonpath = val;
-		} else if (arg === "--auth-required-read-role") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --auth-required-read-role value.");
-				process.exit(1);
-			}
-			authRequiredReadRole = val;
-		} else if (arg === "--auth-required-write-role") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --auth-required-write-role value.");
-				process.exit(1);
-			}
-			authRequiredWriteRole = val;
-		} else if (arg === "--auth-roles-jsonpath") {
-			const val = args[++i];
-			if (!val) {
-				console.error("Error: Missing --auth-roles-jsonpath value.");
-				process.exit(1);
-			}
-			authRolesJsonpath = val;
 		} else if (arg === "-h" || arg === "--help") {
 			printHelp();
 			process.exit(0);
 		} else {
-			console.error(`Error: Unknown argument "${arg}".`);
-			printHelp();
-			process.exit(1);
+			const matched = cliFlagsMap.get(arg);
+			if (matched) {
+				const { item } = matched;
+				const envKeys = Array.isArray(item.env) ? item.env : [item.env];
+				const primaryEnvKey = envKeys[0];
+
+				if (typeof item.defaultVal === "boolean") {
+					resolvedValues.set(primaryEnvKey, true);
+				} else {
+					const val = args[++i];
+					if (val === undefined) {
+						console.error(`Error: Missing value for argument "${arg}".`);
+						process.exit(1);
+					}
+					// Validate allowed values if specified as an array
+					if (Array.isArray(item.allowed)) {
+						if (!item.allowed.includes(val)) {
+							console.error(
+								`Error: Invalid value "${val}" for ${arg}. Must be one of: ${item.allowed.join(", ")}.`,
+							);
+							process.exit(1);
+						}
+					} else if (item.allowed === "Number") {
+						if (Number.isNaN(Number(val))) {
+							console.error(
+								`Error: Invalid numeric value "${val}" for ${arg}.`,
+							);
+							process.exit(1);
+						}
+					}
+					resolvedValues.set(primaryEnvKey, val);
+				}
+			} else {
+				console.error(`Error: Unknown argument "${arg}".`);
+				printHelp();
+				process.exit(1);
+			}
 		}
 	}
+
+	const mode = resolvedValues.get("MODE");
+	const namespace = resolvedValues.get("NAMESPACE");
 
 	if (checkPermissionsOnly) {
 		console.log(`==> Running Kubernetes RBAC permission diagnostics...`);
@@ -306,6 +249,10 @@ async function main(): Promise<void> {
 		process.exit(1);
 	}
 
+	const tlsCert = resolvedValues.get("TLS_CERT");
+	const tlsKey = resolvedValues.get("TLS_KEY");
+	const tlsCa = resolvedValues.get("TLS_CA");
+
 	if (tlsCert || tlsKey || tlsCa) {
 		if (!tlsCert || !tlsKey) {
 			console.error(
@@ -315,38 +262,19 @@ async function main(): Promise<void> {
 		}
 	}
 
-	const env = {
+	const env: Record<string, string | undefined> = {
 		...process.env,
-		TRANSPORT: transport,
-		MODE: mode,
-		NAMESPACE: namespace,
-		PORT: port,
-		HOST: host,
-		LOG_LEVEL: logLevel,
-		DISABLE_PERMISSION_CHECKS: disablePermissionChecks ? "true" : "false",
-		CORS_ALLOWED_ORIGIN: corsOrigin,
-		CORS_ALLOWED_METHODS: corsMethods,
-		CORS_ALLOWED_HEADERS: corsHeaders,
-		CORS_ALLOW_CREDENTIALS: corsAllowCredentials,
-		CORS_EXPOSED_HEADERS: corsExposeHeaders,
-		...(corsMaxAge ? { CORS_MAX_AGE: corsMaxAge } : {}),
-		...(authRequiredReadScope
-			? { AUTH_REQUIRED_READ_SCOPE: authRequiredReadScope }
-			: {}),
-		...(authRequiredWriteScope
-			? { AUTH_REQUIRED_WRITE_SCOPE: authRequiredWriteScope }
-			: {}),
-		AUTH_SCOPE_JSONPATH: authScopeJsonpath,
-		...(authRequiredReadRole
-			? { AUTH_REQUIRED_READ_ROLE: authRequiredReadRole }
-			: {}),
-		...(authRequiredWriteRole
-			? { AUTH_REQUIRED_WRITE_ROLE: authRequiredWriteRole }
-			: {}),
-		AUTH_ROLES_JSONPATH: authRolesJsonpath,
-		...(tlsCert && tlsKey ? { TLS_CERT: tlsCert, TLS_KEY: tlsKey } : {}),
-		...(tlsCa ? { TLS_CA: tlsCa } : {}),
 	};
+
+	for (const [key, value] of resolvedValues.entries()) {
+		if (value !== undefined && value !== null) {
+			if (typeof value === "boolean") {
+				env[key] = value ? "true" : "false";
+			} else {
+				env[key] = String(value);
+			}
+		}
+	}
 
 	let runCmd = "";
 	let runArgs: string[] = [];
@@ -369,9 +297,9 @@ async function main(): Promise<void> {
 
 	console.error(`==> Starting MCP server via ${runtime}...`);
 	console.error(
-		`    Config: Host=${host}, Transport=${transport}, Mode=${mode}, Namespace=${namespace}, Port=${port}, LogLevel=${logLevel}${
-			tlsCert ? ", HTTPS=enabled" : ""
-		}, CORSOrigin=${corsOrigin}`,
+		`    Config: Host=${env.HOST ?? "0.0.0.0"}, Transport=${env.TRANSPORT ?? "http"}, Mode=${env.MODE ?? "cluster"}, Namespace=${env.NAMESPACE ?? "nogoo9"}, Port=${env.PORT ?? "3000"}, LogLevel=${env.LOG_LEVEL ?? "info"}${
+			env.TLS_CERT ? ", HTTPS=enabled" : ""
+		}, CORSOrigin=${env.CORS_ALLOWED_ORIGIN ?? "*"}`,
 	);
 	console.error(`    Command: ${runCmd} ${runArgs.join(" ")}`);
 	console.error(

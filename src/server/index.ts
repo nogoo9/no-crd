@@ -4,7 +4,7 @@ import { getLogger } from "@logtape/logtape";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import fastify, { type FastifyInstance } from "fastify";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 import { initK8sContext, type K8sContext } from "~/k8s/index.js";
 import { createMcpServer } from "~/mcp/server.js";
 import { registerUiApp } from "~/ui/index.js";

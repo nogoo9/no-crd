@@ -4,7 +4,7 @@ import { getLogger } from "@logtape/logtape";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { config } from "~/config.js";
+import { config } from "~/config/index.js";
 import {
 	createPodFromArgs,
 	DEFAULT_NAMESPACE,
@@ -250,7 +250,7 @@ export function registerPodTools(
 			},
 			async ({ name, namespace, jwtPayload }) => {
 				const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
-				const authEnabled = process.env.AUTH_ENABLED === "true";
+				const authEnabled = config.auth.enabled;
 				const store = requestContextStore.getStore();
 				const activeJwtPayload = jwtPayload || store?.jwtPayload;
 				let sub = "";
@@ -267,12 +267,12 @@ export function registerPodTools(
 						verifyAccessOrThrow(activeJwtPayload, "read");
 						sub = extractUserIdentity(
 							activeJwtPayload,
-							process.env.AUTH_SUB_JSONPATH || "$.sub",
+							config.auth.subJsonPath,
 						);
 						isAdmin = extractAdminRole(
 							activeJwtPayload,
-							process.env.AUTH_ADMIN_JSONPATH || "$.realm_access.roles",
-							process.env.AUTH_ADMIN_ROLE || "nogoo9-admin",
+							config.auth.rolesJsonPath,
+							config.auth.adminRole,
 						);
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, { pod: {} });

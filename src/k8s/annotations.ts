@@ -1,3 +1,4 @@
+import { ANNOTATION_KEYS } from "~/config/index.js";
 import type { PodCreateArgs } from "./schemas.js";
 
 /**
@@ -29,7 +30,7 @@ export function applySpawnerAnnotations(
 	};
 
 	// 1. Required Context Validation
-	const requiredRaw = annotations["nogoo9/required-context"];
+	const requiredRaw = annotations[ANNOTATION_KEYS.REQUIRED_CONTEXT];
 	if (requiredRaw) {
 		const requiredKeys = requiredRaw.split(",").map((k) => k.trim());
 		const providedKeys = Object.keys(context);
@@ -47,8 +48,8 @@ export function applySpawnerAnnotations(
 	}));
 
 	// 2. Init Container Injection
-	const initImage = annotations["nogoo9/init-image"];
-	const initCmd = annotations["nogoo9/init-command"];
+	const initImage = annotations[ANNOTATION_KEYS.INIT_IMAGE];
+	const initCmd = annotations[ANNOTATION_KEYS.INIT_COMMAND];
 	if (initImage && initCmd && parsedSpec.containers.length > 0) {
 		parsedSpec.initContainers = parsedSpec.initContainers || [];
 		parsedSpec.initContainers.push({
@@ -61,9 +62,9 @@ export function applySpawnerAnnotations(
 	}
 
 	// 3. Pre-Stop Hook / Sidecar Injection
-	const preStopCmd = annotations["nogoo9/pre-stop-command"];
+	const preStopCmd = annotations[ANNOTATION_KEYS.PRE_STOP_COMMAND];
 	if (preStopCmd && parsedSpec.containers.length > 0) {
-		const sidecarImage = annotations["nogoo9/pre-stop-sidecar-image"];
+		const sidecarImage = annotations[ANNOTATION_KEYS.PRE_STOP_SIDECAR_IMAGE];
 		if (sidecarImage) {
 			parsedSpec.containers.push({
 				name: "spawner-sidecar",
@@ -85,7 +86,7 @@ export function applySpawnerAnnotations(
 			};
 		}
 		parsedSpec.terminationGracePeriodSeconds = Number.parseInt(
-			annotations["nogoo9/default-grace-period"] || "60",
+			annotations[ANNOTATION_KEYS.DEFAULT_GRACE_PERIOD] || "60",
 			10,
 		);
 	}
