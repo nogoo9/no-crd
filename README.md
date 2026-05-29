@@ -11,6 +11,7 @@
 [![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg?style=flat-square)](https://nogoo9.github.io/no-crd/)
 [![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE)
 [![Coverage Status](https://img.shields.io/coveralls/github/nogoo9/no-crd?style=flat-square)](https://coveralls.io/github/nogoo9/no-crd?branch=main)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/nogoo9/no-crd/badge)](https://securityscorecards.dev/viewer/?uri=github.com/nogoo9/no-crd)
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Server-orange.svg?style=flat-square)](https://modelcontextprotocol.io)
 [![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.11-black?logo=bun&style=flat-square)](https://bun.sh)
 [![Deno](https://img.shields.io/badge/Deno-compatible-blue?logo=deno&style=flat-square)](https://deno.land)

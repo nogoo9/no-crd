@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.4.1] — 2026-05-29
+
+### Changed
+
+- **Schema-Driven CLI Wrapper**: Refactored the command-line utility entrypoint to dynamically load parameter types, defaults, and validations directly from active configuration schemas, completely removing hardcoded flags logic.
+- **Centralized Keys Map**: Replaced all hardcoded magic strings for Kubernetes labels and annotations with a single, unified reference map `ANNOTATION_KEYS` in `src/config/annotations.ts`.
+- **Encapsulated Config Directory**: Moved and consolidated all configuration logic directly inside the `src/config/` directory, removing the redundant `src/config.ts` wrapper file.
+
+### Fixed
+
+- **Registry Validation**: Added missing `mcpName` to `package.json` to satisfy registry schema validation constraints.
+
+
 ## [0.4.0] — 2026-05-29
 
 ### Added

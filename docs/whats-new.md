@@ -3,6 +3,12 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.4.1
+
+- **Schema-Driven CLI Wrapper**: Refactored the command-line utility entrypoint to dynamically load parameter types, defaults, and validations directly from active configuration schemas, completely removing hardcoded flags logic.
+- **Centralized Keys Map**: Replaced all hardcoded magic strings for Kubernetes labels and annotations with a single, unified reference map `ANNOTATION_KEYS` in `src/config/annotations.ts`.
+- **Encapsulated Config Directory**: Moved and consolidated all configuration logic directly inside the `src/config/` directory, removing the redundant `src/config.ts` wrapper file.
+
 ## What's New in v0.4.0
 
 - **Local & Built-In Templates**: Added support for reading workspace Pod templates from a local directory (`TEMPLATES_DIR` environment variable) or using the built-in catalog in `templates/`. These are merged seamlessly with cluster-level ConfigMap templates, with ConfigMaps taking higher priority in case of name collisions.
