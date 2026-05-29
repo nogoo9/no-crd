@@ -2,6 +2,10 @@
 
 This document details the authentication and authorization enhancements introduced in `v0.3.0` to secure workspaces and Kubernetes pods.
 
+> [!TIP]
+> For a comprehensive guide on how cookies and sessions work end-to-end (including the `nocr_sess` stateless session cookie, logout flow, and multi-replica key sharing), see the [Session & Cookie Management](/session-cookies) page.
+> Related ADRs: [ADR-002](/decisions/ADR-002-stateless-session-cookies), [ADR-003](/decisions/ADR-003-peer-discovery-session-key), [ADR-011](/decisions/ADR-011-ui-base-url-and-cookie-path-consistency).
+
 ## 1. Raw Pod Tools Owner Isolation
 
 In previous versions, while workspace lifecycle tools (such as `list_workspaces` and `stop_workspace`) performed owner validation, raw Kubernetes pod management tools (`list_pods`, `get_pod`, `create_pod`, `delete_pod`, `patch_pod`, and `get_pod_logs`) allowed unchecked access. Any user presenting a valid JWT could view, patch, or delete pods belonging to other users.

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] — 2026-05-29
+
+### Fixed
+
+- **Remove Hardcoded `localhost:3000` Fallback**: The UI HTTP fallback transport no longer tries `http://localhost:3000/mcp` — it only uses the same-origin path derived from `BASE_URL`. This eliminates connection errors and startup delays in production and k3d ingress deployments.
+- **Logout Endpoint Missing `basePath`**: The UI logout fetch call now correctly includes the `BASE_URL` prefix, fixing 404 errors when the server is deployed behind a subpath reverse proxy.
+- **Infinite Refresh Loop on 401**: The UI no longer calls `window.location.reload()` when the MCP endpoint returns `401 Unauthorized`. Previously, the reload raced with the OIDC `triggerRedirect()`, causing the page to loop endlessly without ever reaching the IdP. The login overlay is now shown instead, allowing the OIDC flow to redirect normally.
+
 ## [0.5.2] — 2026-05-29
 
 ### Fixed

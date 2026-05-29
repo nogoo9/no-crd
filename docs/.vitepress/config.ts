@@ -49,6 +49,7 @@ export default withMermaid(
 					text: "Security, Auth & Identity",
 					items: [
 						{ text: "Authentication Overview", link: "/mcp-auth" },
+						{ text: "Session & Cookie Management", link: "/session-cookies" },
 						{ text: "SSO Provider Integration", link: "/sso-integration" },
 						{ text: "Advanced Auth: RBAC & ABAC", link: "/advanced-auth" },
 						{ text: "Cryptographic Hardening", link: "/auth-hardening" },
@@ -101,6 +102,26 @@ export default withMermaid(
 						{
 							text: "ADR-006: Asset Resolution",
 							link: "/decisions/ADR-006-packaged-ui-asset-resolution",
+						},
+						{
+							text: "ADR-007: Schema Config",
+							link: "/decisions/ADR-007-schema-driven-configuration",
+						},
+						{
+							text: "ADR-008: Managed-Only Access",
+							link: "/decisions/ADR-008-managed-only-pod-access-control",
+						},
+						{
+							text: "ADR-009: Eager Startup",
+							link: "/decisions/ADR-009-eager-startup-health-check",
+						},
+						{
+							text: "ADR-010: ConfigMap Fallback",
+							link: "/decisions/ADR-010-graceful-configmap-template-fallback",
+						},
+						{
+							text: "ADR-011: BASE_URL & Cookies",
+							link: "/decisions/ADR-011-ui-base-url-and-cookie-path-consistency",
 						},
 					],
 				},
