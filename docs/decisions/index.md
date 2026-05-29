@@ -20,6 +20,7 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-009](./ADR-009-eager-startup-health-check.md) | Eager MCP Server Initialization with K8s Health Check | Accepted |
 | [ADR-010](./ADR-010-graceful-configmap-template-fallback.md) | Graceful ConfigMap Template Fallback | Accepted |
 | [ADR-011](./ADR-011-ui-base-url-and-cookie-path-consistency.md) | UI BASE_URL Contract and Cookie Path Consistency | Accepted |
+| [ADR-012](./ADR-012-per-session-mcp-server-factory.md) | Per-Session McpServer Factory Pattern | Accepted |
 
 ## How to Read ADRs
 
@@ -46,6 +47,7 @@ graph LR
     ADR009 -.-> ADR010
     ADR002 --> ADR011["ADR-011: UI BASE_URL & Cookies"]
     ADR005 -.- ADR011
+    ADR009 --> ADR012["ADR-012: Per-Session Factory"]
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -57,6 +59,7 @@ graph LR
     style ADR009 fill:#f59e0b,color:#fff
     style ADR010 fill:#22c55e,color:#fff
     style ADR011 fill:#4a9eff,color:#fff
+    style ADR012 fill:#f59e0b,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain

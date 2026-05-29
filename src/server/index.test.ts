@@ -217,12 +217,14 @@ users:
 		expect(resp.status).toBe(204);
 	});
 
-	test("Health checks (/healthz) return ok", async () => {
+	test("Health checks (/healthz) return ok with version", async () => {
 		const req = new Request("http://localhost/healthz", { method: "GET" });
 		const resp = await handleWebRequest(req);
 		expect(resp.status).toBe(200);
-		const body = await resp.json();
-		expect(body).toEqual({ status: "ok" });
+		const body = (await resp.json()) as any;
+		expect(body.status).toBe("ok");
+		expect(body.version).toBeString();
+		expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
 	});
 
 	test("Serves UI HTML at root and /ui paths", async () => {
@@ -397,8 +399,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(200);
-			const body = await resp.json();
-			expect(body).toEqual({ status: "ok" });
+			const body = (await resp.json()) as any;
+			expect(body.status).toBe("ok");
+			expect(body.version).toBeString();
 		} finally {
 			delete process.env.BASE_URL;
 		}

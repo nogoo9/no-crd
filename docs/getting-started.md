@@ -148,6 +148,8 @@ The server can be configured via environment variables or CLI flags:
 | - | `OAUTH_DISCOVERY_URL` | `""` | URL string | Discovery URL for the OAuth authorization server used by the UI client. |
 | - | `OAUTH_CLIENT_ID` | `""` | String | OAuth client ID for UI authorization. |
 | - | `OAUTH_LOGIN_METHOD` | `redirect` | `redirect`, `popup` | Login interaction mode for UI OAuth client. |
+| - | `UI_TITLE` | `nogoo9 Pod Manager` | String | Custom title shown in the dashboard header. |
+| - | `UI_SUBTITLE` | `On-demand Kubernetes pod orchestration and agent-sandbox management without CRDs.` | String | Custom subtitle shown below the dashboard title. |
 
 
 <!-- CONFIG_TABLES_END -->

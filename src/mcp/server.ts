@@ -10,6 +10,7 @@ import { registerNamespaceTools } from "~/mcp/namespace.js";
 import { registerPodTools } from "~/mcp/pods.js";
 import { registerSpawnerTools } from "~/mcp/spawner.js";
 import { registerTemplateResources } from "~/mcp/templates.js";
+import { APP_VERSION } from "~/version.js";
 
 const logger = getLogger(["nogoo9", "mcp-server"]);
 
@@ -25,7 +26,7 @@ export async function createMcpServer(
 	k8sContext: K8sContext,
 ): Promise<McpServer> {
 	logger.info("Initializing MCP Server...");
-	const server = new McpServer({ name: "nogoo9", version: "0.5.2" });
+	const server = new McpServer({ name: "nogoo9", version: APP_VERSION });
 
 	let report: Awaited<ReturnType<typeof evaluatePermissions>>;
 	try {

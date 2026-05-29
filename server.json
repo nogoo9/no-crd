@@ -6,13 +6,13 @@
     "url": "https://github.com/nogoo9/no-crd",
     "source": "github"
   },
-  "version": "0.5.3",
+  "version": "0.5.4",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@nogoo9/no-crd",
-      "version": "0.5.3",
+      "version": "0.5.4",
       "runtimeHint": "bunx",
       "transport": {
         "type": "stdio"
@@ -310,6 +310,18 @@
         {
           "name": "OAUTH_LOGIN_METHOD",
           "description": "UI SSO flow login method: 'redirect' or silent 'iframe'",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "UI_TITLE",
+          "description": "Custom dashboard header title for white-label branding",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "UI_SUBTITLE",
+          "description": "Custom dashboard subtitle text below the header title",
           "isRequired": false,
           "isSecret": false
         }

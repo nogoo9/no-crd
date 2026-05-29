@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] — 2026-05-30
+
+### Added
+
+- **Configurable UI Branding**: `UI_TITLE` and `UI_SUBTITLE` environment variables allow white-label customization of the dashboard header at runtime.
+- **Version Badge & Links in UI**: Dashboard header shows the server version (fetched from `/healthz`) plus GitHub and npm icon links.
+- **`/healthz` Version & Branding**: Health endpoint now returns `{ status, version, branding: { title, subtitle } }`.
+- **Centralized `APP_VERSION`**: New `src/version.ts` replaces hardcoded version strings in the MCP server constructor and healthz handler.
+- **"Powered by nogoo9" Footer**: Subtle footer with GitHub link at the bottom of the dashboard.
+
+### Fixed
+
+- **"Already Connected" on Second Session** ([ADR-012](/decisions/ADR-012-per-session-mcp-server-factory)): The MCP server no longer throws `"already connected transport, call close()"` when a second client session connects. Each session now gets its own `McpServer` instance, following the official MCP SDK factory pattern. The shared `globalMcpServer` singleton has been removed.
+
 ## [0.5.3] — 2026-05-29
 
 ### Fixed
