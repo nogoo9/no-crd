@@ -7,6 +7,7 @@ Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'l
 
 - **Production-Safe UI Transport**: Removed the hardcoded `http://localhost:3000/mcp` fallback from the dashboard's HTTP transport client. The UI now exclusively uses the same-origin relative path derived from `BASE_URL`, eliminating `ERR_CONNECTION_REFUSED` errors and startup delays when deployed behind an ingress or reverse proxy.
 - **Subpath-Aware Logout**: The UI logout button now correctly prefixes the `/logout` fetch call with `BASE_URL`, fixing silent 404 failures when the server is hosted under a subpath (e.g., `/gateway/no-crd`).
+- **Fix Infinite OIDC Refresh Loop**: When the MCP endpoint returned `401 Unauthorized`, the UI called `window.location.reload()` which raced with the OIDC redirect flow, causing the page to loop endlessly without ever reaching the Identity Provider. The 401 handlers now show the login overlay instead, allowing the OIDC `triggerRedirect()` to execute normally.
 
 ## What's New in v0.5.2
 

@@ -204,6 +204,14 @@ sequenceDiagram
 - **No refresh token in cookies**: The OIDC refresh token is stored in `localStorage` only and never sent to the server as a cookie.
 - **Path scoping**: `nocr_token` is scoped per-workspace, preventing one workspace from reading another's token.
 
+## Known Gotchas
+
+> [!WARNING]
+> **Never call `window.location.reload()` from a 401 handler in the UI.**
+> The UI runs `initOidc()` and `app.connect()` concurrently at boot. If the MCP endpoint returns 401 (no token or expired token) and the handler reloads the page, the reload fires before `triggerRedirect()` can navigate to the IdP — creating an infinite refresh loop where the login prompt flashes but the user is never actually redirected.
+>
+> The correct approach is to show the login overlay (`loginOverlay.classList.remove("hidden")`) and return/throw, letting the OIDC flow handle the redirect independently. This was fixed in v0.5.3.
+
 ## Related Documentation
 
 - [ADR-002: Stateless Signed Session Cookies](/decisions/ADR-002-stateless-session-cookies) — Design rationale
