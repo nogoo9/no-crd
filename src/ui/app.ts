@@ -1506,7 +1506,11 @@ async function initHttpFallback(): Promise<boolean> {
 			);
 			localStorage.removeItem("nocr_token");
 			activeToken = "";
-			window.location.reload();
+			// Don't reload — let initOidc() handle the login prompt/redirect.
+			// Reloading here races with the OIDC triggerRedirect() and causes
+			// an infinite refresh loop. See ADR-011.
+			if (loginOverlay) loginOverlay.classList.remove("hidden");
+			lastHttpFallbackError = "401: Unauthorized";
 			return false;
 		}
 		if (resp.status === 403) {
@@ -1580,7 +1584,9 @@ async function callServerToolFallback(name: string, args: any): Promise<any> {
 		console.warn("Unauthorized server call. Clearing expired token...");
 		localStorage.removeItem("nocr_token");
 		activeToken = "";
-		window.location.reload();
+		// Show login overlay instead of reloading to avoid infinite refresh loop.
+		if (loginOverlay) loginOverlay.classList.remove("hidden");
+		throw new Error("HTTP error 401 (Unauthorized — token expired or missing)");
 	}
 
 	if (resp.status === 403) {
