@@ -1472,83 +1472,74 @@ const mcpVersion = "2024-11-05";
 let lastHttpFallbackError = "";
 
 async function initHttpFallback(): Promise<boolean> {
-	const endpointsToTry = [`${basePath}/mcp`, "http://localhost:3000/mcp"];
-
-	// If the current origin is not localhost:3000, prioritize absolute local server URL
-	if (window.location.origin !== "http://localhost:3000") {
-		endpointsToTry.reverse();
-	}
-
-	for (const endpoint of endpointsToTry) {
-		try {
-			console.log(`Trying HTTP fallback endpoint: ${endpoint}`);
-			const initPayload = {
-				jsonrpc: "2.0",
-				method: "initialize",
-				params: {
-					protocolVersion: mcpVersion,
-					capabilities: {},
-					clientInfo: { name: "nogoo9-ui-fallback", version: "0.2.0" },
-				},
-				id: 1,
-			};
-			const headers: Record<string, string> = {
-				"Content-Type": "application/json",
-				Accept: "application/json, text/event-stream",
-			};
-			if (activeToken) {
-				headers.Authorization = `Bearer ${activeToken}`;
-			}
-			const resp = await fetch(endpoint, {
-				method: "POST",
-				headers,
-				body: JSON.stringify(initPayload),
-			});
-			if (resp.status === 401) {
-				console.warn(
-					"Unauthorized initialization call. Clearing expired token...",
-				);
-				localStorage.removeItem("nocr_token");
-				activeToken = "";
-				window.location.reload();
-				return false;
-			}
-			if (resp.status === 403) {
-				const text = await resp.text().catch(() => "");
-				lastHttpFallbackError = `${resp.status}${text ? `: ${text}` : ""}`;
-				console.warn(`Access forbidden (403): ${text}`);
-				if (forbiddenOverlay) {
-					if (forbiddenMessage) {
-						forbiddenMessage.textContent =
-							text ||
-							"You do not have the required scopes or roles to access this resource.";
-					}
-					forbiddenOverlay.classList.remove("hidden");
-				}
-				return false;
-			}
-			if (resp.ok) {
-				const sessId = resp.headers.get("mcp-session-id");
-				if (sessId) {
-					httpSessionId = sessId;
-				}
-				mcpEndpointUrl = endpoint;
-				_fallbackMode = true;
-				console.log(
-					`HTTP fallback initialized successfully on endpoint: ${endpoint}`,
-				);
-				return true;
-			} else {
-				const text = await resp.text().catch(() => "");
-				lastHttpFallbackError = `${resp.status}${text ? `: ${text}` : ""}`;
-				console.warn(
-					`HTTP fallback failed for ${endpoint} with status ${resp.status}`,
-				);
-			}
-		} catch (err) {
-			lastHttpFallbackError = String(err);
-			console.warn(`HTTP fallback initialization failed for ${endpoint}:`, err);
+	const endpoint = `${basePath}/mcp`;
+	try {
+		console.log(`Trying HTTP fallback endpoint: ${endpoint}`);
+		const initPayload = {
+			jsonrpc: "2.0",
+			method: "initialize",
+			params: {
+				protocolVersion: mcpVersion,
+				capabilities: {},
+				clientInfo: { name: "nogoo9-ui-fallback", version: "0.2.0" },
+			},
+			id: 1,
+		};
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+			Accept: "application/json, text/event-stream",
+		};
+		if (activeToken) {
+			headers.Authorization = `Bearer ${activeToken}`;
 		}
+		const resp = await fetch(endpoint, {
+			method: "POST",
+			headers,
+			body: JSON.stringify(initPayload),
+		});
+		if (resp.status === 401) {
+			console.warn(
+				"Unauthorized initialization call. Clearing expired token...",
+			);
+			localStorage.removeItem("nocr_token");
+			activeToken = "";
+			window.location.reload();
+			return false;
+		}
+		if (resp.status === 403) {
+			const text = await resp.text().catch(() => "");
+			lastHttpFallbackError = `${resp.status}${text ? `: ${text}` : ""}`;
+			console.warn(`Access forbidden (403): ${text}`);
+			if (forbiddenOverlay) {
+				if (forbiddenMessage) {
+					forbiddenMessage.textContent =
+						text ||
+						"You do not have the required scopes or roles to access this resource.";
+				}
+				forbiddenOverlay.classList.remove("hidden");
+			}
+			return false;
+		}
+		if (resp.ok) {
+			const sessId = resp.headers.get("mcp-session-id");
+			if (sessId) {
+				httpSessionId = sessId;
+			}
+			mcpEndpointUrl = endpoint;
+			_fallbackMode = true;
+			console.log(
+				`HTTP fallback initialized successfully on endpoint: ${endpoint}`,
+			);
+			return true;
+		}
+		const text = await resp.text().catch(() => "");
+		lastHttpFallbackError = `${resp.status}${text ? `: ${text}` : ""}`;
+		console.warn(
+			`HTTP fallback failed for ${endpoint} with status ${resp.status}`,
+		);
+	} catch (err) {
+		lastHttpFallbackError = String(err);
+		console.warn(`HTTP fallback initialization failed for ${endpoint}:`, err);
 	}
 	return false;
 }
@@ -2099,7 +2090,7 @@ if (logoutBtn) {
 
 		// 1. Call server /logout endpoint to clear path-scoped workspace cookies
 		try {
-			await fetch("/logout", {
+			await fetch(`${basePath}/logout`, {
 				method: "POST",
 				headers: token ? { Authorization: `Bearer ${token}` } : {},
 			});
