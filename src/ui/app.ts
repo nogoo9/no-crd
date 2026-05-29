@@ -1463,7 +1463,10 @@ if (refreshLogsBtn) refreshLogsBtn.addEventListener("click", fetchLogs);
 if (closeSpawnBtn) closeSpawnBtn.addEventListener("click", closeSpawnModal);
 if (cancelSpawnBtn) cancelSpawnBtn.addEventListener("click", closeSpawnModal);
 
-// Fallback HTTP Transport Client (when opened outside an MCP App Host iframe)
+// Fallback HTTP Transport Client (when opened outside an MCP App Host iframe).
+// basePath is the server-injected BASE_URL prefix (e.g. "/gateway/no-crd").
+// All fetch calls to server endpoints (MCP, themes, logout, route proxy) MUST
+// use basePath so they resolve correctly behind reverse proxies. See ADR-011.
 let _fallbackMode = false;
 let httpSessionId: string | null = null;
 const basePath = (window as any).__NOCR_BASE_URL__ || "";
