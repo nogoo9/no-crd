@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] — 2026-05-29
+
+### Fixed
+
+- **Graceful Error Handling in MCP Tools**: `current_namespace` and `get_capabilities` no longer throw unhandled errors when authentication fails or the K8s API is unreachable — they now return structured `errorResult` responses.
+- **Server Startup Resilience**: `createMcpServer` wraps RBAC permission evaluation in a try/catch, allowing the server to boot with diagnostic tools only when the K8s Auth API is temporarily unavailable.
+
+### Added
+
+- **Permission Denial Test Matrix**: 6-scenario test suite covering all RBAC denial combinations (all granted, pods denied, configmaps denied, namespaces denied, all denied, K8s API unreachable) verifying the server always boots and tools are correctly gated.
+
 ## [0.5.1] — 2026-05-29
+
 
 ### Fixed
 
