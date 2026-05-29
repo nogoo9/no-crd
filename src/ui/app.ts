@@ -1474,6 +1474,29 @@ let mcpEndpointUrl = `${basePath}/mcp`;
 const mcpVersion = "2024-11-05";
 let lastHttpFallbackError = "";
 
+// Fetch version and branding from server and populate the header
+const appVersionEl = document.getElementById("app-version");
+const appTitleEl = document.getElementById("app-title");
+const appSubtitleEl = document.getElementById("app-subtitle");
+fetch(`${basePath}/healthz`)
+	.then((r) => r.json())
+	.then((data: any) => {
+		if (appVersionEl && data.version) {
+			appVersionEl.textContent = `v${data.version}`;
+			appVersionEl.classList.remove("hidden");
+		}
+		if (data.branding) {
+			if (appTitleEl && data.branding.title) {
+				appTitleEl.textContent = data.branding.title;
+				document.title = data.branding.title;
+			}
+			if (appSubtitleEl && data.branding.subtitle) {
+				appSubtitleEl.textContent = data.branding.subtitle;
+			}
+		}
+	})
+	.catch(() => {});
+
 async function initHttpFallback(): Promise<boolean> {
 	const endpoint = `${basePath}/mcp`;
 	try {

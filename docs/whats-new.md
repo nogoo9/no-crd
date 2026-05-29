@@ -3,6 +3,15 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.5.4
+
+- **Fix "Already Connected" on Multi-Session** ([ADR-012](/decisions/ADR-012-per-session-mcp-server-factory)): The MCP server threw `"already connected transport, call close()"` when a second client session connected. The shared `globalMcpServer` singleton has been replaced with a per-session factory pattern, following the official MCP SDK convention. Each session now gets its own `McpServer` instance, and startup validation uses a throwaway server that is discarded after RBAC checks pass.
+- **Configurable UI Branding**: Set `UI_TITLE` and `UI_SUBTITLE` environment variables to customize the dashboard header for white-label deployments. The branding is served via `/healthz` and applied at runtime — no rebuild required.
+- **Version Badge in UI Header**: The dashboard header now shows the current server version, fetched at runtime from `/healthz`. GitHub and npm icon links are also displayed for quick navigation.
+- **`/healthz` Returns Version & Branding**: The health check endpoint now returns `{ status, version, branding: { title, subtitle } }`, making version and branding information available to clients and monitoring tools.
+- **Centralized `APP_VERSION` Constant**: A single `src/version.ts` module is the runtime source of truth for the application version, used by the MCP server constructor and `/healthz`. The `/bump` workflow updates it alongside `package.json` and `server.json`.
+- **"Powered by nogoo9" Footer**: A subtle footer with a link to the GitHub repository is shown at the bottom of the dashboard.
+
 ## What's New in v0.5.3
 
 - **Production-Safe UI Transport**: Removed the hardcoded `http://localhost:3000/mcp` fallback from the dashboard's HTTP transport client. The UI now exclusively uses the same-origin relative path derived from `BASE_URL`, eliminating `ERR_CONNECTION_REFUSED` errors and startup delays when deployed behind an ingress or reverse proxy.

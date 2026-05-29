@@ -123,6 +123,10 @@ export default withMermaid(
 							text: "ADR-011: BASE_URL & Cookies",
 							link: "/decisions/ADR-011-ui-base-url-and-cookie-path-consistency",
 						},
+						{
+							text: "ADR-012: Per-Session Factory",
+							link: "/decisions/ADR-012-per-session-mcp-server-factory",
+						},
 					],
 				},
 			],

@@ -6,6 +6,7 @@ import {
 	getRequestHostAndProto,
 	setCorsHeaders,
 } from "~/server/helpers.js";
+import { APP_VERSION } from "~/version.js";
 import type { RouteDeps } from "./index.js";
 
 const logger = getLogger(["nogoo9", "routes", "mcp"]);
@@ -45,7 +46,14 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 		reply: FastifyReply,
 	) => {
 		setCorsHeaders(reply);
-		return { status: "ok" };
+		return {
+			status: "ok",
+			version: APP_VERSION,
+			branding: {
+				title: config.ui.title,
+				subtitle: config.ui.subtitle,
+			},
+		};
 	};
 	api.get("/healthz", healthHandler);
 	api.get("/mcp/healthz", healthHandler);

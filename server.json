@@ -312,6 +312,18 @@
           "description": "UI SSO flow login method: 'redirect' or silent 'iframe'",
           "isRequired": false,
           "isSecret": false
+        },
+        {
+          "name": "UI_TITLE",
+          "description": "Custom dashboard header title for white-label branding",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "UI_SUBTITLE",
+          "description": "Custom dashboard subtitle text below the header title",
+          "isRequired": false,
+          "isSecret": false
         }
       ]
     }

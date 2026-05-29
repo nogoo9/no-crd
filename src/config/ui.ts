@@ -92,6 +92,29 @@ export const uiSchema = {
 			return getEnv(this.env) ?? this.defaultVal;
 		},
 	} satisfies SchemaItem<string>,
+
+	title: {
+		cli: "-",
+		env: "UI_TITLE",
+		defaultVal: "nogoo9 Pod Manager",
+		allowed: "String",
+		description: "Custom title shown in the dashboard header.",
+		get value(): string {
+			return getEnv(this.env) ?? this.defaultVal;
+		},
+	} satisfies SchemaItem<string>,
+
+	subtitle: {
+		cli: "-",
+		env: "UI_SUBTITLE",
+		defaultVal:
+			"On-demand Kubernetes pod orchestration and agent-sandbox management without CRDs.",
+		allowed: "String",
+		description: "Custom subtitle shown below the dashboard title.",
+		get value(): string {
+			return getEnv(this.env) ?? this.defaultVal;
+		},
+	} satisfies SchemaItem<string>,
 };
 
 export const uiConfig = {
@@ -122,5 +145,11 @@ export const uiConfig = {
 				return uiSchema.oauthLoginMethod.value;
 			},
 		};
+	},
+	get title() {
+		return uiSchema.title.value;
+	},
+	get subtitle() {
+		return uiSchema.subtitle.value;
 	},
 };
