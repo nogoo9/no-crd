@@ -3,6 +3,11 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.5.1
+
+- **Graceful ConfigMap Template Fallback** ([ADR-010](/decisions/ADR-010-graceful-configmap-template-fallback)): Template tools now degrade gracefully when the service account lacks `configmaps` RBAC permissions. `list_templates` catches ConfigMap errors and continues to return local/built-in templates with a warning. `spawn_workspace` falls back to local templates when ConfigMap reads fail.
+- **Template Read Tools Always Available**: `list_templates` and `get_template` are no longer gated behind ConfigMap permissions — they are unconditionally registered, ensuring agents always have access to the local and built-in template catalog even in minimal RBAC deployments.
+
 ## What's New in v0.4.2
 
 - **Managed-Only Pod Access Control** ([ADR-008](/decisions/ADR-008-managed-only-pod-access-control)): Pod tools (`list_pods`, `get_pod`, `delete_pod`, `patch_pod`, `get_pod_logs`) now only operate on pods labeled `nogoo9/managed-by=nogoo9-spawner` when `MANAGED_ONLY=true` (default). No one bypasses this — not even admins.

@@ -13,6 +13,7 @@ import {
 	EnvVar,
 	errorResult,
 	extractUserIdentity,
+	findLocalTemplate,
 	getAccessibleNamespaces,
 	type K8sContext,
 	type LocalTemplate,
@@ -27,7 +28,6 @@ import {
 	parseTemplateRef,
 	parseWorkspaceApis,
 	ResourceQuantity,
-	readLocalTemplate,
 	readTemplateMap,
 	requestContextStore,
 	resolveNamespace,
@@ -164,22 +164,7 @@ function collectLocalTemplates(): LocalTemplate[] {
 	return results;
 }
 
-/**
- * Tries to find a local or built-in template by name.
- * Checks custom TEMPLATES_DIR first, then built-in dir.
- */
-function findLocalTemplate(name: string): LocalTemplate | null {
-	const k8sCfg = config.k8s;
-	if (k8sCfg.templatesDir) {
-		const found = readLocalTemplate(k8sCfg.templatesDir, name);
-		if (found) return found;
-	}
-	if (k8sCfg.builtinTemplates) {
-		const found = readLocalTemplate(k8sCfg.builtinTemplatesDir, name);
-		if (found) return found;
-	}
-	return null;
-}
+// findLocalTemplate is now imported from ~/k8s/index.js
 
 const nsParam = z
 	.string()
@@ -373,9 +358,21 @@ export function registerTemplateResources(
 				logger.info("Tool list_templates called for namespace {namespace}", {
 					namespace: ns,
 				});
+				// 1. ConfigMap templates (highest priority) — graceful on permission failure
+				let configMapWarning = "";
+				let maps: Awaited<ReturnType<typeof listTemplateMaps>> = [];
 				try {
-					// 1. ConfigMap templates (highest priority)
-					const maps = await listTemplateMaps(k8sContext.coreApi, ns);
+					maps = await listTemplateMaps(k8sContext.coreApi, ns);
+				} catch (err) {
+					logger.warn(
+						"ConfigMap template listing failed in namespace {namespace} (likely missing RBAC permissions). Local/built-in templates still available. Error: {error}",
+						{ namespace: ns, error: err },
+					);
+					configMapWarning =
+						"⚠ ConfigMap templates unavailable (missing permissions). Showing local/built-in templates only.\n";
+				}
+
+				try {
 					const seenNames = new Set<string>();
 					const templates = maps.map((cm) => {
 						const reqContextRaw =
@@ -423,16 +420,26 @@ export function registerTemplateResources(
 					});
 					if (!templates.length)
 						return {
-							content: [{ type: "text" as const, text: "(no templates)" }],
+							content: [
+								{
+									type: "text" as const,
+									text: configMapWarning
+										? `${configMapWarning}(no templates)`
+										: "(no templates)",
+								},
+							],
 							structuredContent: { templates: [] },
 						};
+					const listText = templates
+						.map((t) => `${t.name}\t${t.description}`)
+						.join("\n");
 					return {
 						content: [
 							{
 								type: "text" as const,
-								text: templates
-									.map((t) => `${t.name}\t${t.description}`)
-									.join("\n"),
+								text: configMapWarning
+									? `${configMapWarning}${listText}`
+									: listText,
 							},
 						],
 						structuredContent: { templates },

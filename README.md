@@ -208,8 +208,7 @@ Below is the mapping showing which Kubernetes API resources and verbs each MCP t
 |---|---|---|
 | `create` | `create_template` | Save a new pod template definition as a ConfigMap. |
 | `delete` | `delete_template` | Delete a stored pod template ConfigMap. |
-| `get` | `create_pod_from_template`, `get_template` | Read template pod specifications stored in ConfigMaps. |
-| `list` | `list_templates` | Find ConfigMaps registered as reusable pod templates. |
+| `get` | `create_pod_from_template` | Read template pod specifications stored in ConfigMaps. |
 | `update` | `update_template` | Modify metadata, annotations, or specifications of an existing template. |
 
 ### Resource: `namespaces`

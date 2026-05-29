@@ -1,7 +1,7 @@
 {
 	"name": "@nogoo9/no-crd",
 	"mcpName": "io.github.nogoo9/no-crd",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"license": "Apache-2.0",
 	"description": "Agent-driven, on-demand pod orchestration in Kubernetes (k8s/k3s) without Custom Resource Definitions (CRDs)",
 	"author": "eterna2",

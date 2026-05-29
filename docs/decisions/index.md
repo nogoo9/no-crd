@@ -18,6 +18,7 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-007](./ADR-007-schema-driven-configuration.md) | Schema-Driven Configuration & Unified Annotation Keys | Accepted |
 | [ADR-008](./ADR-008-managed-only-pod-access-control.md) | Managed-Only Pod Access Control | Accepted |
 | [ADR-009](./ADR-009-eager-startup-health-check.md) | Eager MCP Server Initialization with K8s Health Check | Accepted |
+| [ADR-010](./ADR-010-graceful-configmap-template-fallback.md) | Graceful ConfigMap Template Fallback | Accepted |
 
 ## How to Read ADRs
 
@@ -40,6 +41,8 @@ graph LR
     ADR001 -.-> ADR007["ADR-007: Schema Config"]
     ADR007 -.-> ADR008["ADR-008: Managed-Only Access"]
     ADR008 -.-> ADR009["ADR-009: Eager Startup"]
+    ADR001 -.-> ADR010["ADR-010: ConfigMap Fallback"]
+    ADR009 -.-> ADR010
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -49,8 +52,10 @@ graph LR
     style ADR007 fill:#22c55e,color:#fff
     style ADR008 fill:#f59e0b,color:#fff
     style ADR009 fill:#f59e0b,color:#fff
+    style ADR010 fill:#22c55e,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain
 - **Green**: Template & theme system
 - **Amber**: Access control & security
+
