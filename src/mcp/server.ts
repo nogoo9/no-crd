@@ -25,7 +25,7 @@ export async function createMcpServer(
 	k8sContext: K8sContext,
 ): Promise<McpServer> {
 	logger.info("Initializing MCP Server...");
-	const server = new McpServer({ name: "nogoo9", version: "0.1.1" });
+	const server = new McpServer({ name: "nogoo9", version: "0.5.0" });
 	const report = await evaluatePermissions(k8sContext, DEFAULT_NAMESPACE, MODE);
 
 	logger.info("Registering MCP tools and resources...");

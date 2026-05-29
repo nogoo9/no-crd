@@ -106,6 +106,7 @@ The server can be configured via environment variables or CLI flags:
 | `-m, --mode` | `MODE` | `cluster` | `cluster`, `namespaced` | Kubernetes access scope. `namespaced` locks operations to a single namespace. |
 | `-n, --namespace` | `NAMESPACE`, `DEFAULT_NAMESPACE` | `nogoo9` | String | Default Kubernetes namespace for operations. |
 | `--disable-permission-checks` | `DISABLE_PERMISSION_CHECKS` | `false` | `true`, `false` | Disable Kubernetes RBAC permission checks and assume all tools are enabled. |
+| `--managed-only` | `MANAGED_ONLY` | `true` | `true`, `false` | When true, pod tools only operate on pods managed by this server (`nogoo9/managed-by` label). No one bypasses this, not even admins. See [ADR-008](./decisions/ADR-008-managed-only-pod-access-control.md). |
 | `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | - | Number | Default target port inside the workspace pods to proxy traffic to. |
 | - | `REGISTRY_URL` | - | URL string | Target container registry URL to query for images (e.g. `http://localhost:5001`). |
 | - | `TEMPLATES_DIR` | - | Path string | Path to local directory containing pod template files (YAML/JSON). See [ADR-001](./decisions/ADR-001-template-file-format.md). |

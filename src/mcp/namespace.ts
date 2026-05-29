@@ -5,6 +5,7 @@ import { z } from "zod";
 import { config } from "~/config/index.js";
 import {
 	evaluatePermissions,
+	extractAdminRole,
 	type K8sContext,
 	requestContextStore,
 	verifyAccessOrThrow,
@@ -25,6 +26,13 @@ export const CheckPermissionsOutputSchema = z.object({
 	enabledTools: z.array(z.string()),
 	disabledTools: z.array(z.string()),
 	permissions: z.record(z.string(), z.record(z.string(), z.boolean())),
+});
+
+export const GetCapabilitiesOutputSchema = z.object({
+	enabledTools: z.array(z.string()),
+	managedOnly: z.boolean(),
+	authEnabled: z.boolean(),
+	isAdmin: z.boolean(),
 });
 
 /**
@@ -54,7 +62,7 @@ export function currentNamespaceText(
 
 /**
  * Registers namespace diagnostics and metadata tools into the MCP server.
- * Registered tools: `current_namespace`, `check_permissions`.
+ * Registered tools: `current_namespace`, `check_permissions`, `get_capabilities`.
  *
  * @param server The McpServer instance.
  * @param k8sContext Active K8sContext containing API clients.
@@ -190,6 +198,66 @@ export function registerNamespaceTools(
 					isError: true,
 				};
 			}
+		},
+	);
+
+	registerAppTool(
+		server,
+		"get_capabilities",
+		{
+			description:
+				"Get the server capabilities for the current user — enabled tools, access mode, and role",
+			inputSchema: {
+				jwtPayload: z.record(z.string(), z.unknown()).optional(),
+			},
+			outputSchema: GetCapabilitiesOutputSchema.shape,
+			_meta: { ui: { resourceUri: APP_URI } },
+		},
+		async ({
+			jwtPayload,
+		}): Promise<{
+			content: Array<{ type: "text"; text: string }>;
+			structuredContent: z.infer<typeof GetCapabilitiesOutputSchema>;
+		}> => {
+			const authEnabled = config.auth.enabled;
+			const store = requestContextStore.getStore();
+			const activeJwtPayload = jwtPayload || store?.jwtPayload;
+
+			let isAdmin = false;
+			if (authEnabled && activeJwtPayload) {
+				try {
+					isAdmin = extractAdminRole(
+						activeJwtPayload,
+						config.auth.rolesJsonPath,
+						config.auth.adminRole,
+					);
+				} catch {
+					// Not admin if extraction fails
+				}
+			}
+
+			const report = await evaluatePermissions(
+				k8sContext,
+				defaultNamespace,
+				mode,
+			);
+
+			const capabilities = {
+				enabledTools: report.enabledTools,
+				managedOnly: config.k8s.managedOnly,
+				authEnabled,
+				isAdmin,
+			};
+
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: JSON.stringify(capabilities, null, 2),
+					},
+				],
+				structuredContent: capabilities,
+			};
 		},
 	);
 }

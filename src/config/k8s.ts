@@ -40,6 +40,18 @@ export const k8sSchema = {
 		},
 	} satisfies SchemaItem<boolean>,
 
+	managedOnly: {
+		cli: "--managed-only",
+		env: "MANAGED_ONLY",
+		defaultVal: true,
+		allowed: ["true", "false"],
+		description:
+			"When true, pod tools only operate on pods managed by this server (`nogoo9/managed-by` label). No one bypasses this, not even admins. See [ADR-008](docs/decisions/ADR-008-managed-only-pod-access-control.md).",
+		get value(): boolean {
+			return getEnv(this.env) !== "false";
+		},
+	} satisfies SchemaItem<boolean>,
+
 	defaultWorkspacePort: {
 		cli: "--default-workspace-port",
 		env: "DEFAULT_WORKSPACE_PORT",

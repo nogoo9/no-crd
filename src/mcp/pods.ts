@@ -4,7 +4,7 @@ import { getLogger } from "@logtape/logtape";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { config } from "~/config/index.js";
+import { ANNOTATION_KEYS, config } from "~/config/index.js";
 import {
 	createPodFromArgs,
 	DEFAULT_NAMESPACE,
@@ -39,6 +39,7 @@ export const ListPodsOutputSchema = z.object({
 			annotations: z.record(z.string(), z.string()),
 		}),
 	),
+	unmanagedCount: z.number().int().optional(),
 });
 
 export const GetPodOutputSchema = z.object({
@@ -78,6 +79,7 @@ export const ListRegistryImagesOutputSchema = z.object({
 
 const APP_URI = "ui://nogoo9/app";
 const UI_META = { ui: { resourceUri: APP_URI } } as const;
+const MANAGED_BY_VALUE = "nogoo9-spawner";
 
 const nsParam = z
 	.string()
@@ -85,6 +87,19 @@ const nsParam = z
 	.describe(
 		`Namespace (defaults to "${DEFAULT_NAMESPACE}"${MODE === "namespaced" ? "; locked — namespaced mode ignores this" : ""})`,
 	);
+
+/**
+ * Checks whether a pod is managed by this server (has the managed-by label).
+ * Returns true if managed-only mode is off, or if the pod has the label.
+ */
+function isManagedPod(pod: {
+	metadata?: { labels?: Record<string, string> };
+}): boolean {
+	if (!config.k8s.managedOnly) return true;
+	return (
+		pod.metadata?.labels?.[ANNOTATION_KEYS.MANAGED_BY] === MANAGED_BY_VALUE
+	);
+}
 
 /**
  * Registers core Kubernetes pod management tools with the MCP server.
@@ -181,6 +196,13 @@ export function registerPodTools(
 					},
 				);
 				let actualLabelSelector = labelSelector || "";
+				// Managed-only mode: filter to pods managed by this server (no bypass, not even admin)
+				if (config.k8s.managedOnly) {
+					const managedFilter = `${ANNOTATION_KEYS.MANAGED_BY}=${MANAGED_BY_VALUE}`;
+					actualLabelSelector = actualLabelSelector
+						? `${actualLabelSelector},${managedFilter}`
+						: managedFilter;
+				}
 				if (authEnabled && !isAdmin) {
 					if (actualLabelSelector) {
 						actualLabelSelector += `,nogoo9/user-sub=${sub}`;
@@ -189,6 +211,7 @@ export function registerPodTools(
 					}
 				}
 				try {
+					// Fetch managed pods
 					const res = await k8sContext.coreApi.listNamespacedPod({
 						namespace: ns,
 						fieldSelector,
@@ -196,29 +219,53 @@ export function registerPodTools(
 						limit,
 					});
 					const summaries = res.items.map(podToSummary);
+
+					// Count unmanaged pods when managed-only mode is active
+					let unmanagedCount: number | undefined;
+					if (config.k8s.managedOnly) {
+						try {
+							const allRes = await k8sContext.coreApi.listNamespacedPod({
+								namespace: ns,
+							});
+							unmanagedCount = allRes.items.length - summaries.length;
+						} catch {
+							// If we can't count, that's fine — just omit
+						}
+					}
+
 					logger.debug("Successfully listed {count} pods", {
 						count: summaries.length,
 					});
 					if (!summaries.length)
 						return {
-							content: [{ type: "text" as const, text: "(no pods)" }],
-							structuredContent: { pods: [] },
+							content: [
+								{
+									type: "text" as const,
+									text: unmanagedCount
+										? `(no managed pods; ${unmanagedCount} unmanaged pods in namespace)`
+										: "(no pods)",
+								},
+							],
+							structuredContent: { pods: [], unmanagedCount },
 						};
 					const rows = summaries.map(
 						(p) =>
 							`${p.name}\t${p.phase}\t${p.ready}/${p.total}\t${p.restarts}\t${p.podIP || "-"}\t${p.node || "-"}`,
 					);
+					const footer = unmanagedCount
+						? `\n(${unmanagedCount} unmanaged pods not shown)`
+						: "";
 					return {
 						content: [
 							{
 								type: "text" as const,
-								text: [
-									"NAME\tPHASE\tREADY\tRESTARTS\tPOD-IP\tNODE",
-									...rows,
-								].join("\n"),
+								text:
+									["NAME\tPHASE\tREADY\tRESTARTS\tPOD-IP\tNODE", ...rows].join(
+										"\n",
+									) + footer,
 							},
 						],
-						structuredContent: { pods: summaries },
+						structuredContent: { pods: summaries, unmanagedCount },
 					};
 				} catch (err) {
 					logger.error(
@@ -290,6 +337,9 @@ export function registerPodTools(
 						name,
 						namespace: ns,
 					});
+					if (!isManagedPod(body)) {
+						throw new Error(`Pod ${name} not found or access denied`);
+					}
 					if (authEnabled && !isAdmin) {
 						const podSub = body.metadata?.labels?.["nogoo9/user-sub"];
 						if (podSub !== sub) {
@@ -372,6 +422,7 @@ export function registerPodTools(
 						...specArgs,
 						labels: {
 							...(specArgs.labels || {}),
+							[ANNOTATION_KEYS.MANAGED_BY]: MANAGED_BY_VALUE,
 							...(authEnabled ? { "nogoo9/user-sub": sub } : {}),
 						},
 						annotations: {
@@ -473,13 +524,19 @@ export function registerPodTools(
 					},
 				);
 				try {
-					if (authEnabled && !isAdmin) {
+					// Only fetch pod when access checks are needed
+					if (config.k8s.managedOnly || (authEnabled && !isAdmin)) {
 						const pod = await k8sContext.coreApi.readNamespacedPod({
 							name,
 							namespace: ns,
 						});
-						if (pod.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+						if (!isManagedPod(pod)) {
 							throw new Error(`Pod ${name} not found or access denied`);
+						}
+						if (authEnabled && !isAdmin) {
+							if (pod.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+								throw new Error(`Pod ${name} not found or access denied`);
+							}
 						}
 					}
 					await k8sContext.coreApi.deleteNamespacedPod({
@@ -582,13 +639,19 @@ export function registerPodTools(
 					},
 				);
 				try {
-					if (authEnabled && !isAdmin) {
-						const pod = await k8sContext.coreApi.readNamespacedPod({
+					// Only fetch pod when access checks are needed
+					if (config.k8s.managedOnly || (authEnabled && !isAdmin)) {
+						const podForCheck = await k8sContext.coreApi.readNamespacedPod({
 							name,
 							namespace: ns,
 						});
-						if (pod.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+						if (!isManagedPod(podForCheck)) {
 							throw new Error(`Pod ${name} not found or access denied`);
+						}
+						if (authEnabled && !isAdmin) {
+							if (podForCheck.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+								throw new Error(`Pod ${name} not found or access denied`);
+							}
 						}
 					}
 					const options = {
@@ -752,13 +815,19 @@ export function registerPodTools(
 					let resolvedContainer = container;
 					let pod: any = null;
 
-					if (authEnabled && !isAdmin) {
+					// Always fetch pod for managed-by check (and optionally user-sub)
+					if (config.k8s.managedOnly || (authEnabled && !isAdmin)) {
 						pod = await k8sContext.coreApi.readNamespacedPod({
 							name,
 							namespace: ns,
 						});
-						if (pod.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+						if (!isManagedPod(pod)) {
 							throw new Error(`Pod ${name} not found or access denied`);
+						}
+						if (authEnabled && !isAdmin) {
+							if (pod.metadata?.labels?.["nogoo9/user-sub"] !== sub) {
+								throw new Error(`Pod ${name} not found or access denied`);
+							}
 						}
 					}
 

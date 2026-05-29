@@ -45,6 +45,7 @@ describe("Pods MCP Tools", () => {
 			"get_pod_logs",
 		]);
 		process.env.AUTH_ENABLED = "false";
+		process.env.MANAGED_ONLY = "false";
 		delete process.env.AUTH_SUB_JSONPATH;
 		delete process.env.AUTH_ADMIN_JSONPATH;
 		delete process.env.AUTH_ADMIN_ROLE;
@@ -60,6 +61,7 @@ describe("Pods MCP Tools", () => {
 		spyOn(coreApi, "deleteNamespacedPod").mockRestore();
 		spyOn(coreApi, "patchNamespacedPod").mockRestore();
 		spyOn(coreApi, "readNamespacedPodLog").mockRestore();
+		delete process.env.MANAGED_ONLY;
 	});
 
 	test("registers all pod tools", () => {
@@ -198,6 +200,37 @@ describe("Pods MCP Tools", () => {
 			});
 
 			expect(readSpy).toHaveBeenCalledTimes(0);
+			expect(deleteSpy).toHaveBeenCalledTimes(1);
+			expect(result.isError).toBeUndefined();
+		});
+
+		test("admin always reads pod first when managed-only is enabled", async () => {
+			process.env.AUTH_ENABLED = "true";
+			process.env.MANAGED_ONLY = "true";
+			const readSpy = spyOn(coreApi, "readNamespacedPod").mockResolvedValue({
+				metadata: {
+					name: "pod-1",
+					labels: {
+						"nogoo9/user-sub": "user-abc",
+						"nogoo9/managed-by": "nogoo9-spawner",
+					},
+				},
+			} as any);
+			const deleteSpy = spyOn(coreApi, "deleteNamespacedPod").mockResolvedValue(
+				{} as any,
+			);
+
+			const handler = registeredTools.get("delete_pod")!;
+			const result = await handler({
+				name: "pod-1",
+				jwtPayload: {
+					sub: "admin-user",
+					realm_access: { roles: ["nogoo9-admin"] },
+				},
+			});
+
+			// Pod is fetched for managed-by check even though user is admin
+			expect(readSpy).toHaveBeenCalledTimes(1);
 			expect(deleteSpy).toHaveBeenCalledTimes(1);
 			expect(result.isError).toBeUndefined();
 		});

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-05-29
+
+### Added
+
+- **Managed-Only Pod Access Control**: Pod tools (`list_pods`, `get_pod`, `delete_pod`, `patch_pod`, `get_pod_logs`) now only operate on pods labeled `nogoo9/managed-by=nogoo9-spawner` when `MANAGED_ONLY=true` (default). No one bypasses this — not even admins. ([ADR-008](docs/decisions/ADR-008-managed-only-pod-access-control.md))
+- **Unmanaged Pod Count**: `list_pods` reports `unmanagedCount` — the number of pods in the namespace not managed by this server — without leaking details.
+- **Auto-Label on Create**: `create_pod` automatically applies the `nogoo9/managed-by=nogoo9-spawner` label to all new pods.
+- **Server Capabilities Endpoint**: New `get_capabilities` MCP tool returns `{ enabledTools, managedOnly, authEnabled, isAdmin }` so UI clients can adapt their rendering.
+- **Capabilities-Aware UI**: Dashboard buttons (Delete, Stop, Spawn, Logs) are disabled when the corresponding MCP tool is not in the user's `enabledTools` list.
+- **Eager MCP Server Initialization**: The HTTP transport now creates the MCP server and evaluates RBAC permissions at startup rather than lazily on the first request. ([ADR-009](docs/decisions/ADR-009-eager-startup-health-check.md))
+- **Startup Health Check**: A K8s API connectivity probe (`listPods limit=1`) runs before the MCP server is created, with actionable HINT diagnostics for common deployment failures.
+
+### Fixed
+
+- **Missing `get_capabilities` in enabledTools**: The `get_capabilities` tool was not listed in the always-enabled tools set returned by `evaluatePermissions`.
+
+### Security
+
+- **Managed-only access gate**: Prevents information leakage from unmanaged pods in shared namespaces.
+
 ## [0.4.1] — 2026-05-29
 
 ### Changed

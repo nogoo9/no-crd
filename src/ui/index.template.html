@@ -385,6 +385,17 @@
       transform: scale(0.98) !important;
     }
 
+    /* Disabled button state */
+    .theme-button-primary:disabled,
+    .theme-button-secondary:disabled,
+    .theme-button-danger:disabled {
+      opacity: 0.4 !important;
+      cursor: not-allowed !important;
+      pointer-events: none !important;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
     /* Logo badge matching theme */
     .logo-badge {
       background-color: var(--accent-color) !important;
@@ -490,8 +501,9 @@
             <div class="flex items-center gap-2.5">
               <h2 class="text-xl font-bold tracking-tight theme-text-title">Kubernetes Pods</h2>
               <span id="pods-count" class="px-2 py-0.5 theme-badge-pill text-xs font-bold rounded-full">0</span>
+              <span id="unmanaged-count-info" class="text-[10px] theme-text-muted hidden"></span>
             </div>
-            <p class="text-xs theme-text-muted">Raw pods in namespace.</p>
+            <p class="text-xs theme-text-muted">Managed pods in namespace.</p>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm border-collapse">

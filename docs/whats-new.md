@@ -3,6 +3,16 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.4.2
+
+- **Managed-Only Pod Access Control** ([ADR-008](/decisions/ADR-008-managed-only-pod-access-control)): Pod tools (`list_pods`, `get_pod`, `delete_pod`, `patch_pod`, `get_pod_logs`) now only operate on pods labeled `nogoo9/managed-by=nogoo9-spawner` when `MANAGED_ONLY=true` (default). No one bypasses this — not even admins.
+- **Unmanaged Pod Count**: `list_pods` reports `unmanagedCount` — the number of pods in the namespace not managed by this server — without leaking details.
+- **Auto-Label on Create**: `create_pod` automatically applies the `nogoo9/managed-by=nogoo9-spawner` label to all new pods, ensuring they are visible under managed-only mode.
+- **Server Capabilities Endpoint**: New `get_capabilities` MCP tool returns `{ enabledTools, managedOnly, authEnabled, isAdmin }` so UI clients can adapt their rendering.
+- **Capabilities-Aware UI**: The dashboard now disables buttons (Delete, Stop, Spawn, Logs) when the corresponding MCP tool is not in the user's `enabledTools` list. Disabled buttons show a "Insufficient permissions" tooltip.
+- **Eager MCP Server Initialization** ([ADR-009](/decisions/ADR-009-eager-startup-health-check)): The HTTP transport now creates the MCP server and evaluates RBAC permissions at startup rather than lazily on the first request. If the Kubernetes API is unreachable, the server exits immediately with an actionable error instead of silently failing on every request.
+- **Startup Health Check**: A K8s API connectivity probe (`listPods limit=1`) runs before the MCP server is created. Failed deployments now produce clear log messages with hints for common issues (ECONNREFUSED, Unauthorized, missing RBAC bindings).
+
 ## What's New in v0.4.1
 
 - **Schema-Driven CLI Wrapper**: Refactored the command-line utility entrypoint to dynamically load parameter types, defaults, and validations directly from active configuration schemas, completely removing hardcoded flags logic.

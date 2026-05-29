@@ -138,10 +138,29 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
+	const errorMsg = err instanceof Error ? err.message : String(err);
+	const errorStack = err instanceof Error ? err.stack : undefined;
 	try {
-		logger.fatal("Application error: {error}", { error: err });
+		logger.fatal("Application failed to start: {error}", { error: errorMsg });
+		if (errorStack) {
+			logger.fatal("Stack trace: {stack}", { stack: errorStack });
+		}
+		// Provide actionable hints for common failure modes
+		if (errorMsg.includes("ECONNREFUSED") || errorMsg.includes("unreachable")) {
+			logger.fatal(
+				"HINT: The Kubernetes API server is not reachable. " +
+					"Check KUBERNETES_SERVICE_HOST, service account mount, and network policies.",
+			);
+		}
+		if (errorMsg.includes("Unauthorized") || errorMsg.includes("403")) {
+			logger.fatal(
+				"HINT: The service account lacks required RBAC permissions. " +
+					"Ensure a ClusterRole/Role with pod and configmap access is bound.",
+			);
+		}
 	} catch (_) {
-		console.error(err);
+		console.error("FATAL:", errorMsg);
+		if (errorStack) console.error(errorStack);
 	}
 	const Deno = (
 		globalThis as unknown as { Deno?: { exit?: (code: number) => void } }

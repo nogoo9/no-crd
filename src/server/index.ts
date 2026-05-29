@@ -96,9 +96,12 @@ async function getMcpServerAndTransport(req: Request): Promise<{
 		return activeSessions.get(sessionId)!;
 	}
 
-	logger.info("Creating new stateful server and session transport.");
-	const server = await createMcpServer(getK8sContext());
-	registerUiApp(server, DIST_DIR);
+	logger.info("Creating new stateful session transport.");
+	// Reuse eagerly-created server, or create if not available (e.g. tests)
+	const server = globalMcpServer ?? (await createMcpServer(getK8sContext()));
+	if (!globalMcpServer) {
+		registerUiApp(server, DIST_DIR);
+	}
 
 	const transport = new WebStandardStreamableHTTPServerTransport({
 		sessionIdGenerator: () => uuidv7(),
@@ -275,6 +278,44 @@ export async function startHttpServer(
 	}
 	globalIsStateless = config.server.stateless;
 
+	// ── Eager K8s connectivity check ──────────────────────────────────────────
+	const k8sCtx = getK8sContext();
+	const cluster = k8sCtx.kc.getCurrentCluster();
+	logger.info("Validating Kubernetes API connectivity to {server}...", {
+		server: cluster?.server ?? "(unknown)",
+	});
+	try {
+		await k8sCtx.coreApi.listNamespacedPod({
+			namespace: config.k8s.namespace,
+			limit: 1,
+		});
+		logger.info("Kubernetes API connectivity verified.");
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		logger.error(
+			"Failed to connect to Kubernetes API at {server}: {error}. " +
+				"Ensure the pod has a valid service account, the RBAC role is bound, " +
+				"and the cluster API server is reachable from this pod.",
+			{ server: cluster?.server ?? "(unknown)", error: msg },
+		);
+		throw new Error(
+			`Kubernetes API unreachable (${cluster?.server ?? "unknown"}): ${msg}`,
+		);
+	}
+
+	// ── Eager MCP server creation ─────────────────────────────────────────────
+	logger.info("Creating MCP server eagerly at startup...");
+	if (!globalIsStateless) {
+		globalMcpServer = await createMcpServer(k8sCtx);
+		registerUiApp(globalMcpServer, DIST_DIR);
+		logger.info("MCP server created and tools registered.");
+	} else {
+		logger.info(
+			"Stateless mode: MCP server will be created per-request (tools validated at first request).",
+		);
+	}
+
+	// ── TLS ───────────────────────────────────────────────────────────────────
 	const TLS_CERT_PATH = config.tls.cert;
 	const TLS_KEY_PATH = config.tls.key;
 	const TLS_CA_PATH = config.tls.ca;

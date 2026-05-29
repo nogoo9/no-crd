@@ -148,6 +148,7 @@ export async function evaluatePermissions(
 			"list_registry_images",
 			"current_namespace",
 			"check_permissions",
+			"get_capabilities",
 			...Object.keys(REQUIRED_PERMISSIONS),
 		];
 		return {
@@ -200,6 +201,7 @@ export async function evaluatePermissions(
 		"list_registry_images",
 		"current_namespace",
 		"check_permissions",
+		"get_capabilities",
 	];
 	const disabledTools: string[] = [];
 

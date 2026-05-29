@@ -17,6 +17,7 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-006](./ADR-006-packaged-ui-asset-resolution.md) | Packaged UI Asset and Built-in Resource Resolution | Accepted |
 | [ADR-007](./ADR-007-schema-driven-configuration.md) | Schema-Driven Configuration & Unified Annotation Keys | Accepted |
 | [ADR-008](./ADR-008-managed-only-pod-access-control.md) | Managed-Only Pod Access Control | Accepted |
+| [ADR-009](./ADR-009-eager-startup-health-check.md) | Eager MCP Server Initialization with K8s Health Check | Accepted |
 
 ## How to Read ADRs
 
@@ -38,6 +39,7 @@ graph LR
     ADR004 -.-> ADR006["ADR-006: Asset Resolution"]
     ADR001 -.-> ADR007["ADR-007: Schema Config"]
     ADR007 -.-> ADR008["ADR-008: Managed-Only Access"]
+    ADR008 -.-> ADR009["ADR-009: Eager Startup"]
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -46,6 +48,7 @@ graph LR
     style ADR006 fill:#22c55e,color:#fff
     style ADR007 fill:#22c55e,color:#fff
     style ADR008 fill:#f59e0b,color:#fff
+    style ADR009 fill:#f59e0b,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain
