@@ -3,7 +3,7 @@ import { App } from "@modelcontextprotocol/ext-apps";
 
 // Initialize the MCP App client bridge
 const app = new App(
-	{ name: "nogoo9-pod-manager", version: "0.4.1" },
+	{ name: "nogoo9-pod-manager", version: "0.5.0" },
 	{ tools: {} },
 );
 
@@ -54,6 +54,20 @@ let templates: Array<{
 	workspaceType?: string;
 	apis?: WorkspaceApi[];
 }> = [];
+
+// Server capabilities state
+let capabilities: {
+	enabledTools: string[];
+	managedOnly: boolean;
+	authEnabled: boolean;
+	isAdmin: boolean;
+} = {
+	enabledTools: [],
+	managedOnly: true,
+	authEnabled: false,
+	isAdmin: false,
+};
+let unmanagedCount: number | undefined;
 
 // Authentication & token state
 let activeToken = "";
@@ -321,6 +335,21 @@ async function refreshAll() {
 	}
 
 	try {
+		// 0. Fetch capabilities first (so we know what tools are available)
+		const capRes = await app.callServerTool({
+			name: "get_capabilities",
+			arguments: { jwtPayload: getJwtPayload() },
+		});
+		if (capRes && !capRes.isError && capRes.structuredContent) {
+			const cap = capRes.structuredContent as any;
+			capabilities = {
+				enabledTools: cap.enabledTools || [],
+				managedOnly: cap.managedOnly ?? true,
+				authEnabled: cap.authEnabled ?? false,
+				isAdmin: cap.isAdmin ?? false,
+			};
+		}
+
 		// 1. Get current namespace and mode
 		const nsRes = await app.callServerTool({
 			name: "current_namespace",
@@ -385,6 +414,7 @@ async function refreshAll() {
 		});
 		if (podsRes && !podsRes.isError && podsRes.structuredContent) {
 			pods = (podsRes.structuredContent as any).pods || [];
+			unmanagedCount = (podsRes.structuredContent as any).unmanagedCount;
 		} else if (podsRes?.isError) {
 			showError(
 				`Pods error: ${(podsRes.content?.[0] as any)?.text || "Unknown"}`,
@@ -551,7 +581,7 @@ function renderWorkspaces() {
           ${viewSpecBtnHtml}
           ${previewBtnHtml}
           ${openLinkHtml}
-          <button data-ws-id="${ws.id}" class="stop-ws-btn theme-button-danger inline-flex items-center gap-1 px-3 py-1.5 text-xs cursor-pointer">
+          <button data-ws-id="${ws.id}" class="stop-ws-btn theme-button-danger inline-flex items-center gap-1 px-3 py-1.5 text-xs cursor-pointer"${!capabilities.enabledTools.includes("stop_workspace") ? ' disabled title="Insufficient permissions"' : ""}>
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -603,6 +633,17 @@ function renderPods() {
 	if (!podsCount || !podsTableBody) return;
 	podsCount.textContent = String(pods.length);
 
+	// Show unmanaged count info
+	const unmanagedInfo = document.getElementById("unmanaged-count-info");
+	if (unmanagedInfo) {
+		if (unmanagedCount !== undefined && unmanagedCount > 0) {
+			unmanagedInfo.textContent = `(${unmanagedCount} unmanaged pod${unmanagedCount === 1 ? "" : "s"} not shown)`;
+			unmanagedInfo.classList.remove("hidden");
+		} else {
+			unmanagedInfo.classList.add("hidden");
+		}
+	}
+
 	if (pods.length === 0) {
 		podsTableBody.innerHTML = `
       <tr>
@@ -637,8 +678,8 @@ function renderPods() {
         <td class="px-6 py-4 font-mono theme-text-body">${pod.podIP || "-"}</td>
         <td class="px-6 py-4 text-right shrink-0">
           <div class="inline-flex gap-2">
-            <button data-pod-name="${pod.name}" class="view-logs-btn theme-button-secondary px-2.5 py-1 text-xs cursor-pointer">Logs</button>
-            <button data-pod-name="${pod.name}" class="delete-pod-btn theme-button-danger px-2.5 py-1 text-xs cursor-pointer">Delete</button>
+            <button data-pod-name="${pod.name}" class="view-logs-btn theme-button-secondary px-2.5 py-1 text-xs cursor-pointer"${!capabilities.enabledTools.includes("get_pod_logs") ? ' disabled title="Insufficient permissions"' : ""}>Logs</button>
+            <button data-pod-name="${pod.name}" class="delete-pod-btn theme-button-danger px-2.5 py-1 text-xs cursor-pointer"${!capabilities.enabledTools.includes("delete_pod") ? ' disabled title="Insufficient permissions"' : ""}>Delete</button>
           </div>
         </td>
       </tr>
@@ -722,7 +763,7 @@ function renderTemplates() {
             </svg>
             View Spec
           </button>
-          <button data-tmpl-name="${tmpl.name}" class="spawn-ws-modal-btn theme-button-primary px-3 py-1.5 text-xs flex items-center gap-1 cursor-pointer">
+          <button data-tmpl-name="${tmpl.name}" class="spawn-ws-modal-btn theme-button-primary px-3 py-1.5 text-xs flex items-center gap-1 cursor-pointer"${!capabilities.enabledTools.includes("spawn_workspace") ? ' disabled title="Insufficient permissions"' : ""}>
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
