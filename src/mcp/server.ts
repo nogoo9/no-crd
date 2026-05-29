@@ -26,7 +26,29 @@ export async function createMcpServer(
 ): Promise<McpServer> {
 	logger.info("Initializing MCP Server...");
 	const server = new McpServer({ name: "nogoo9", version: "0.5.0" });
-	const report = await evaluatePermissions(k8sContext, DEFAULT_NAMESPACE, MODE);
+
+	let report: Awaited<ReturnType<typeof evaluatePermissions>>;
+	try {
+		report = await evaluatePermissions(k8sContext, DEFAULT_NAMESPACE, MODE);
+	} catch (err) {
+		logger.error(
+			"Failed to evaluate RBAC permissions at startup. Server will boot with diagnostic tools only. Error: {error}",
+			{ error: err },
+		);
+		report = {
+			configuredFlags: { mode: MODE, namespace: DEFAULT_NAMESPACE },
+			permissions: {},
+			enabledTools: [
+				"list_registry_images",
+				"current_namespace",
+				"check_permissions",
+				"get_capabilities",
+				"list_templates",
+				"get_template",
+			],
+			disabledTools: [],
+		};
+	}
 
 	logger.info("Registering MCP tools and resources...");
 	registerPodTools(server, k8sContext, report.enabledTools);

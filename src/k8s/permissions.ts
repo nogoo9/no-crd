@@ -44,6 +44,14 @@ export interface PermissionReport {
 let cachedReport: PermissionReport | null = null;
 
 /**
+ * Clears the cached permission report. Intended for use in tests
+ * to prevent cross-suite cache contamination.
+ */
+export function clearPermissionCache(): void {
+	cachedReport = null;
+}
+
+/**
  * Checks a specific Kubernetes RBAC permission using the SelfSubjectAccessReview API.
  * Always returns true if `DISABLE_PERMISSION_CHECKS` environment variable is active.
  *
