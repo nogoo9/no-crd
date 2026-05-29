@@ -33,7 +33,6 @@ const DIST_DIR = __dirname.startsWith("/$bunfs/root")
 
 const logger = getLogger(["nogoo9", "server"]);
 
-let globalMcpServer: McpServer | null = null;
 let globalTransport: WebStandardStreamableHTTPServerTransport | null = null;
 let globalIsStateless = false;
 let globalK8sContext: K8sContext | null = null;
@@ -62,12 +61,17 @@ const activeSessions = new Map<
 >();
 
 /**
- * Retrieves the MCP Server and Streamable HTTP Transport instances.
+ * Creates a fresh MCP server + transport pair.
+ *
+ * Per the MCP SDK contract, each McpServer can only be connected to one
+ * transport. We follow the official "getServer()" factory pattern:
+ * every session (or request in stateless mode) gets its own instance.
  */
 async function getMcpServerAndTransport(req: Request): Promise<{
 	server: McpServer;
 	transport: WebStandardStreamableHTTPServerTransport;
 }> {
+	// ── Stateless mode: fresh server + transport per request ──────────────
 	if (globalIsStateless) {
 		logger.debug(
 			"Stateless mode enabled. Creating a new MCP Server and Transport instance.",
@@ -82,26 +86,35 @@ async function getMcpServerAndTransport(req: Request): Promise<{
 		return { server, transport };
 	}
 
+	// ── Test mode: injected transport via resetMcpServer() ────────────────
 	if (globalTransport) {
-		if (!globalMcpServer) {
-			globalMcpServer = await createMcpServer(getK8sContext());
-			registerUiApp(globalMcpServer, DIST_DIR);
-			await globalMcpServer.connect(globalTransport);
+		if (!globalTransport.sessionId) {
+			// First call — create a server and connect it to the injected transport
+			const server = await createMcpServer(getK8sContext());
+			registerUiApp(server, DIST_DIR);
+			await server.connect(globalTransport);
+			return { server, transport: globalTransport };
 		}
-		return { server: globalMcpServer, transport: globalTransport };
+		// Subsequent calls reuse the same transport (it's already connected)
+		// The SDK routes through transport.handleRequest().
+		// We need the server reference from activeSessions if stored,
+		// but for test mode this path just re-returns the transport.
+		const existing = activeSessions.get(globalTransport.sessionId);
+		if (existing) return existing;
+		// Fallback: create fresh
+		const server = await createMcpServer(getK8sContext());
+		registerUiApp(server, DIST_DIR);
+		await server.connect(globalTransport);
+		return { server, transport: globalTransport };
 	}
 
+	// ── Stateful mode: session-based server instances ─────────────────────
 	const sessionId = req.headers.get("mcp-session-id");
 	if (sessionId && activeSessions.has(sessionId)) {
 		return activeSessions.get(sessionId)!;
 	}
 
 	logger.info("Creating new stateful session transport.");
-	// Always create a fresh MCP server per session. A McpServer can only be
-	// connected to one transport — reusing globalMcpServer here would throw
-	// "already connected" on the second session. The eagerly-created
-	// globalMcpServer (from startHttpServer) is only used for startup
-	// validation; each session gets its own instance.
 	const server = await createMcpServer(getK8sContext());
 	registerUiApp(server, DIST_DIR);
 
@@ -141,12 +154,6 @@ export async function resetMcpServer(
 	}
 	activeSessions.clear();
 
-	if (globalMcpServer) {
-		try {
-			await globalMcpServer.close();
-		} catch (_) {}
-	}
-	globalMcpServer = null;
 	globalTransport = customTransport ?? null;
 	globalIsStateless = isStateless;
 	globalK8sContext = customK8sContext ?? null;
@@ -305,12 +312,15 @@ export async function startHttpServer(
 		);
 	}
 
-	// ── Eager MCP server creation ─────────────────────────────────────────────
-	logger.info("Creating MCP server eagerly at startup...");
+	// ── Eager MCP server validation (ADR-009) ────────────────────────────────
+	// Create a throwaway McpServer to validate that RBAC permissions allow
+	// tool registration. Each session will create its own instance later
+	// (per the MCP SDK "one server per transport" contract).
+	logger.info("Validating MCP tool registration at startup...");
 	if (!globalIsStateless) {
-		globalMcpServer = await createMcpServer(k8sCtx);
-		registerUiApp(globalMcpServer, DIST_DIR);
-		logger.info("MCP server created and tools registered.");
+		const validationServer = await createMcpServer(k8sCtx);
+		registerUiApp(validationServer, DIST_DIR);
+		logger.info("MCP server validated — tools registered successfully.");
 	} else {
 		logger.info(
 			"Stateless mode: MCP server will be created per-request (tools validated at first request).",
