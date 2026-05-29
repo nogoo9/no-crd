@@ -18,8 +18,6 @@ export const REQUIRED_PERMISSIONS: Record<string, RbacPermission[]> = {
 	patch_pod: [{ verb: "patch", resource: "pods" }],
 	get_pod_logs: [{ verb: "get", resource: "pods/log" }],
 	list_namespaces: [{ verb: "list", resource: "namespaces" }],
-	list_templates: [{ verb: "list", resource: "configmaps" }],
-	get_template: [{ verb: "get", resource: "configmaps" }],
 	create_template: [{ verb: "create", resource: "configmaps" }],
 	update_template: [{ verb: "update", resource: "configmaps" }],
 	delete_template: [{ verb: "delete", resource: "configmaps" }],
@@ -149,6 +147,8 @@ export async function evaluatePermissions(
 			"current_namespace",
 			"check_permissions",
 			"get_capabilities",
+			"list_templates",
+			"get_template",
 			...Object.keys(REQUIRED_PERMISSIONS),
 		];
 		return {
@@ -202,6 +202,8 @@ export async function evaluatePermissions(
 		"current_namespace",
 		"check_permissions",
 		"get_capabilities",
+		"list_templates",
+		"get_template",
 	];
 	const disabledTools: string[] = [];
 

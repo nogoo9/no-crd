@@ -9,6 +9,7 @@ import {
 	DEFAULT_NAMESPACE,
 	errorResult,
 	extractUserIdentity,
+	findLocalTemplate,
 	type K8sContext,
 	MODE,
 	type PodCreateArgs,
@@ -621,7 +622,7 @@ export function registerSpawnerTools(
 
 				try {
 					let parsedSpec: PodCreateArgs;
-					let annotations: Record<string, string>;
+					let annotations: Record<string, string> = {};
 
 					if (templateRef) {
 						const { ns: tmplNs, name: tmplName } = parseTemplateRef(
@@ -632,15 +633,32 @@ export function registerSpawnerTools(
 							k8sContext.coreApi,
 							tmplNs,
 							tmplName,
-						);
-						const raw = cm.data?.spec;
+						).catch(() => null);
+
+						let raw: string | undefined;
+						if (cm?.data?.spec) {
+							raw = cm.data.spec;
+						} else {
+							// Fallback to local/built-in templates
+							const localTmpl = findLocalTemplate(tmplName);
+							if (localTmpl) {
+								logger.warn(
+									"ConfigMap template '{templateRef}' not available (likely missing permissions). Using local template '{name}' instead.",
+									{ templateRef, name: localTmpl.name },
+								);
+								raw = JSON.stringify(localTmpl.spec);
+								annotations = { ...localTmpl.annotations };
+							}
+						}
+
 						if (!raw) {
 							const err = new Error(
-								`Template "${templateRef}" has no data.spec`,
+								`Template "${templateRef}" not found in ConfigMaps, local templates, or built-in templates`,
 							);
-							logger.error("Template invalid: {error}", { error: err });
+							logger.error("Template not found: {error}", { error: err });
 							return errorResult(k8sContext.kc, err, { id, podName: "" });
 						}
+
 						const interpolatedRaw = raw
 							.replaceAll(VAR_USER, templateUser)
 							.replaceAll(VAR_WORKSPACE_ID, id)
@@ -649,8 +667,7 @@ export function registerSpawnerTools(
 							parseSpecString(interpolatedRaw),
 						) as PodCreateArgs;
 
-						annotations = {};
-						if (cm.metadata?.annotations) {
+						if (cm?.metadata?.annotations) {
 							for (const [k, v] of Object.entries(cm.metadata.annotations)) {
 								if (k === "__proto__" || k === "constructor") continue;
 								Object.defineProperty(annotations, k, {

@@ -32,6 +32,7 @@ export {
 	type K8sErrorDetails,
 } from "./errors.js";
 export {
+	findLocalTemplate,
 	type LocalTemplate,
 	listLocalTemplates,
 	parseSpecString,

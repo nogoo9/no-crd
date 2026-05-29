@@ -113,14 +113,19 @@ users:
 		expect(report.configuredFlags.mode).toBe("cluster");
 		expect(report.configuredFlags.namespace).toBe("test-ns");
 		expect(report.permissions.pods?.list).toBe(true);
-		expect(report.permissions.configmaps?.list).toBe(false);
+		expect(report.permissions.configmaps?.create).toBe(false);
 
 		// Pod tools should be enabled
 		expect(report.enabledTools).toContain("list_pods");
 		expect(report.enabledTools).toContain("get_pod");
 
-		// ConfigMap template tools should be disabled
-		expect(report.disabledTools).toContain("list_templates");
-		expect(report.disabledTools).toContain("get_template");
+		// Template read tools should be enabled (graceful ConfigMap fallback — see ADR-010)
+		expect(report.enabledTools).toContain("list_templates");
+		expect(report.enabledTools).toContain("get_template");
+
+		// Template write tools should be disabled (require ConfigMap write access)
+		expect(report.disabledTools).toContain("create_template");
+		expect(report.disabledTools).toContain("update_template");
+		expect(report.disabledTools).toContain("delete_template");
 	});
 });

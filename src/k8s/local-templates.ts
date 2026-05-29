@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { getLogger } from "@logtape/logtape";
 import { load as yamlLoad } from "js-yaml";
+import { config } from "~/config/index.js";
 
 const logger = getLogger(["nogoo9", "local-templates"]);
 
@@ -151,5 +152,25 @@ export function readLocalTemplate(
 		}
 	}
 
+	return null;
+}
+
+/**
+ * Tries to find a local or built-in template by name.
+ * Checks custom `TEMPLATES_DIR` first, then the built-in templates directory.
+ *
+ * @param name Template name (without extension).
+ * @returns The parsed template, or `null` if not found in any source.
+ */
+export function findLocalTemplate(name: string): LocalTemplate | null {
+	const k8sCfg = config.k8s;
+	if (k8sCfg.templatesDir) {
+		const found = readLocalTemplate(k8sCfg.templatesDir, name);
+		if (found) return found;
+	}
+	if (k8sCfg.builtinTemplates) {
+		const found = readLocalTemplate(k8sCfg.builtinTemplatesDir, name);
+		if (found) return found;
+	}
 	return null;
 }

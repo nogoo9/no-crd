@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-05-29
+
+### Fixed
+
+- **Graceful ConfigMap Template Fallback**: `list_templates` and `spawn_workspace` no longer crash when the service account lacks `configmaps` RBAC permissions. They now fall back to local/built-in templates with a warning, instead of returning an error. ([ADR-010](docs/decisions/ADR-010-graceful-configmap-template-fallback.md))
+- **Template Read Tools Always Available**: `list_templates` and `get_template` are now unconditionally registered regardless of ConfigMap permissions, ensuring local/built-in templates are always accessible.
+
 ## [0.5.0] — 2026-05-29
 
 ### Added
