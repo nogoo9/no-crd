@@ -14,7 +14,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 // the actual pod filtering happens inside MCP tool handlers
 // that require a full K8s context mock (covered by integration tests).
 
-import { ListPodsOutputSchema } from "../mcp/pods.js";
+import { ListPodsOutputSchema } from "~/mcp/pods.js";
 
 describe("Managed-Only Pod Access Control", () => {
 	const originalManagedOnly = process.env.MANAGED_ONLY;
