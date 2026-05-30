@@ -457,15 +457,23 @@ function renderWorkspaces() {
 
 	if (workspaces.length === 0) {
 		workspacesList.innerHTML = `
-      <div class="p-6 text-center theme-text-muted text-sm">
+      <div class="py-8 text-center theme-text-muted text-sm">
         No active workspaces. Click a template to spawn one.
       </div>
     `;
 		return;
 	}
 
+	const collapsedListStr =
+		localStorage.getItem("nocr_collapsed_workspaces") || "[]";
+	let collapsedIds: string[] = [];
+	try {
+		collapsedIds = JSON.parse(collapsedListStr);
+	} catch (_) {}
+
 	workspacesList.innerHTML = workspaces
 		.map((ws) => {
+			const isCollapsed = collapsedIds.includes(ws.id);
 			let statusClass = "status-unknown";
 			let pulseDot = "";
 			if (ws.status === "Running") {
@@ -489,7 +497,7 @@ function renderWorkspaces() {
 				const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
 				const workspaceUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
 				openLinkHtml = `
-					<a href="${workspaceUrl}" target="_blank" class="theme-button-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer">
+					<a href="${workspaceUrl}" target="_blank" class="theme-button-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer text-center">
 						<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
 						</svg>
@@ -520,7 +528,7 @@ function renderWorkspaces() {
 			}
 
 			let infoHtml = "";
-			if (ws.podIP) {
+			if (ws.podIP || ws.templateRef) {
 				let apisHtml = "";
 				if (ws.apis && ws.apis.length > 0) {
 					apisHtml = ws.apis
@@ -528,70 +536,167 @@ function renderWorkspaces() {
 							const apiPath = api.path.startsWith("/")
 								? api.path
 								: `/${api.path}`;
-							const methodBadge = api.method
-								? `<span class="opacity-75 text-[9px] uppercase font-bold mr-0.5">${api.method.split(",")[0]}</span>`
-								: "";
+							const methodText = api.method
+								? api.method.split(",")[0].toUpperCase()
+								: "GET";
+							let methodClass =
+								"bg-neutral-500/10 text-neutral-600 dark:text-neutral-400 border border-neutral-500/20";
+							if (methodText === "GET") {
+								methodClass =
+									"bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20";
+							} else if (methodText === "POST") {
+								methodClass =
+									"bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
+							} else if (methodText === "WS" || methodText === "WEBSOCKET") {
+								methodClass =
+									"bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20";
+							}
+
 							const tooltip = api.desc ? `title="${api.desc}"` : "";
 							const tokenQuery = activeToken
 								? `?token=${encodeURIComponent(activeToken)}`
 								: "";
 							const linkUrl = `${basePath}/route/${ws.id}${apiPath}${tokenQuery}`;
-							return `<a href="${linkUrl}" target="_blank" ${tooltip} class="px-2 py-0.5 theme-button-secondary rounded text-[10px] font-medium transition hover:brightness-110 flex items-center gap-1">
-								${methodBadge}${api.name}
-							</a>`;
+							const isGet = methodText === "GET";
+							const pathHtml = isGet
+								? `<a href="${linkUrl}" target="_blank" ${tooltip} class="theme-text-link hover:underline break-all">${apiPath}</a>`
+								: `<span ${tooltip} class="theme-text-muted break-all">${apiPath}</span>`;
+							return `
+								<tr class="hover:bg-[var(--panel-hover-bg)] transition-colors duration-150">
+									<td class="px-4 py-2.5 font-bold theme-text-title">${api.name}</td>
+									<td class="px-4 py-2.5 font-mono">
+										<span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase font-mono tracking-wider ${methodClass}">
+											${methodText}
+										</span>
+									</td>
+									<td class="px-4 py-2.5 font-mono">
+										${pathHtml}
+									</td>
+									<td class="px-4 py-2.5 theme-text-muted leading-normal">${api.desc || "-"}</td>
+								</tr>
+							`;
 						})
-						.join(" ");
+						.join("");
 				}
 
-				infoHtml = `<div class="text-[10px] theme-text-muted mt-1 flex flex-col gap-1.5">
-					<div class="flex flex-wrap gap-x-3 gap-y-1">
-						<span><strong>IP:</strong> <span class="font-mono">${ws.podIP}</span></span>
+				infoHtml = `<div class="text-xs theme-text-muted mt-2 space-y-4">
+					<div class="flex flex-wrap gap-2.5">
+						${ws.templateRef ? `<span><strong>Template:</strong> <span class="px-1.5 py-0.5 theme-badge-pill text-[10px] font-bold rounded-md font-mono">${ws.templateRef}</span></span>` : ""}
+						${ws.podIP ? `<span><strong>IP:</strong> <span class="font-mono">${ws.podIP}</span></span>` : ""}
 						${ws.port ? `<span><strong>Port:</strong> <span class="font-mono">${ws.port}</span></span>` : ""}
 						${ws.userSub ? `<span><strong>Owner:</strong> <span class="font-mono">${ws.userSub}</span></span>` : ""}
 					</div>
-					${apisHtml ? `<div class="flex flex-wrap gap-1.5 items-center mt-0.5"><strong>APIs:</strong> ${apisHtml}</div>` : ""}
+					${
+						apisHtml
+							? `
+					<div class="space-y-2 mt-3">
+						<div class="text-[10px] font-bold theme-text-muted uppercase tracking-wider">Workspace Endpoints</div>
+						<div class="overflow-x-auto">
+							<table class="w-full text-left text-xs border-collapse min-w-[500px]">
+								<thead>
+									<tr class="theme-table-header opacity-75 uppercase text-[9px] font-bold tracking-wider">
+										<th class="px-4 py-2">Name</th>
+										<th class="px-4 py-2">Method</th>
+										<th class="px-4 py-2">Path</th>
+										<th class="px-4 py-2">Description</th>
+									</tr>
+								</thead>
+								<tbody>
+									${apisHtml}
+								</tbody>
+							</table>
+						</div>
+					</div>`
+							: ""
+					}
 				</div>`;
 			}
 
 			return `
-      <div class="theme-card-row p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition">
-        <div class="flex items-center gap-3">
-          <span class="theme-icon-box">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </span>
-          <div>
-            <h4 class="font-bold theme-text-title text-sm flex items-center gap-2">
-              ${ws.name}
-            </h4>
-            <p class="text-xs theme-text-muted font-mono mt-0.5">
-              ID: ${ws.id}
-              ${ws.templateRef ? ` | Template: <span class="px-1.5 py-0.5 theme-badge-pill text-[10px] font-bold rounded-md">${ws.templateRef}</span>` : ""}
-            </p>
-            ${infoHtml}
+      <div data-ws-id="${ws.id}" class="theme-card-row w-full p-6 flex flex-col justify-between transition workspace-card ${isCollapsed ? "is-collapsed" : ""}">
+        <!-- Card Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <button class="toggle-details-btn p-1 rounded hover:bg-neutral-200 dark:hover:bg-neutral-800 transition cursor-pointer shrink-0" data-ws-id="${ws.id}" title="Toggle Details">
+              <svg class="w-4 h-4 transform transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <span class="theme-icon-box shrink-0">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </span>
+            <div class="min-w-0">
+              <h4 class="font-bold theme-text-title text-sm truncate" title="${ws.name}">
+                ${ws.name}
+              </h4>
+              <div class="text-[11px] theme-text-muted font-mono mt-0.5 truncate">
+                ID: ${ws.id}
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+            <span class="px-2.5 py-1 text-[11px] font-bold rounded-lg flex items-center gap-1.5 shrink-0 ${statusClass}">
+              ${pulseDot}
+              ${ws.status}
+            </span>
+            ${openLinkHtml}
+            <button data-ws-id="${ws.id}" class="stop-ws-btn theme-button-danger inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer"${!capabilities.enabledTools.includes("stop_workspace") ? ' disabled title="Insufficient permissions"' : ""}>
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Stop
+            </button>
           </div>
         </div>
 
-        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-          <span class="px-2.5 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 ${statusClass}">
-            ${pulseDot}
-            ${ws.status}
-          </span>
-          ${viewSpecBtnHtml}
-          ${previewBtnHtml}
-          ${openLinkHtml}
-          <button data-ws-id="${ws.id}" class="stop-ws-btn theme-button-danger inline-flex items-center gap-1 px-3 py-1.5 text-xs cursor-pointer"${!capabilities.enabledTools.includes("stop_workspace") ? ' disabled title="Insufficient permissions"' : ""}>
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Stop
-          </button>
+        <!-- Card Collapsible Details -->
+        <div class="workspace-details mt-4 flex flex-col gap-4">
+          ${infoHtml}
+          <div class="flex items-center gap-2 mt-1">
+            ${viewSpecBtnHtml}
+            ${previewBtnHtml}
+          </div>
         </div>
       </div>
     `;
 		})
 		.join("");
+
+	// Attach collapse/expand toggle listener
+	document.querySelectorAll(".toggle-details-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", (e: Event) => {
+			const target = e.currentTarget as HTMLButtonElement;
+			const wsId = target.getAttribute("data-ws-id");
+			if (!wsId) return;
+
+			const card = target.closest(".workspace-card");
+			if (!card) return;
+
+			const currentCollapsedStr =
+				localStorage.getItem("nocr_collapsed_workspaces") || "[]";
+			let currentCollapsedIds: string[] = [];
+			try {
+				currentCollapsedIds = JSON.parse(currentCollapsedStr);
+			} catch (_) {}
+
+			if (card.classList.contains("is-collapsed")) {
+				card.classList.remove("is-collapsed");
+				currentCollapsedIds = currentCollapsedIds.filter((id) => id !== wsId);
+			} else {
+				card.classList.add("is-collapsed");
+				if (!currentCollapsedIds.includes(wsId)) {
+					currentCollapsedIds.push(wsId);
+				}
+			}
+			localStorage.setItem(
+				"nocr_collapsed_workspaces",
+				JSON.stringify(currentCollapsedIds),
+			);
+		});
+	});
 
 	// Attach event listeners
 	document.querySelectorAll(".stop-ws-btn").forEach((btn: Element) => {
@@ -1251,9 +1356,25 @@ async function openWsSpecModal(wsId: string) {
 			if (data.apis && data.apis.length > 0) {
 				const apisList = data.apis
 					.map((api: any) => {
-						const methodText = api.method ? ` [${api.method}]` : "";
+						const apiPath = api.path.startsWith("/")
+							? api.path
+							: `/${api.path}`;
+						const methodText = api.method
+							? api.method.split(",")[0].toUpperCase()
+							: "GET";
+						const tokenQuery = activeToken
+							? `?token=${encodeURIComponent(activeToken)}`
+							: "";
+						const linkUrl = `${basePath}/route/${wsId}${apiPath}${tokenQuery}`;
+						const isGet = methodText === "GET";
+
+						const methodBadge = api.method ? ` [${api.method}]` : "";
 						const descText = api.desc ? ` - ${api.desc}` : "";
-						return `<div class="text-xs theme-text-body font-mono break-all">• ${api.name} (Port ${api.port}, Path ${api.path})${methodText}${descText}</div>`;
+						const pathHtml = isGet
+							? `<a href="${linkUrl}" target="_blank" class="theme-text-link hover:underline break-all">${api.path}</a>`
+							: `<span class="theme-text-muted break-all">${api.path}</span>`;
+
+						return `<div class="text-xs theme-text-body font-mono break-all">• ${api.name} (Port ${api.port}, Path ${pathHtml})${methodBadge}${descText}</div>`;
 					})
 					.join("");
 				apisHtml = `
