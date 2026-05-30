@@ -343,7 +343,7 @@ export function registerSpawnerTools(
 						labels: pod.metadata?.labels ?? {},
 						templateRef: annotations[ANNOTATION_KEYS.TEMPLATE_REF],
 						apis,
-						spec: pod.spec,
+						spec: pod.spec ? JSON.parse(JSON.stringify(pod.spec)) : undefined,
 					};
 					const fullWorkspaceObj = {
 						metadata: {
