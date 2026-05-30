@@ -6,18 +6,11 @@
 
 > **Agent-Driven, On-Demand Pod Orchestration in Kubernetes — Without Custom Resource Definitions.**
 
-[![npm version](https://img.shields.io/npm/v/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
-[![npm downloads](https://img.shields.io/npm/dm/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
-[![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg?style=flat-square)](https://nogoo9.github.io/no-crd/)
-[![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE)
-[![Coverage Status](https://img.shields.io/coveralls/github/nogoo9/no-crd?style=flat-square)](https://coveralls.io/github/nogoo9/no-crd?branch=main)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/nogoo9/no-crd/badge)](https://securityscorecards.dev/viewer/?uri=github.com/nogoo9/no-crd)
-[![Model Context Protocol](https://img.shields.io/badge/MCP-Server-orange.svg?style=flat-square)](https://modelcontextprotocol.io)
-[![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.11-black?logo=bun&style=flat-square)](https://bun.sh)
-[![Deno](https://img.shields.io/badge/Deno-compatible-blue?logo=deno&style=flat-square)](https://deno.land)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.14.0-green?logo=node.js&style=flat-square)](https://nodejs.org)
-[![Antigravity](https://img.shields.io/badge/Built%20with-Antigravity-blue?logo=google&style=flat-square)](https://antigravity.google)
-[![Gemini](https://img.shields.io/badge/Powered%20by-Gemini-orange?logo=google&style=flat-square)](https://deepmind.google/technologies/gemini/)
+[![npm version](https://img.shields.io/npm/v/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd) [![npm downloads](https://img.shields.io/npm/dm/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd) [![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg?style=flat-square)](https://nogoo9.github.io/no-crd/) [![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE) [![Coverage Status](https://img.shields.io/coveralls/github/nogoo9/no-crd?style=flat-square)](https://coveralls.io/github/nogoo9/no-crd?branch=main) [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/nogoo9/no-crd/badge)](https://securityscorecards.dev/viewer/?uri=github.com/nogoo9/no-crd)
+
+[![Model Context Protocol](https://img.shields.io/badge/MCP-Server-orange.svg?style=flat-square)](https://modelcontextprotocol.io) [![Built with Antigravity](https://img.shields.io/badge/Built%20with-Antigravity-blue?logo=google&style=flat-square)](https://antigravity.google) [![Powered by Gemini](https://img.shields.io/badge/Powered%20by-Gemini-orange?logo=google&style=flat-square)](https://deepmind.google/technologies/gemini/)
+
+[![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.11-black?logo=bun&style=flat-square)](https://bun.sh) [![Deno](https://img.shields.io/badge/Deno-compatible-blue?logo=deno&style=flat-square)](https://deno.land) [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.14.0-green?logo=node.js&style=flat-square)](https://nodejs.org)
 
 `@nogoo9/no-crd` is a lightweight, cross-runtime Model Context Protocol (MCP) server that empowers AI agents and APIs to dynamically spawn, route to, and manage ephemeral containerized sandboxes on standard Kubernetes (k8s/k3s) clusters — **without requiring Custom Resource Definitions (CRDs)**, cluster-level operators, or elevated RBAC permissions. 
 
