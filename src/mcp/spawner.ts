@@ -623,6 +623,7 @@ export function registerSpawnerTools(
 				try {
 					let parsedSpec: PodCreateArgs;
 					let annotations: Record<string, string> = {};
+					const templateLabels: Record<string, string> = {};
 
 					if (templateRef) {
 						const { ns: tmplNs, name: tmplName } = parseTemplateRef(
@@ -648,6 +649,20 @@ export function registerSpawnerTools(
 								);
 								raw = JSON.stringify(localTmpl.spec);
 								annotations = { ...localTmpl.annotations };
+								if (localTmpl.labels) {
+									for (const [k, v] of Object.entries(localTmpl.labels)) {
+										if (k === "__proto__" || k === "constructor") continue;
+										Object.defineProperty(templateLabels, k, {
+											value: v
+												.replaceAll(VAR_USER, templateUser)
+												.replaceAll(VAR_WORKSPACE_ID, id)
+												.replaceAll(VAR_WORKSPACE, id),
+											writable: true,
+											enumerable: true,
+											configurable: true,
+										});
+									}
+								}
 							}
 						}
 
@@ -671,6 +686,21 @@ export function registerSpawnerTools(
 							for (const [k, v] of Object.entries(cm.metadata.annotations)) {
 								if (k === "__proto__" || k === "constructor") continue;
 								Object.defineProperty(annotations, k, {
+									value: v
+										.replaceAll(VAR_USER, templateUser)
+										.replaceAll(VAR_WORKSPACE_ID, id)
+										.replaceAll(VAR_WORKSPACE, id),
+									writable: true,
+									enumerable: true,
+									configurable: true,
+								});
+							}
+						}
+
+						if (cm?.metadata?.labels) {
+							for (const [k, v] of Object.entries(cm.metadata.labels)) {
+								if (k === "__proto__" || k === "constructor") continue;
+								Object.defineProperty(templateLabels, k, {
 									value: v
 										.replaceAll(VAR_USER, templateUser)
 										.replaceAll(VAR_WORKSPACE_ID, id)
@@ -741,6 +771,7 @@ export function registerSpawnerTools(
 						);
 					}
 					parsedSpec.labels = {
+						...templateLabels,
 						...(parsedSpec.labels || {}),
 						[ANNOTATION_KEYS.TYPE]: "workspace",
 						[ANNOTATION_KEYS.WORKSPACE_ID]: id,

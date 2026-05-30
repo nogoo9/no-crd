@@ -23,6 +23,7 @@ export const ANNOTATION_KEYS = {
 	MANAGED_BY: "nogoo9/managed-by",
 	WORKSPACE_NAME: "nogoo9/workspace-name",
 	TEMPLATE_REF: "nogoo9/template-ref",
+	INIT_SHARE_VOLUMES: "nogoo9/init-share-volumes",
 } as const;
 
 export const ANNOTATION_METADATA: AnnotationParam[] = [
@@ -85,6 +86,12 @@ export const ANNOTATION_METADATA: AnnotationParam[] = [
 		type: "Annotation (Shell command)",
 		description:
 			"The shell command to run in the init-container. It automatically shares the main container's volume mounts.",
+	},
+	{
+		key: ANNOTATION_KEYS.INIT_SHARE_VOLUMES,
+		type: 'Annotation ("true" | "false")',
+		description:
+			"Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`.",
 	},
 	{
 		key: ANNOTATION_KEYS.PRE_STOP_COMMAND,
