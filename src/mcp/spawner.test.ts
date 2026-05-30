@@ -542,6 +542,7 @@ spec:
 				expect(body.metadata.labels["custom-local-label"]).toBe(
 					"val-test-user-identity",
 				);
+				expect(body.metadata.labels["nogoo9/pod-template"]).toBe("true");
 				// System labels should still exist and not be overridden
 				expect(body.metadata.labels["nogoo9/type"]).toBe("workspace");
 				expect(body.metadata.labels["nogoo9/workspace-id"]).toBe("ws-test");

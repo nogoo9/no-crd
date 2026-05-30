@@ -1,5 +1,7 @@
 metadata:
   name: default-agent-workspace
+  labels:
+    nogoo9/pod-template: "true"
   annotations:
     nogoo9/description: "Default agent workspace with HTTP echo server"
     nogoo9/tag: default

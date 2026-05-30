@@ -1,5 +1,7 @@
 metadata:
-  name: workspace-terminal
+  name: workspace-terminal-default
+  labels:
+    nogoo9/custom-label: "custom-label"
   annotations:
     nogoo9/description: "Interactive web terminal in the workspace sandbox"
     nogoo9/tag: terminal

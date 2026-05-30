@@ -1,5 +1,7 @@
 metadata:
   name: open-webui
+  labels:
+    nogoo9/pod-template: "true"
   annotations:
     nogoo9/description: "Open WebUI - User-friendly WebUI for LLMs"
     nogoo9/tag: chat

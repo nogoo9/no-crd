@@ -403,6 +403,40 @@
       color: #ffffff !important;
       box-shadow: 0 10px 15px -3px rgba(204, 120, 92, 0.2) !important;
     }
+
+    /* Workspace Premium Card Layout */
+    #workspaces-list .theme-card-row {
+      border: 1px solid var(--panel-border) !important;
+      border-radius: 12px !important;
+      background-color: rgba(255, 255, 255, 0.01);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    #workspaces-list .theme-card-row:hover {
+      background-color: var(--panel-hover-bg) !important;
+      border-color: var(--accent-color) !important;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    /* Collapsible card styling */
+    #workspaces-list .workspace-card.is-collapsed .workspace-details {
+      display: none !important;
+    }
+    #workspaces-list .workspace-card.is-collapsed .toggle-details-btn svg {
+      transform: rotate(-90deg);
+    }
+    #workspaces-list .toggle-details-btn svg {
+      transition: transform 0.2s ease;
+    }
+    #workspaces-list .toggle-details-btn {
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+    }
+    #workspaces-list .toggle-details-btn:hover {
+      color: var(--text-title);
+      background-color: var(--panel-hover-bg);
+    }
   </style>
   <style id="custom-theme-style"></style>
 </head>
@@ -497,9 +531,9 @@
             </div>
             <p class="text-xs theme-text-muted">Agent sandboxes running inside the cluster.</p>
           </div>
-          <div id="workspaces-list" class="theme-divide-y">
+          <div id="workspaces-list" class="flex flex-col gap-6 p-6">
             <!-- Dynamic workspace items inserted here -->
-            <div class="p-6 text-center theme-text-muted text-sm">No active workspaces. Click a template to spawn one.</div>
+            <div class="py-8 text-center theme-text-muted text-sm">No active workspaces. Click a template to spawn one.</div>
           </div>
         </div>
  

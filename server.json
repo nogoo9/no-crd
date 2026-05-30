@@ -6,13 +6,13 @@
     "url": "https://github.com/nogoo9/no-crd",
     "source": "github"
   },
-  "version": "0.5.5",
+  "version": "0.5.6",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@nogoo9/no-crd",
-      "version": "0.5.5",
+      "version": "0.5.6",
       "runtimeHint": "bunx",
       "transport": {
         "type": "stdio"

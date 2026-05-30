@@ -3,6 +3,10 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.5.6
+
+- **Built-in Local Fallback Templates**: Dynamically attach the `nogoo9/pod-template` label in the local template parser so that fallback workspaces automatically inherit the template discovery label without modifying the YAML files.
+
 ## What's New in v0.5.5
 
 - **Template Label Merging**: Corrected the bug where metadata labels defined in templates (both cluster-level ConfigMaps and local templates) were not merged into the spawned workspace pod's labels.
