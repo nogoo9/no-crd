@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Built-in Local Fallback Templates**: Added the `nogoo9/pod-template` label to all built-in templates (`default-agent-workspace.yaml`, `open-webui.yaml`, and `workspace-terminal.yaml`) to resolve a discrepancy where pods spawned from fallback templates did not inherit the template discovery label.
+- **Built-in Local Fallback Templates**: Dynamically attach the `nogoo9/pod-template` label in the local template parser so that fallback workspaces automatically inherit the template discovery label without modifying the YAML files.
 
 ## [0.5.5] — 2026-05-30
 

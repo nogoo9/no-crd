@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { getLogger } from "@logtape/logtape";
 import { load as yamlLoad } from "js-yaml";
-import { config } from "~/config/index.js";
+import { ANNOTATION_KEYS, config } from "~/config/index.js";
 
 const logger = getLogger(["nogoo9", "local-templates"]);
 
@@ -79,7 +79,10 @@ export function parseTemplateContent(
 	const name =
 		(metadata.name as string) || basename(filename, extname(filename));
 	const annotations = (metadata.annotations ?? {}) as Record<string, string>;
-	const labels = metadata.labels as Record<string, string> | undefined;
+	const labels = {
+		[ANNOTATION_KEYS.POD_TEMPLATE]: "true",
+		...(metadata.labels as Record<string, string> | undefined),
+	};
 
 	return { name, annotations, labels, spec };
 }
