@@ -6,16 +6,11 @@
 
 > **Agent-Driven, On-Demand Pod Orchestration in Kubernetes — Without Custom Resource Definitions.**
 
-[![npm version](https://img.shields.io/npm/v/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
-[![npm downloads](https://img.shields.io/npm/dm/@nogoo9%2Fno-crd.svg?style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd)
-[![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg?style=flat-square)](https://nogoo9.github.io/no-crd/)
-[![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE)
-[![Coverage Status](https://img.shields.io/coveralls/github/nogoo9/no-crd?style=flat-square)](https://coveralls.io/github/nogoo9/no-crd?branch=main)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/nogoo9/no-crd/badge)](https://securityscorecards.dev/viewer/?uri=github.com/nogoo9/no-crd)
-[![Model Context Protocol](https://img.shields.io/badge/MCP-Server-orange.svg?style=flat-square)](https://modelcontextprotocol.io)
-[![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.11-black?logo=bun&style=flat-square)](https://bun.sh)
-[![Deno](https://img.shields.io/badge/Deno-compatible-blue?logo=deno&style=flat-square)](https://deno.land)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.14.0-green?logo=node.js&style=flat-square)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/@nogoo9%2Fno-crd.svg?color=c65f5f&logo=npm&logoColor=ffffff&style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd) [![npm downloads](https://img.shields.io/npm/dm/@nogoo9%2Fno-crd.svg?color=c65f5f&logo=npm&logoColor=ffffff&style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd) [![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-5f7f9f.svg?logo=github&logoColor=ffffff&style=flat-square)](https://nogoo9.github.io/no-crd/) [![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?color=c65f5f&style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE) [![Coverage Status](https://img.shields.io/coveralls/github/nogoo9/no-crd?color=6fa37f&style=flat-square)](https://coveralls.io/github/nogoo9/no-crd?branch=main) [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/nogoo9/no-crd/badge)](https://securityscorecards.dev/viewer/?uri=github.com/nogoo9/no-crd) [![Semgrep](https://img.shields.io/badge/Security-Semgrep-80679c?logo=semgrep&logoColor=ffffff&style=flat-square)](https://semgrep.dev/)
+
+[![Model Context Protocol](https://img.shields.io/badge/MCP-Server-d87258?style=flat-square)](https://modelcontextprotocol.io) [![Built with Antigravity](https://img.shields.io/badge/Built%20with-Antigravity-4f7ac7?logo=google&logoColor=ffffff&style=flat-square)](https://antigravity.google) [![Powered by Gemini](https://img.shields.io/badge/Powered%20by-Gemini-7b66c4?logo=google&logoColor=ffffff&style=flat-square)](https://deepmind.google/technologies/gemini/)
+
+[![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.11-b85b75?logo=bun&logoColor=ffffff&style=flat-square)](https://bun.sh) [![Deno](https://img.shields.io/badge/Deno-compatible-4a4e57?logo=deno&logoColor=ffffff&style=flat-square)](https://deno.land) [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.14.0-4e824e?logo=node.js&logoColor=ffffff&style=flat-square)](https://nodejs.org)
 
 `@nogoo9/no-crd` is a lightweight, cross-runtime Model Context Protocol (MCP) server that empowers AI agents and APIs to dynamically spawn, route to, and manage ephemeral containerized sandboxes on standard Kubernetes (k8s/k3s) clusters — **without requiring Custom Resource Definitions (CRDs)**, cluster-level operators, or elevated RBAC permissions. 
 
@@ -98,6 +93,162 @@ When running the MCP server or proxy under **Bun** (versions before the fix in [
 *   **Symptoms**: WebSocket connections (e.g. term/GUI access to workspace pods) hang, fail, or return `400 Bad Request` followed by immediate termination.
 *   **Root Cause**: Bun's native HTTP parser doesn't switch the socket into raw streaming mode in userland quickly enough when the `upgrade` event handler executes asynchronously. The native C++ HTTP parser keeps expecting subsequent payloads to be HTTP requests and rejects them.
 *   **Mitigation**: Run the production container or daemon using **Node.js** (`node dist/server-entry.js` or `npx tsx src/server-entry.ts`) where the upgrade flow behaves natively.
+
+---
+
+## 🛠️ MCP Integration Configs
+
+To let AI coding assistants (like Claude Desktop, Cursor, Cline, or Roo Code) orchestrate Kubernetes workspaces, add `@nogoo9/no-crd` to your MCP configuration. Choose the configuration block below that matches your deployment mode (**Cluster-Wide** vs. **Namespace-Scoped**).
+
+### 1. Claude CLI / Claude Desktop
+Add to your server configurations (usually `~/.config/Claude/config.json` or `~/Library/Application Support/Claude/config.json`):
+
+#### Cluster-Wide Mode
+```json
+{
+  "mcpServers": {
+    "no-crd": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nogoo9/no-crd",
+        "--transport",
+        "stdio",
+        "--mode",
+        "cluster",
+        "--namespace",
+        "nogoo9"
+      ]
+    }
+  }
+}
+```
+
+#### Namespace-Scoped Mode
+```json
+{
+  "mcpServers": {
+    "no-crd": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nogoo9/no-crd",
+        "--transport",
+        "stdio",
+        "--mode",
+        "namespaced",
+        "--namespace",
+        "nogoo9"
+      ]
+    }
+  }
+}
+```
+
+### 2. Cursor
+In Cursor Settings:
+1. Go to **Settings** > **Features** > **MCP**.
+2. Click **+ Add New MCP Server**.
+3. Fill in details based on your variant:
+   - **Name**: `no-crd`
+   - **Type**: `stdio`
+   - **Command**:
+     - *Cluster-Wide*: `npx -y @nogoo9/no-crd --transport stdio --mode cluster --namespace nogoo9`
+     - *Namespace-Scoped*: `npx -y @nogoo9/no-crd --transport stdio --mode namespaced --namespace nogoo9`
+
+### 3. Cline / Roo Code
+Add to `mcp_settings.json` (inside VS Code global storage paths):
+
+#### Cluster-Wide Mode
+```json
+{
+  "mcpServers": {
+    "no-crd": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nogoo9/no-crd",
+        "--transport",
+        "stdio",
+        "--mode",
+        "cluster",
+        "--namespace",
+        "nogoo9"
+      ]
+    }
+  }
+}
+```
+
+#### Namespace-Scoped Mode
+```json
+{
+  "mcpServers": {
+    "no-crd": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nogoo9/no-crd",
+        "--transport",
+        "stdio",
+        "--mode",
+        "namespaced",
+        "--namespace",
+        "nogoo9"
+      ]
+    }
+  }
+}
+```
+
+### 4. Local Development / Cross-Runtime Configurations
+If you are developing locally or running the server directly from the source repository, you can register the local server with your MCP client using one of the following configurations:
+
+#### Bun (Source execution)
+Recommended for development on Bun:
+```json
+    "nogoo9-no-crd-local-bun": {
+      "command": "bun",
+      "args": ["run", "src/index.ts"],
+      "env": {
+        "TRANSPORT": "stdio",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+```
+
+#### Deno (Source execution)
+Runs the server directly from source using Deno. The flags ensure sloppier Node compatibility imports and ignore self-signed certificate issues with local Kubernetes APIs:
+```json
+    "nogoo9-no-crd-local-deno": {
+      "command": "deno",
+      "args": [
+        "run",
+        "--allow-all",
+        "--unstable-sloppy-imports",
+        "--unsafely-ignore-certificate-errors",
+        "src/index.ts"
+      ],
+      "env": {
+        "TRANSPORT": "stdio",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+```
+
+#### Node.js (Pre-compiled execution)
+Runs the compiled bundle using Node.js:
+```json
+    "nogoo9-no-crd-local-node": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "TRANSPORT": "stdio",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+```
+*(Make sure to run `bun run build` first to compile the code into the `dist/` directory).*
 
 ---
 
@@ -322,162 +473,6 @@ subjects:
 
 ---
 
-## 🛠️ MCP Integration Configs
-
-To let AI coding assistants (like Claude Desktop, Cursor, Cline, or Roo Code) orchestrate Kubernetes workspaces, add `@nogoo9/no-crd` to your MCP configuration. Choose the configuration block below that matches your deployment mode (**Cluster-Wide** vs. **Namespace-Scoped**).
-
-### 1. Claude CLI / Claude Desktop
-Add to your server configurations (usually `~/.config/Claude/config.json` or `~/Library/Application Support/Claude/config.json`):
-
-#### Cluster-Wide Mode
-```json
-{
-  "mcpServers": {
-    "no-crd": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@nogoo9/no-crd",
-        "--transport",
-        "stdio",
-        "--mode",
-        "cluster",
-        "--namespace",
-        "nogoo9"
-      ]
-    }
-  }
-}
-```
-
-#### Namespace-Scoped Mode
-```json
-{
-  "mcpServers": {
-    "no-crd": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@nogoo9/no-crd",
-        "--transport",
-        "stdio",
-        "--mode",
-        "namespaced",
-        "--namespace",
-        "nogoo9"
-      ]
-    }
-  }
-}
-```
-
-### 2. Cursor
-In Cursor Settings:
-1. Go to **Settings** > **Features** > **MCP**.
-2. Click **+ Add New MCP Server**.
-3. Fill in details based on your variant:
-   - **Name**: `no-crd`
-   - **Type**: `stdio`
-   - **Command**:
-     - *Cluster-Wide*: `npx -y @nogoo9/no-crd --transport stdio --mode cluster --namespace nogoo9`
-     - *Namespace-Scoped*: `npx -y @nogoo9/no-crd --transport stdio --mode namespaced --namespace nogoo9`
-
-### 3. Cline / Roo Code
-Add to `mcp_settings.json` (inside VS Code global storage paths):
-
-#### Cluster-Wide Mode
-```json
-{
-  "mcpServers": {
-    "no-crd": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@nogoo9/no-crd",
-        "--transport",
-        "stdio",
-        "--mode",
-        "cluster",
-        "--namespace",
-        "nogoo9"
-      ]
-    }
-  }
-}
-```
-
-#### Namespace-Scoped Mode
-```json
-{
-  "mcpServers": {
-    "no-crd": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@nogoo9/no-crd",
-        "--transport",
-        "stdio",
-        "--mode",
-        "namespaced",
-        "--namespace",
-        "nogoo9"
-      ]
-    }
-  }
-}
-```
-
-### 4. Local Development / Cross-Runtime Configurations
-If you are developing locally or running the server directly from the source repository, you can register the local server with your MCP client using one of the following configurations:
-
-#### Bun (Source execution)
-Recommended for development on Bun:
-```json
-    "nogoo9-no-crd-local-bun": {
-      "command": "bun",
-      "args": ["run", "src/index.ts"],
-      "env": {
-        "TRANSPORT": "stdio",
-        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
-      }
-    }
-```
-
-#### Deno (Source execution)
-Runs the server directly from source using Deno. The flags ensure sloppier Node compatibility imports and ignore self-signed certificate issues with local Kubernetes APIs:
-```json
-    "nogoo9-no-crd-local-deno": {
-      "command": "deno",
-      "args": [
-        "run",
-        "--allow-all",
-        "--unstable-sloppy-imports",
-        "--unsafely-ignore-certificate-errors",
-        "src/index.ts"
-      ],
-      "env": {
-        "TRANSPORT": "stdio",
-        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
-      }
-    }
-```
-
-#### Node.js (Pre-compiled execution)
-Runs the compiled bundle using Node.js:
-```json
-    "nogoo9-no-crd-local-node": {
-      "command": "node",
-      "args": ["dist/index.js"],
-      "env": {
-        "TRANSPORT": "stdio",
-        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
-      }
-    }
-```
-*(Make sure to run `bun run build` first to compile the code into the `dist/` directory).*
-
----
-
 ## 📑 Workspace Templates & Spawner Annotations
 
 Templates in `@nogoo9/no-crd` can be loaded from **three sources** (highest to lowest priority):
@@ -556,6 +551,7 @@ The spawner inspects `ConfigMap` metadata annotations (and custom inline annotat
 | `nogoo9/iam-role-arn` | Annotation (AWS Role ARN) | Instructs the spawner to provision a dedicated Kubernetes `ServiceAccount` annotated for EKS IAM Role mapping (IRSA). |
 | `nogoo9/init-image` | Annotation (Image string) | The container image to run in the dynamic `spawner-init` init-container. |
 | `nogoo9/init-command` | Annotation (Shell command) | The shell command to run in the init-container. It automatically shares the main container's volume mounts. |
+| `nogoo9/init-share-volumes` | Annotation ("true" | "false") | Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`. |
 | `nogoo9/pre-stop-command` | Annotation (Shell command) | A shell command executed in a Kubernetes `preStop` lifecycle exec hook when the workspace is terminated (e.g. to save/push state). |
 | `nogoo9/pre-stop-sidecar-image` | Annotation (Image string) | If specified alongside `pre-stop-command`, runs the pre-stop command inside a dedicated sidecar container instead of the main container. |
 | `nogoo9/default-grace-period` | Annotation (Number in seconds) | Overrides the Pod's `terminationGracePeriodSeconds` (defaults to `60` if a pre-stop command is defined) to give cleanup commands time to finish. |
@@ -632,6 +628,7 @@ If `AUTH_ENABLED` is true:
 - The proxy requires a valid Bearer token in the `Authorization` header or a `?token=` query parameter.
 - The workspace pod's `nogoo9/user-sub` label must match the JWT's subject claim, preventing unauthorized access to other users' workspaces.
 - The proxy target port inside the workspace pod defaults to `3000` or can be overridden via pod annotation `nogoo9/workspace-port` or the `DEFAULT_WORKSPACE_PORT` environment variable.
+- **Multi-Port / Custom API Routing**: You can expose and route additional APIs inside the pod (e.g., a web terminal or secondary service) by defining custom annotations in the template (e.g., `nogoo9/api.terminal.port: "7681"`, `nogoo9/api.terminal.path: "/terminal"`). The proxy will dynamically handle subpath routing and method checks.
 - A **stateless signed session cookie** (`nocr_sess`) is minted on first successful JWT validation, enabling workspace traffic to survive short-lived token expiry. See [ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md) and [ADR-003](docs/decisions/ADR-003-peer-discovery-session-key.md) for design details.
 
 ### 3. OAuth Resource Discovery (RFC 9728)

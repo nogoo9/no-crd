@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] — 2026-05-30
+
+### Fixed
+
+- **Template Label Merging**: Fixed a bug where metadata labels defined in templates (both ConfigMap templates and local templates) were not merged into the spawned workspace pod's labels.
+- **Dynamic Init volume sharing**: Added a new boolean annotation flag `nogoo9/init-share-volumes` (defaulting to `"true"` for backward compatibility). When set to `"false"`, it prevents the dynamically injected init container from inheriting the main container's volume mounts.
+
 ## [0.5.4] — 2026-05-30
 
 ### Added

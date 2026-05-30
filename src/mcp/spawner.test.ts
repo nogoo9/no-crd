@@ -433,6 +433,126 @@ describe("Spawner MCP Tools - get_workspace", () => {
 			createSpy.mockRestore();
 		});
 
+		test("spawn_workspace merges template labels from ConfigMap", async () => {
+			const mockCM = {
+				metadata: {
+					name: "tmpl-labels",
+					labels: {
+						// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+						"custom-label": "value-${{user}}",
+						"other-label": "static-val",
+					},
+					annotations: {},
+				},
+				data: {
+					spec: JSON.stringify({
+						containers: [
+							{
+								name: "agent",
+								image: "node",
+							},
+						],
+					}),
+				},
+			};
+
+			const mockRead = spyOn(
+				coreApi,
+				"readNamespacedConfigMap" as any,
+			).mockResolvedValue(mockCM as any);
+			const createSpy = spyOn(coreApi, "createNamespacedPod").mockResolvedValue(
+				{
+					body: { metadata: { name: "ws-test" } },
+				} as any,
+			);
+
+			const handler = registeredTools.get("spawn_workspace")!;
+			const result = await handler({
+				id: "ws-test",
+				templateRef: "tmpl-labels",
+				namespace: "default",
+				jwtPayload: { sub: "test-user-identity" },
+			});
+
+			expect(result.isError).toBeUndefined();
+			expect(createSpy).toHaveBeenCalledTimes(1);
+			const body = (createSpy.mock.calls[0] as any)[0].body;
+
+			// Verify template labels are copied and user identity is interpolated
+			expect(body.metadata.labels["custom-label"]).toBe(
+				"value-test-user-identity",
+			);
+			expect(body.metadata.labels["other-label"]).toBe("static-val");
+			// System labels should still exist and not be overridden
+			expect(body.metadata.labels["nogoo9/type"]).toBe("workspace");
+			expect(body.metadata.labels["nogoo9/workspace-id"]).toBe("ws-test");
+
+			mockRead.mockRestore();
+			createSpy.mockRestore();
+		});
+
+		test("spawn_workspace merges template labels from local fallback template", async () => {
+			const fs = require("node:fs");
+			const path = require("node:path");
+			const tempDir = path.join(import.meta.dir, "__test_templates_spawner__");
+			fs.mkdirSync(tempDir, { recursive: true });
+
+			fs.writeFileSync(
+				path.join(tempDir, "local-labels.yaml"),
+				`metadata:
+  name: local-labels
+  labels:
+    custom-local-label: "val-\${{user}}"
+spec:
+  containers:
+    - name: agent
+      image: node
+`,
+			);
+
+			const origTemplatesDir = process.env.TEMPLATES_DIR;
+			process.env.TEMPLATES_DIR = tempDir;
+
+			// Force spawner to fallback by having readNamespacedConfigMap fail
+			const mockRead = spyOn(
+				coreApi,
+				"readNamespacedConfigMap" as any,
+			).mockRejectedValue(new Error("ConfigMap permission denied"));
+
+			const createSpy = spyOn(coreApi, "createNamespacedPod").mockResolvedValue(
+				{
+					body: { metadata: { name: "ws-test" } },
+				} as any,
+			);
+
+			try {
+				const handler = registeredTools.get("spawn_workspace")!;
+				const result = await handler({
+					id: "ws-test",
+					templateRef: "local-labels",
+					namespace: "default",
+					jwtPayload: { sub: "test-user-identity" },
+				});
+
+				expect(result.isError).toBeUndefined();
+				expect(createSpy).toHaveBeenCalledTimes(1);
+				const body = (createSpy.mock.calls[0] as any)[0].body;
+
+				// Verify template labels are copied and user identity is interpolated
+				expect(body.metadata.labels["custom-local-label"]).toBe(
+					"val-test-user-identity",
+				);
+				// System labels should still exist and not be overridden
+				expect(body.metadata.labels["nogoo9/type"]).toBe("workspace");
+				expect(body.metadata.labels["nogoo9/workspace-id"]).toBe("ws-test");
+			} finally {
+				process.env.TEMPLATES_DIR = origTemplatesDir;
+				fs.rmSync(tempDir, { recursive: true, force: true });
+				mockRead.mockRestore();
+				createSpy.mockRestore();
+			}
+		});
+
 		test("spawn_workspace interpolates user variable to guest if no auth payload present", async () => {
 			const mockCM = {
 				metadata: {

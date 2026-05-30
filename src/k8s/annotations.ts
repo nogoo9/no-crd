@@ -50,13 +50,17 @@ export function applySpawnerAnnotations(
 	// 2. Init Container Injection
 	const initImage = annotations[ANNOTATION_KEYS.INIT_IMAGE];
 	const initCmd = annotations[ANNOTATION_KEYS.INIT_COMMAND];
+	const shareVolumes =
+		annotations[ANNOTATION_KEYS.INIT_SHARE_VOLUMES] !== "false";
 	if (initImage && initCmd && parsedSpec.containers.length > 0) {
 		parsedSpec.initContainers = parsedSpec.initContainers || [];
 		parsedSpec.initContainers.push({
 			name: "spawner-init",
 			image: initImage,
 			command: ["/bin/sh", "-c", initCmd],
-			volumeMounts: parsedSpec.containers[0].volumeMounts,
+			volumeMounts: shareVolumes
+				? parsedSpec.containers[0].volumeMounts
+				: undefined,
 			env: envVars,
 		});
 	}
