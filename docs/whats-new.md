@@ -3,6 +3,11 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.5.5
+
+- **Template Label Merging**: Corrected the bug where metadata labels defined in templates (both cluster-level ConfigMaps and local templates) were not merged into the spawned workspace pod's labels.
+- **Dynamic Init volume sharing**: Added a new boolean annotation flag `nogoo9/init-share-volumes` (default `true`). Setting it to `"false"` disables the auto-application of the main container's volume mounts to the dynamically injected `spawner-init` container.
+
 ## What's New in v0.5.4
 
 - **Fix "Already Connected" on Multi-Session** ([ADR-012](/decisions/ADR-012-per-session-mcp-server-factory)): The MCP server threw `"already connected transport, call close()"` when a second client session connected. The shared `globalMcpServer` singleton has been replaced with a per-session factory pattern, following the official MCP SDK convention. Each session now gets its own `McpServer` instance, and startup validation uses a throwaway server that is discarded after RBAC checks pass.
