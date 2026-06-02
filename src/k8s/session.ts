@@ -1,4 +1,9 @@
-import { createHmac, randomBytes } from "node:crypto";
+import {
+	createCipheriv,
+	createDecipheriv,
+	createHmac,
+	randomBytes,
+} from "node:crypto";
 import type * as k8s from "@kubernetes/client-node";
 import { getLogger } from "@logtape/logtape";
 import { config } from "~/config/index.js";
@@ -314,4 +319,53 @@ function extractJsonPathValue(
 		current = (current as Record<string, unknown>)[part];
 	}
 	return current ?? defaultValue;
+}
+
+/**
+ * AES-256-GCM encrypts a refresh token using a key derived from the session secret.
+ * Returns a dot-separated string: `base64url(iv).base64url(ciphertext).base64url(authTag)`.
+ */
+export function encryptRefreshToken(
+	refreshToken: string,
+	secret: string,
+): string {
+	const key = createHmac("sha256", secret)
+		.update("nocr_refresh_encryption")
+		.digest();
+	const iv = randomBytes(12);
+	const cipher = createCipheriv("aes-256-gcm", key, iv);
+	let ciphertext = cipher.update(refreshToken, "utf8", "base64url");
+	ciphertext += cipher.final("base64url");
+	const tag = cipher.getAuthTag().toString("base64url");
+	const ivStr = iv.toString("base64url");
+	return `${ivStr}.${ciphertext}.${tag}`;
+}
+
+/**
+ * AES-256-GCM decrypts an encrypted refresh token using the session secret.
+ * Returns the decrypted string, or `null` if verification/decryption fails.
+ */
+export function decryptRefreshToken(
+	encrypted: string,
+	secret: string,
+): string | null {
+	try {
+		const parts = encrypted.split(".");
+		if (parts.length !== 3) return null;
+		const [ivStr, ciphertext, tagStr] = parts;
+		const iv = Buffer.from(ivStr, "base64url");
+		const tag = Buffer.from(tagStr, "base64url");
+		const key = createHmac("sha256", secret)
+			.update("nocr_refresh_encryption")
+			.digest();
+		const decipher = createDecipheriv("aes-256-gcm", key, iv, {
+			authTagLength: 16,
+		});
+		decipher.setAuthTag(tag);
+		let decrypted = decipher.update(ciphertext, "base64url", "utf8");
+		decrypted += decipher.final("utf8");
+		return decrypted;
+	} catch {
+		return null;
+	}
 }

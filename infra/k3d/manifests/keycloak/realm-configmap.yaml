@@ -136,6 +136,9 @@ data:
             "mcp:read",
             "mcp:write"
           ],
+          "optionalClientScopes": [
+            "offline_access"
+          ],
           "attributes": {
             "pkce.code.challenge.method": "S256"
           },

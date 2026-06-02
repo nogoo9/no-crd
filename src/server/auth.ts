@@ -4,6 +4,8 @@ import { ANNOTATION_KEYS, config } from "~/config/index.js";
 import {
 	createSessionCookie,
 	DEFAULT_NAMESPACE,
+	decryptRefreshToken,
+	encryptRefreshToken,
 	extractTokenFromCookie,
 	extractUserIdentity,
 	getSessionKey,
@@ -23,6 +25,111 @@ import {
 } from "./helpers.js";
 
 const logger = getLogger(["nogoo9", "auth"]);
+
+let cachedTokenEndpoint: string | null = null;
+let lastDiscoveryFetch = 0;
+const DISCOVERY_CACHE_TTL = 300000; // 5 minutes
+
+async function getTokenEndpoint(): Promise<string> {
+	if (
+		cachedTokenEndpoint &&
+		Date.now() - lastDiscoveryFetch < DISCOVERY_CACHE_TTL
+	) {
+		return cachedTokenEndpoint;
+	}
+
+	const discoveryUrl = config.ui.oauth.discoveryUrl;
+	if (!discoveryUrl) {
+		throw new Error("OAUTH_DISCOVERY_URL is not configured on the server");
+	}
+
+	try {
+		const res = await fetch(discoveryUrl, {
+			signal: AbortSignal.timeout(5000),
+		});
+		if (!res.ok) {
+			throw new Error(`OIDC Discovery returned HTTP ${res.status}`);
+		}
+		const data = (await res.json()) as { token_endpoint?: string };
+		if (!data.token_endpoint) {
+			throw new Error("OIDC Discovery response is missing token_endpoint");
+		}
+		cachedTokenEndpoint = data.token_endpoint;
+		lastDiscoveryFetch = Date.now();
+		return cachedTokenEndpoint;
+	} catch (err) {
+		logger.error("Failed to fetch OIDC discovery document: {error}", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+		if (cachedTokenEndpoint) {
+			return cachedTokenEndpoint;
+		}
+		throw err;
+	}
+}
+
+/**
+ * Performs a refresh token exchange against the OIDC provider.
+ */
+export async function performTokenRefresh(
+	request: FastifyRequest,
+	decryptedRefresh: string,
+	_sessKey: string,
+	basePrefix: string,
+): Promise<{ jwtPayload: any; token: string; rotatedRefreshToken: string }> {
+	const tokenEndpoint = await getTokenEndpoint();
+	const clientId = config.auth.clientId || "";
+	const clientSecret = config.auth.clientSecret || "";
+
+	const params = new URLSearchParams({
+		grant_type: "refresh_token",
+		refresh_token: decryptedRefresh,
+	});
+	if (clientId) params.set("client_id", clientId);
+	if (clientSecret) params.set("client_secret", clientSecret);
+
+	const refreshRes = await fetch(tokenEndpoint, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+		body: params.toString(),
+		signal: AbortSignal.timeout(5000),
+	});
+
+	if (!refreshRes.ok) {
+		const errText = await refreshRes.text().catch(() => "");
+		throw new Error(
+			`OIDC refresh endpoint returned HTTP ${refreshRes.status}: ${errText}`,
+		);
+	}
+
+	const tokenData = (await refreshRes.json()) as {
+		access_token?: string;
+		refresh_token?: string;
+	};
+	if (!tokenData.access_token) {
+		throw new Error("OIDC refresh response did not contain access_token");
+	}
+
+	let expectedAudience: string | undefined;
+	try {
+		const { host, proto } = getRequestHostAndProto(request);
+		expectedAudience = `${proto}://${host}${basePrefix}`;
+	} catch (_) {}
+
+	const jwtPayload = await verifyToken(
+		tokenData.access_token,
+		expectedAudience,
+	);
+	const rotatedRefreshToken = tokenData.refresh_token || decryptedRefresh;
+
+	return {
+		jwtPayload,
+		token: tokenData.access_token,
+		rotatedRefreshToken,
+	};
+}
 
 export function registerAuthHooks(
 	api: FastifyInstance,
@@ -112,6 +219,65 @@ export function registerAuthHooks(
 			}
 		}
 
+		// Try transparent token refresh using nocr_refresh cookie if not authenticated
+		if (!jwtPayload && config.auth.enabled && sessKey) {
+			const refreshCookie = extractTokenFromCookie(
+				request.headers.cookie,
+				"nocr_refresh",
+			);
+			if (refreshCookie) {
+				try {
+					const decryptedRefresh = decryptRefreshToken(refreshCookie, sessKey);
+					if (decryptedRefresh) {
+						logger.debug(
+							"Attempting transparent token refresh using refresh cookie",
+						);
+						const result = await performTokenRefresh(
+							request,
+							decryptedRefresh,
+							sessKey,
+							basePrefix,
+						);
+
+						jwtPayload = result.jwtPayload;
+						token = result.token;
+						authError = null;
+
+						logger.info("Transparent token refresh successful for user {sub}", {
+							sub: jwtPayload.sub,
+						});
+
+						// Mint new session cookie
+						const newSessCookie = createSessionCookie(
+							jwtPayload,
+							sessKey,
+							config.auth.sessionTtlSeconds,
+							config.auth.subJsonPath,
+							config.auth.rolesJsonPath,
+						);
+						reply.header(
+							"Set-Cookie",
+							`nocr_sess=${newSessCookie}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${config.auth.sessionTtlSeconds}`,
+						);
+
+						// Rotate refresh token
+						const encryptedNewRefresh = encryptRefreshToken(
+							result.rotatedRefreshToken,
+							sessKey,
+						);
+						reply.header(
+							"Set-Cookie",
+							`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`,
+						);
+					}
+				} catch (err) {
+					logger.warn("Failed transparent token refresh: {error}", {
+						error: err instanceof Error ? err.message : String(err),
+					});
+				}
+			}
+		}
+
 		(request as any).jwtPayload = jwtPayload;
 		(request as any).token = token;
 		(request as any).authError = authError;
@@ -134,6 +300,13 @@ export function registerAuthHooks(
 		const authError = (request as any).authError;
 
 		if (!jwtPayload) {
+			const acceptHeader = request.headers.accept || "";
+			if (request.method === "GET" && acceptHeader.includes("text/html")) {
+				const currentUrl = request.url;
+				const loginUrl = `${basePrefix || ""}/?redirect_uri=${encodeURIComponent(currentUrl)}`;
+				return reply.redirect(loginUrl);
+			}
+
 			const { host, proto } = getRequestHostAndProto(request);
 			const metadataUrl = `${proto}://${host}${basePrefix}/.well-known/oauth-protected-resource`;
 
@@ -365,6 +538,7 @@ export function registerAuthHooks(
 			const upstreamUrl = `http://${podIP}:${port}`;
 			(request as any).tmpUpstream = upstreamUrl;
 			(request as any).workspaceId = workspaceId;
+			(request as any).workspaceAnnotations = pod.metadata?.annotations || {};
 
 			logger.info(
 				"Resolved workspace {workspaceId} upstream to {upstreamUrl}",

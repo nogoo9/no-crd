@@ -1935,6 +1935,37 @@ async function initOidc() {
 		return;
 	}
 
+	const urlParams = new URLSearchParams(window.location.search);
+	const targetRedirect = urlParams.get("redirect_uri");
+	if (targetRedirect) {
+		localStorage.setItem("nocr_redirect_after_login", targetRedirect);
+		// Clean the parameter to keep address bar clean
+		const cleanParams = new URLSearchParams(window.location.search);
+		cleanParams.delete("redirect_uri");
+		const newSearch = cleanParams.toString();
+		const cleanUrl =
+			window.location.pathname +
+			(newSearch ? `?${newSearch}` : "") +
+			window.location.hash;
+		window.history.replaceState({}, document.title, cleanUrl);
+
+		// If user already has a valid token, redirect back immediately
+		const currentToken = localStorage.getItem("nocr_token") || activeToken;
+		if (currentToken) {
+			localStorage.removeItem("nocr_redirect_after_login");
+			try {
+				const testUrl = new URL(targetRedirect, window.location.origin);
+				if (testUrl.origin === window.location.origin) {
+					const separator = targetRedirect.includes("?") ? "&" : "?";
+					const finalUrl = `${targetRedirect}${separator}token=${encodeURIComponent(currentToken)}`;
+					// nosemgrep: javascript.browser.security.open-redirect.js-open-redirect
+					window.location.href = finalUrl; // Safe: validated same-origin
+					return;
+				}
+			} catch (_) {}
+		}
+	}
+
 	async function triggerRedirect() {
 		try {
 			const state = generateRandomString(16);
@@ -1972,10 +2003,10 @@ async function initOidc() {
 	}
 
 	// 1. Check if returning from redirect flow
-	const urlParams = new URLSearchParams(window.location.search);
-	const code = urlParams.get("code");
-	const state = urlParams.get("state");
-	const error = urlParams.get("error");
+	const callbackParams = new URLSearchParams(window.location.search);
+	const code = callbackParams.get("code");
+	const state = callbackParams.get("state");
+	const error = callbackParams.get("error");
 	const hasOauthCallback = code || error;
 
 	if (code) {
@@ -2013,8 +2044,40 @@ async function initOidc() {
 					if (tokenData.id_token) {
 						localStorage.setItem("nocr_id_token", tokenData.id_token);
 					}
+					if (tokenData.refresh_token) {
+						await fetch(`${basePath}/auth/set-refresh`, {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								Authorization: `Bearer ${tokenData.access_token}`,
+							},
+							body: JSON.stringify({ refresh_token: tokenData.refresh_token }),
+						}).catch((err) => {
+							console.error("Failed to send refresh token to gateway:", err);
+						});
+					}
 					updateUserBadge(activeToken);
 					showToast("Login successful!", "success");
+
+					const redirectAfterLogin = localStorage.getItem(
+						"nocr_redirect_after_login",
+					);
+					if (redirectAfterLogin) {
+						localStorage.removeItem("nocr_redirect_after_login");
+						try {
+							const testUrl = new URL(
+								redirectAfterLogin,
+								window.location.origin,
+							);
+							if (testUrl.origin === window.location.origin) {
+								const separator = redirectAfterLogin.includes("?") ? "&" : "?";
+								const finalUrl = `${redirectAfterLogin}${separator}token=${encodeURIComponent(tokenData.access_token)}`;
+								// nosemgrep: javascript.browser.security.open-redirect.js-open-redirect
+								window.location.href = finalUrl; // Safe: validated same-origin
+								return;
+							}
+						} catch (_) {}
+					}
 				}
 			} catch (e) {
 				console.error("OAuth token exchange failed:", e);
@@ -2140,6 +2203,10 @@ async function fetchPreview(wsId: string, path: string, type: string) {
 		if (type === "html") {
 			const iframe = document.createElement("iframe");
 			iframe.sandbox.add("allow-scripts");
+			iframe.sandbox.add("allow-same-origin");
+			iframe.sandbox.add("allow-forms");
+			iframe.sandbox.add("allow-popups");
+			iframe.setAttribute("data-workspace-id", wsId);
 			iframe.src = url;
 			iframe.className =
 				"w-full h-full min-h-[50vh] border-0 rounded-xl bg-white";

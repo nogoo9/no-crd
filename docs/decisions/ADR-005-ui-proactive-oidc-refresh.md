@@ -47,8 +47,8 @@ Scope the `nocr_sess` session cookie to `Path=/` (root). The server's global `pr
 
 ### C. Server-side refresh (proxy holds refresh_token)
 - Pros: Fully transparent to the UI
-- Cons: Requires storing `refresh_token` server-side (security risk); adds server state; violates stateless design (ADR-002)
-- Rejected: Security risk and architectural mismatch
+- Cons: Originally rejected due to concerns over server state and security risk of key reuse.
+- **Update (ADR-013)**: Subsequently adopted via an encrypted client-side cookie (`nocr_refresh`). Encrypting the refresh token with AES-256-GCM using a key derived via HKDF-SHA256 from the session secret avoids server-side state (keeping the gateway stateless) and prevents JavaScript access, satisfying both security and stateless requirements.
 
 ### D. Redirect on 401 (reactive)
 - Pros: No timer; simple
