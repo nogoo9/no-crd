@@ -50,6 +50,10 @@ data:
           {
             "name": "mcp-writer",
             "description": "Read-write access role for nogoo9 MCP"
+          },
+          {
+            "name": "offline_access",
+            "description": "Role to request offline tokens"
           }
         ]
       },
@@ -70,7 +74,8 @@ data:
             }
           ],
           "realmRoles": [
-            "mcp-reader"
+            "mcp-reader",
+            "offline_access"
           ]
         },
         {
@@ -90,7 +95,8 @@ data:
           ],
           "realmRoles": [
             "mcp-reader",
-            "mcp-writer"
+            "mcp-writer",
+            "offline_access"
           ]
         },
         {
@@ -109,7 +115,8 @@ data:
             }
           ],
           "realmRoles": [
-            "nogoo9-admin"
+            "nogoo9-admin",
+            "offline_access"
           ]
         }
       ],
