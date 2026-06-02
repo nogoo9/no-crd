@@ -1987,12 +1987,10 @@ async function initOidc() {
 			url.searchParams.set("state", state);
 			url.searchParams.set("code_challenge", challenge);
 			url.searchParams.set("code_challenge_method", "S256");
-			const scopes = ["openid", "profile", "email"];
-			if (Array.isArray(oauthConfig.scopes)) {
-				for (const s of oauthConfig.scopes) {
-					if (s && !scopes.includes(s)) scopes.push(s);
-				}
-			}
+			const scopes =
+				Array.isArray(oauthConfig.scopes) && oauthConfig.scopes.length > 0
+					? oauthConfig.scopes
+					: ["openid", "profile", "email"];
 			url.searchParams.set("scope", scopes.join(" "));
 
 			window.location.href = url.toString();
