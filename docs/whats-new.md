@@ -3,6 +3,12 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.6.0
+
+- **Proxy-Level Transparent Token Refresh**: Implemented a transparent, proxy-level OIDC token refresh flow in the BFF gateway. The gateway now automatically intercepts requests with expired JWT access tokens, exchanges the HttpOnly secure session refresh token for a new pair of access/refresh tokens, and updates the client cookies and session in-flight without interrupting the user.
+- **OIDC Scopes Parameterization**: Parameterized the OIDC scopes requested by the frontend login flow via the `OAUTH_SCOPES` server environment variable (defaulting to `"openid profile email offline_access"`).
+- **Keycloak Offline Access Role Mapping**: Explicitly added the `offline_access` role to the local dev realm configuration and assigned it to the default test users (`readuser`, `writeuser`, `adminuser`) to prevent `400 Bad Request` token exchange failures during OIDC PKCE flow.
+
 ## What's New in v0.5.6
 
 - **Built-in Local Fallback Templates**: Dynamically attach the `nogoo9/pod-template` label in the local template parser so that fallback workspaces automatically inherit the template discovery label without modifying the YAML files.
