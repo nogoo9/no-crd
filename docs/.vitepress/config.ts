@@ -48,12 +48,10 @@ export default withMermaid(
 				{
 					text: "Security, Auth & Identity",
 					items: [
-						{ text: "Authentication Overview", link: "/mcp-auth" },
-						{ text: "Session & Cookie Management", link: "/session-cookies" },
+						{ text: "Authentication & Authorization Overview", link: "/auth-overview" },
+						{ text: "Workspace App Integration & Sessions", link: "/workspace-app-integration" },
 						{ text: "SSO Provider Integration", link: "/sso-integration" },
 						{ text: "Advanced Auth: RBAC & ABAC", link: "/advanced-auth" },
-						{ text: "Workspace App Authorization", link: "/workspace-app-integration" },
-						{ text: "Cryptographic Hardening", link: "/auth-hardening" },
 					],
 				},
 				{

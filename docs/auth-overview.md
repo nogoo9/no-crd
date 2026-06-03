@@ -1,16 +1,6 @@
-# MCP Authentication (Experimental)
-*(Available from v0.2.0 - Experimental)*
+# Authentication & Authorization Overview
 
-> [!WARNING]
-> The MCP Authentication engine is experimental and likely to change in the next version.
-
-This page describes how to configure, authenticate, and secure remote HTTP and SSE client connections using the `@nogoo9/no-crd` built-in Model Context Protocol (MCP) authentication and authorization engine.
-
-This engine is designed to align with the official **Model Context Protocol Authorization specification**:
-* [MCP Draft Authorization Specification](https://modelcontextprotocol.io/specification/draft/basic/authorization)
-* [MCP Authorization Tutorial Guide](https://modelcontextprotocol.io/docs/tutorials/security/authorization)
-* [MCP Authentication Overview & OAuth 2.1 Extension](https://modelcontextprotocol.io/extensions/auth/overview)
-* [MCP Ext-Auth Reference Implementation](https://github.com/modelcontextprotocol/ext-auth)
+This guide describes how to configure, authenticate, and secure remote client connections, workspaces, and API endpoints using the `@nogoo9/no-crd` built-in authentication and authorization engine.
 
 ---
 
@@ -39,7 +29,7 @@ This starts Keycloak on `http://localhost:8080` with username `admin` and passwo
    - Included Custom Audience: Set to the MCP Server base URL (e.g., `http://localhost:3000`). This ensures that Keycloak-issued tokens have the correct `aud` claim.
 
 ### 3. Register the MCP Server Client (for Introspection)
-To support real-time token status verification (RFC 7662 token introspection) by the MCP server:
+To support real-time token status verification (RFC 7662 token introspection) by the server:
 1. In the Keycloak console, navigate to **Clients** and click **Create client**.
 2. Set **Client ID** to `mcp-server` (or configure a custom ID corresponding to `OAUTH_CLIENT_ID`).
 3. Set **Capability config**: Enable **Client authentication** (making it a confidential client) and **Service accounts roles**.
@@ -50,7 +40,7 @@ To support real-time token status verification (RFC 7662 token introspection) by
 
 ## 🔌 RFC 9728 Compliance & OAuth Discovery
 
-To allow remote MCP hosts or clients to authenticate dynamically, `@nogoo9/no-crd` supports the RFC 9728 standard for Protected Resource Metadata.
+To allow remote clients or agents to authenticate dynamically, `@nogoo9/no-crd` supports the RFC 9728 standard for Protected Resource Metadata.
 
 ### Metadata Discovery Endpoint
 The server hosts a standardized JSON discovery document at:
@@ -74,7 +64,7 @@ Which returns information enabling clients to dynamically query authorization se
 ```
 
 ### Unauthorized Challenges
-If a client attempts to execute an MCP tool without a valid JWT token when `AUTH_ENABLED` is true, the server returns a `401 Unauthorized` response with the following headers in alignment with RFC 9728:
+If a client attempts to access a protected endpoint or execute a tool without a valid JWT token when `AUTH_ENABLED` is true, the server returns a `401 Unauthorized` response with the following headers in alignment with RFC 9728:
 - `WWW-Authenticate`: Points the client to the metadata endpoint using the `resource_metadata` parameter.
 - `Link`: A rel-link pointing to the metadata location.
 
@@ -88,22 +78,23 @@ Link: <http://localhost:3000/.well-known/oauth-protected-resource>; rel="oauth-p
 ---
 
 ## 🔑 JWT Validation Configuration
-To secure the MCP server, enable authentication by setting:
+
+To secure the gateway server, enable authentication by setting:
 ```bash
 AUTH_ENABLED=true
 ```
-When enabled, all HTTP request endpoints (including `/mcp`, `/permissions`, `/route/:workspaceId/*`, and `/namespaces`) will require a valid JSON Web Token (JWT). The server will extract and verify the token signature, validate the expiration (`exp`), and resolve the user identity.
+When enabled, all HTTP request endpoints (including `/mcp`, `/permissions`, `/route/:workspaceId/*`, and `/namespaces`) will require a valid JSON Web Token (JWT) or session cookie. The server will extract and verify the token signature, validate the expiration (`exp`), and resolve the user identity.
 
 ### 1. Signature Verification Requirement (`JWT_VERIFICATION_REQUIRED`)
 In enterprise environments, token verification is often offloaded to an upstream API Gateway, Ingress Controller (e.g., Traefik, Kong, Apigee), or OAuth Proxy. 
 
 * **Default (`true`)**: The server performs full cryptographic signature validation of the incoming JWT.
-* **Offloaded Mode (`false`)**: If you set `JWT_VERIFICATION_REQUIRED=false`, the server will skip signature validation and only decode the token payload. Set this ONLY if an upstream gateway guarantees that the `Authorization` header is verified before reaching the MCP server.
+* **Offloaded Mode (`false`)**: If you set `JWT_VERIFICATION_REQUIRED=false`, the server will skip signature validation and only decode the token payload. Set this ONLY if an upstream gateway guarantees that the `Authorization` header is verified before reaching the server.
 
 ---
 
 ### 2. Symmetric HMAC-SHA256 (`HS256`)
-Use this mode if the MCP server and the token provider share a common secret.
+Use this mode if the gateway server and the token provider share a common secret.
 
 * **Required configuration:**
   ```bash
@@ -163,7 +154,7 @@ When token introspection is configured, the server will make a POST request to t
 ---
 
 ## 🎯 Audience Claim Verification & Prefix Matching
-To prevent token replay/passthrough attacks where a token meant for a different service is presented to the MCP server, the engine enforces audience validation.
+To prevent token replay/passthrough attacks where a token meant for a different service is presented to the server, the engine enforces audience validation.
 
 ### Expected Audience Resolution
 The server determines the expected audience dynamically or statically:
@@ -197,7 +188,7 @@ By default, the server extracts the user identity from the `sub` claim in the JW
 ---
 
 ## 🛡️ User Resource Isolation & Authorization Checks
-When `AUTH_ENABLED` is set to `true`, the MCP server automatically enforces multi-tenant workspace isolation. This ensures that users can only view, modify, or proxy traffic to workspaces they have created.
+When `AUTH_ENABLED` is set to `true`, the gateway server automatically enforces multi-tenant workspace isolation. This ensures that users can only view, modify, or proxy traffic to workspaces they have created.
 
 ### 1. Resource Tagging & Ownership
 All resources created during workspace provisioning are automatically stamped with the user's identity:
