@@ -27,7 +27,8 @@ It provides JupyterHub-like dynamic pod lifecycle management but is completely a
 - **ConfigMap-Based Templates:** Store, version, and load reusable pod templates stored as standard Kubernetes ConfigMaps.
 - **Local Filesystem Templates:** Bake YAML/JSON pod templates into Docker images or mount them from host paths — with built-in defaults shipped in the package.
 - **Isomorphic Multi-Runtime SDK:** Imports seamlessly as a composable programmatic SDK or MCP server running under Node.js, Bun, or Deno.
-- **Workspace Routing Proxy:** Built-in reverse proxy routing that dynamically pipes traffic to running container IPs with secure user token ownership verification, path-scoped session cookies (`nocr_token` and `nocr_sess`), and automatic HMAC-signed session management for short-lived token resilience.
+- **Workspace Routing Proxy (Experimental):** Built-in reverse proxy routing that dynamically pipes traffic to running container IPs with secure user token ownership verification, path-scoped session cookies (`nocr_token` and `nocr_sess`), and automatic HMAC-signed session management for short-lived token resilience.
+- **Experimental JWT Authentication:** Built-in OAuth token validation engine supporting HS256, RS256, ES256, JWKS endpoints, and OAuth 2.0 Token Introspection (RFC 7662).
 - **Embedded Web UI App:** Exposes an interactive web-based Pod Manager interface featuring a light/dark theme toggle, client-side PKCE OIDC login with proactive silent token refresh, and workspace file preview rendering (supporting HTML sandboxed iframes and custom Markdown rendering).
 
 ---
@@ -552,7 +553,7 @@ The spawner inspects `ConfigMap` metadata annotations (and custom inline annotat
 | `nogoo9/iam-role-arn` | Annotation (AWS Role ARN) | Instructs the spawner to provision a dedicated Kubernetes `ServiceAccount` annotated for EKS IAM Role mapping (IRSA). |
 | `nogoo9/init-image` | Annotation (Image string) | The container image to run in the dynamic `spawner-init` init-container. |
 | `nogoo9/init-command` | Annotation (Shell command) | The shell command to run in the init-container. It automatically shares the main container's volume mounts. |
-| `nogoo9/init-share-volumes` | Annotation ("true" | "false") | Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`. |
+| `nogoo9/init-share-volumes` | Annotation ("true" | "false") | Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`. *(Available from v0.5.5)* |
 | `nogoo9/pre-stop-command` | Annotation (Shell command) | A shell command executed in a Kubernetes `preStop` lifecycle exec hook when the workspace is terminated (e.g. to save/push state). |
 | `nogoo9/pre-stop-sidecar-image` | Annotation (Image string) | If specified alongside `pre-stop-command`, runs the pre-stop command inside a dedicated sidecar container instead of the main container. |
 | `nogoo9/default-grace-period` | Annotation (Number in seconds) | Overrides the Pod's `terminationGracePeriodSeconds` (defaults to `60` if a pre-stop command is defined) to give cleanup commands time to finish. |
@@ -630,7 +631,7 @@ If `AUTH_ENABLED` is true:
 - The workspace pod's `nogoo9/user-sub` label must match the JWT's subject claim, preventing unauthorized access to other users' workspaces.
 - The proxy target port inside the workspace pod defaults to `3000` or can be overridden via pod annotation `nogoo9/workspace-port` or the `DEFAULT_WORKSPACE_PORT` environment variable.
 - **Multi-Port / Custom API Routing**: You can expose and route additional APIs inside the pod (e.g., a web terminal or secondary service) by defining custom annotations in the template (e.g., `nogoo9/api.terminal.port: "7681"`, `nogoo9/api.terminal.path: "/terminal"`). The proxy will dynamically handle subpath routing and method checks.
-- A **stateless signed session cookie** (`nocr_sess`) is minted on first successful JWT validation, enabling workspace traffic to survive short-lived token expiry. See [ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md) and [ADR-003](docs/decisions/ADR-003-peer-discovery-session-key.md) for design details.
+- A **stateless signed session cookie** (`nocr_sess`) is minted on first successful JWT validation, enabling workspace traffic to survive short-lived token expiry. *(Available from v0.4.0)* See [ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md) and [ADR-003](docs/decisions/ADR-003-peer-discovery-session-key.md) for design details.
 
 ### 3. OAuth Resource Discovery (RFC 9728)
 

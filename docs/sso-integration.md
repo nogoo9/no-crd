@@ -2,6 +2,9 @@
 
 This guide details how to integrate the `@nogoo9/no-crd` MCP server with generic OpenID Connect (OIDC) / OAuth 2.0 Identity Providers (IdPs) and provides specific integration recipes for popular platforms including **Okta**, **Auth0**, **Microsoft Entra ID (Azure AD)**, **Keycloak**, and **PingIdentity (PingOne / PingFederate)**.
 
+> [!IMPORTANT]
+> **Experimental Feature**: Single Sign-On (SSO) integration is available from **v0.2.0** and is currently marked as experimental.
+
 ---
 
 ## 🌐 Generic OIDC Integration Architecture
@@ -20,10 +23,10 @@ The following sequence diagram shows the step-by-step communication during tool 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as AI Agent / Browser Client
-    participant IdP as Identity Provider (SSO)
-    participant MCP as no-crd MCP Server
-    participant K8s as Kubernetes API
+    actor User as "AI Agent / Browser Client"
+    participant IdP as "Identity Provider (SSO)"
+    participant MCP as "no-crd MCP Server"
+    participant K8s as "Kubernetes API"
 
     User->>IdP: Authenticate & request token (with scopes/roles)
     IdP-->>User: Return JWT Access Token

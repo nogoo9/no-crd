@@ -2,6 +2,9 @@
 
 This guide explains how applications running inside workspace pods (e.g., custom development environments, code editors, internal dashboards, or custom single-page applications) authenticate users, how the gateway manages stateless sessions via cookies, and how to retrieve OIDC credentials.
 
+> [!IMPORTANT]
+> **Experimental Feature**: Workspace application routing and authorization are available from **v0.2.0** and are currently marked as experimental.
+
 By implementing the **Backend-for-Frontend (BFF) pattern**, the `@nogoo9/no-crd` gateway handles token verification, cookie management, session key sharing, and OIDC token refresh server-side. This keeps workspace containers safe from credential theft and simplifies the codebase of applications running inside them.
 
 ---
@@ -40,16 +43,16 @@ All three cookies are set with `SameSite=Lax` and `HttpOnly` flags to protect ag
 
 ## 🔑 Session & Security Mechanics
 
-### How `nocr_sess` Works (Stateless Session Cookie)
+### How `nocr_sess` Works (Stateless Session Cookie) *(Available from v0.4.0)*
 
 When a user presents a valid JWT token, the server mints a lightweight `nocr_sess` cookie containing only the essential claims needed for authorization. Subsequent requests can authenticate via this cookie without requiring the full JWT verification flow (JWKS fetch, signature check, or introspection call).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Browser as Browser / UI Client
-    participant Server as no-crd Server
-    participant IdP as Identity Provider
+    actor Browser as "Browser / UI Client"
+    participant Server as "no-crd Server"
+    participant IdP as "Identity Provider"
 
     Browser->>Server: Request with Bearer JWT token
     Server->>IdP: Verify JWT (JWKS / introspection)
@@ -78,7 +81,7 @@ The cookie is signed with **HMAC-SHA256** using a session key resolved via a pri
 
 ---
 
-### How `nocr_token` Works (Workspace Proxy Cookie)
+### How `nocr_token` Works (Workspace Proxy Cookie) *(Available from v0.3.0)*
 
 When a user accesses a routed workspace (e.g., `/route/my-workspace/`), the server sets a `nocr_token` cookie containing the raw JWT token, scoped to that workspace's path.
 
@@ -88,7 +91,7 @@ This solves a practical problem: workspace UIs (e.g., Open WebUI, VS Code, KasmV
 sequenceDiagram
     autonumber
     actor Browser
-    participant Proxy as Routing Proxy
+    participant Proxy as "Routing Proxy"
 
     Browser->>Proxy: GET /route/ws-1/ (with Bearer token)
     Proxy-->>Browser: HTML page + Set-Cookie: nocr_token=jwt; Path=/route/ws-1/
@@ -116,7 +119,7 @@ The first successfully extracted token is used. If a JWT is found (steps 1–3),
 
 ---
 
-### Session Key Resolution
+### Session Key Resolution *(Available from v0.4.0)*
 
 The HMAC key used to sign `nocr_sess` and encrypt `nocr_refresh` cookies is resolved via a **5-step priority cascade** at server startup:
 
@@ -150,8 +153,8 @@ The UI calls `POST /logout` which triggers the server to clear all cookies:
 sequenceDiagram
     autonumber
     actor Browser
-    participant Server as no-crd Server
-    participant K8s as Kubernetes API
+    participant Server as "no-crd Server"
+    participant K8s as "Kubernetes API"
 
     Browser->>Server: POST /logout (with Bearer token)
     Server->>K8s: List pods for user (label: nogoo9/user-sub)
@@ -286,7 +289,7 @@ func main() {
 
 ---
 
-## 🌐 Integration Walkthrough: Frontend Applications (`token-api`)
+## 🌐 Integration Walkthrough: Frontend Applications (`token-api`) *(Available from v0.4.0)*
 
 If your workspace runs a pure client-side Single-Page Application (SPA) loaded in the user's browser, the application cannot read `HttpOnly` session cookies directly. When `token-api` is active, the gateway exposes path-scoped helper endpoints relative to the workspace subpath:
 
@@ -346,7 +349,7 @@ async function ensureFreshToken() {
 The gateway acts as an OAuth 2.0 **Backend-for-Frontend (BFF) Mediator**:
 
 1.  **HttpOnly Cookie Isolation**: The OIDC `refresh_token` is encrypted using **AES-256-GCM** (with keys dynamically derived via **HKDF-SHA256** from the gateway session secret) and stored in a secure `HttpOnly` cookie named `nocr_refresh`. It is never exposed to JavaScript or workspace containers.
-2.  **Transparent Auto-Refresh**: If a user visits their workspace and their access token has expired but the `nocr_refresh` cookie is still valid, the gateway's global `preHandler` hook intercepts the request, calls the OIDC provider's `/token` endpoint, rotates the refresh token cookie, and fulfills the request with the new credentials. This happens **transparently in the background** with zero interruptions.
+2.  **Transparent Auto-Refresh *(Available from v0.6.0)***: If a user visits their workspace and their access token has expired but the `nocr_refresh` cookie is still valid, the gateway's global `preHandler` hook intercepts the request, calls the OIDC provider's `/token` endpoint, rotates the refresh token cookie, and fulfills the request with the new credentials. This happens **transparently in the background** with zero interruptions.
 3.  **Graceful Degradation**:
     *   If the refresh token has expired or is revoked, standard web requests (`GET` with `Accept: text/html`) are redirected to the login landing page for a seamless sign-in loop.
     *   API endpoints (`fetch` / `XMLHttpRequest` / `POST`) receive a `401 Unauthorized` response, allowing frontends to gracefully prompt users or store local state.

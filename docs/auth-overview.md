@@ -2,6 +2,9 @@
 
 This guide describes how to configure, authenticate, and secure remote client connections, workspaces, and API endpoints using the `@nogoo9/no-crd` built-in authentication and authorization engine.
 
+> [!IMPORTANT]
+> **Experimental Feature**: Authentication and authorization are available from **v0.2.0** and are currently marked as experimental.
+
 ---
 
 ## 🔒 Setting Up Keycloak as the Authorization Server

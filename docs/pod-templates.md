@@ -60,7 +60,7 @@ You can define spawner-specific annotations on the template `ConfigMap` to injec
 | `nogoo9/iam-role-arn` | Annotation (AWS Role ARN) | Instructs the spawner to provision a dedicated Kubernetes `ServiceAccount` annotated for EKS IAM Role mapping (IRSA). |
 | `nogoo9/init-image` | Annotation (Image string) | The container image to run in the dynamic `spawner-init` init-container. |
 | `nogoo9/init-command` | Annotation (Shell command) | The shell command to run in the init-container. It automatically shares the main container's volume mounts. |
-| `nogoo9/init-share-volumes` | Annotation ("true" | "false") | Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`. |
+| `nogoo9/init-share-volumes` | Annotation ("true" | "false") | Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`. *(Available from v0.5.5)* |
 | `nogoo9/pre-stop-command` | Annotation (Shell command) | A shell command executed in a Kubernetes `preStop` lifecycle exec hook when the workspace is terminated (e.g. to save/push state). |
 | `nogoo9/pre-stop-sidecar-image` | Annotation (Image string) | If specified alongside `pre-stop-command`, runs the pre-stop command inside a dedicated sidecar container instead of the main container. |
 | `nogoo9/default-grace-period` | Annotation (Number in seconds) | Overrides the Pod's `terminationGracePeriodSeconds` (defaults to `60` if a pre-stop command is defined) to give cleanup commands time to finish. |
@@ -78,7 +78,7 @@ You can define spawner-specific annotations on the template `ConfigMap` to injec
 
 ---
 
-## 📂 Local & Built-In Templates
+## 📂 Local & Built-In Templates *(Available from v0.4.0)*
 
 In addition to cluster-level Kubernetes `ConfigMap` templates, `@nogoo9/no-crd` supports loading templates from local file filesystems. This enables simple template management alongside the codebase or mounting templates dynamically via volumes:
 
@@ -96,12 +96,12 @@ To regenerate or extend, maintain this visual structure and list any new templat
 -->
 ```mermaid
 graph TD
-    Client[MCP Client / API] --> Registry[Template Registry]
+    Client["MCP Client / API"] --> Registry["Template Registry"]
     Registry --> S1["1. Kubernetes ConfigMaps (Namespace)"]
     Registry --> S2["2. Custom Directory (TEMPLATES_DIR)"]
     Registry --> S3["3. Built-In Catalog (templates/)"]
 
-    S1 -->|Priority 1: Shadows Collisions| Merge[Merged Templates List]
+    S1 -->|Priority 1: Shadows Collisions| Merge["Merged Templates List"]
     S2 -->|Priority 2: Added if Name Unseen| Merge
     S3 -->|Priority 3: Added if Name Unseen| Merge
 ```
@@ -132,7 +132,7 @@ If templates in different sources share the same name, the source with the highe
 
 ---
 
-## 👤 Dynamic Template Variable `${{user}}`
+## 👤 Dynamic Template Variable `${{user}}` *(Available from v0.3.0)*
 
 To support multi-tenant workspaces where storage directories, S3 folders, or resource paths must be isolated per user, the template engine supports the dynamic template variable `${{user}}`.
 
@@ -202,7 +202,7 @@ If spawned anonymously or without authentication enabled:
 
 ---
 
-## 🆔 Dynamic Workspace Variables `${{workspace_id}}` & `${{workspace}}`
+## 🆔 Dynamic Workspace Variables `${{workspace_id}}` & `${{workspace}}` *(Available from v0.3.0)*
 
 To support templates that need to refer to their own dynamically generated workspace ID (for example, to configure routing path prefixes or subpath-based container variables), the template engine supports the dynamic placeholders `${{workspace_id}}` and `${{workspace}}`.
 
@@ -232,7 +232,7 @@ data:
 
 ---
 
-## 🌐 Subpath Routing & Prefix Preservation
+## 🌐 Subpath Routing & Prefix Preservation *(Available from v0.4.0)*
 
 When dynamic workspaces are accessed via path-based URLs (e.g. `http://localhost:8080/route/:workspaceId/`), the routing proxy behaves dynamically based on the pod configuration:
 

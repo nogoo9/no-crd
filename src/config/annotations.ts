@@ -91,7 +91,7 @@ export const ANNOTATION_METADATA: AnnotationParam[] = [
 		key: ANNOTATION_KEYS.INIT_SHARE_VOLUMES,
 		type: 'Annotation ("true" | "false")',
 		description:
-			"Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`.",
+			"Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`. *(Available from v0.5.5)*",
 	},
 	{
 		key: ANNOTATION_KEYS.PRE_STOP_COMMAND,
