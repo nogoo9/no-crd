@@ -107,7 +107,7 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 			`nocr_refresh=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
 		);
 
-		return reply.send("Logged out");
+		return reply.send({ message: "Logged out" });
 	};
 	api.get("/logout", logoutHandler);
 	api.get("/mcp/logout", logoutHandler);
@@ -124,7 +124,10 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 		const { refresh_token } = request.body as { refresh_token?: string };
 		if (!refresh_token) {
 			reply.status(400);
-			return reply.send("Bad Request: Missing refresh_token in request body");
+			return reply.send({
+				error: "Bad Request",
+				message: "Missing refresh_token in request body",
+			});
 		}
 
 		try {
@@ -134,7 +137,10 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 			const sessKey = getSessionKey();
 			if (!sessKey) {
 				reply.status(500);
-				return reply.send("Internal Server Error: Session secret not resolved");
+				return reply.send({
+					error: "Internal Server Error",
+					message: "Session secret not resolved",
+				});
 			}
 
 			const encrypted = encryptRefreshToken(refresh_token, sessKey);
@@ -150,7 +156,10 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 				error: err,
 			});
 			reply.status(500);
-			return reply.send("Internal Server Error");
+			return reply.send({
+				error: "Internal Server Error",
+				message: "Internal Server Error",
+			});
 		}
 	};
 	api.post("/auth/set-refresh", { preHandler: requireAuth }, setRefreshHandler);
@@ -257,6 +266,7 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 				reply.raw.end();
 			} else {
 				const arrayBuffer = await res.arrayBuffer();
+				// Safe: This is an internal routing proxy forwarding binary payload/streams from the workspace pod, not executing user input as HTML.
 				// nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
 				reply.send(Buffer.from(arrayBuffer));
 			}

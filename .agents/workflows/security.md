@@ -33,11 +33,11 @@ For each finding:
 
 | Severity | Action |
 |---|---|
-| **ERROR** | Hard block — must fix or add a justified `# nosemgrep: <rule-id>` suppression before continuing |
-| **WARNING** | Review — fix if it is a real vulnerability; suppress with justification if it's a false positive |
+| **ERROR** | Hard block — must fix or obtain human review and approval for any bypass |
+| **WARNING** | Review — fix if it is a real vulnerability; obtain human review and approval for any bypass |
 | **INFO** | Note only — informational, no action required |
 
-Do **not** use blanket `# nosemgrep` without specifying the rule ID. Every suppression must have a comment explaining why it is a false positive.
+Security bypasses (such as adding `// nosemgrep` comments or dismissing CodeQL alerts) are strictly prohibited without explicit human review and approval. Every proposed bypass must be documented with a detailed justification.
 
 ## Step 4 — Apply the code-security skill
 

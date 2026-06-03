@@ -29,9 +29,10 @@ export async function registerProxyRoutes(
 
 			if (!modes.includes("token-api")) {
 				reply.status(403);
-				return reply.send(
-					"Forbidden: token-api mode is not enabled for this workspace",
-				);
+				return reply.send({
+					error: "Forbidden",
+					message: "token-api mode is not enabled for this workspace",
+				});
 			}
 
 			const token = (request as any).token;
@@ -55,9 +56,10 @@ export async function registerProxyRoutes(
 
 			if (!modes.includes("token-api")) {
 				reply.status(403);
-				return reply.send(
-					"Forbidden: token-api mode is not enabled for this workspace",
-				);
+				return reply.send({
+					error: "Forbidden",
+					message: "token-api mode is not enabled for this workspace",
+				});
 			}
 
 			const query = request.query as {
@@ -68,33 +70,52 @@ export async function registerProxyRoutes(
 
 			if (!redirectUri) {
 				reply.status(400);
-				return reply.send("Bad Request: Missing redirect_uri query parameter");
+				return reply.send({
+					error: "Bad Request",
+					message: "Missing redirect_uri query parameter",
+				});
 			}
 
 			// Open-redirect protection: redirect_uri must be same-origin
+			let relativePath = "";
 			try {
 				const requestHost = request.headers.host || "localhost";
-				const url = new URL(redirectUri, `http://${requestHost}`);
+				const protocol =
+					request.headers["x-forwarded-proto"] === "https" ? "https" : "http";
+				const url = new URL(redirectUri, `${protocol}://${requestHost}`);
 				if (url.host !== requestHost) {
 					reply.status(400);
-					return reply.send("Bad Request: redirect_uri must be same-origin");
+					return reply.send({
+						error: "Bad Request",
+						message: "redirect_uri must be same-origin",
+					});
+				}
+				relativePath = url.pathname + url.search + url.hash;
+				if (!relativePath.startsWith("/") || relativePath.startsWith("//")) {
+					reply.status(400);
+					return reply.send({
+						error: "Bad Request",
+						message: "Invalid redirect_uri path",
+					});
 				}
 			} catch (_) {
 				reply.status(400);
-				return reply.send("Bad Request: Invalid redirect_uri format");
+				return reply.send({
+					error: "Bad Request",
+					message: "Invalid redirect_uri format",
+				});
 			}
 
 			const token = (request as any).token || "";
 			const responseMode = query.response_mode || "fragment";
 			const separator =
 				responseMode === "query"
-					? redirectUri.includes("?")
+					? relativePath.includes("?")
 						? "&"
 						: "?"
 					: "#";
-			const redirectUrl = `${redirectUri}${separator}token=${encodeURIComponent(token)}`;
+			const redirectUrl = `${relativePath}${separator}token=${encodeURIComponent(token)}`;
 
-			// nosemgrep: javascript.express.security.audit.express-open-redirect.express-open-redirect
 			return reply.redirect(redirectUrl);
 		},
 	);
@@ -106,7 +127,10 @@ export async function registerProxyRoutes(
 		const { workspaceId } = request.params as { workspaceId: string };
 		if (!workspaceId) {
 			reply.status(400);
-			return reply.send("Workspace ID is required");
+			return reply.send({
+				error: "Bad Request",
+				message: "Workspace ID is required",
+			});
 		}
 
 		// 1. Look up workspace pod to check user sub and mode annotation
@@ -132,7 +156,10 @@ export async function registerProxyRoutes(
 			});
 			if (res.items.length === 0) {
 				reply.status(404);
-				return reply.send(`Workspace "${workspaceId}" not found`);
+				return reply.send({
+					error: "Not Found",
+					message: "Workspace not found",
+				});
 			}
 			pod = res.items[0];
 		} catch (err) {
@@ -140,7 +167,10 @@ export async function registerProxyRoutes(
 				error: err,
 			});
 			reply.status(500);
-			return reply.send("Internal Server Error");
+			return reply.send({
+				error: "Internal Server Error",
+				message: "Internal Server Error",
+			});
 		}
 
 		// 2. Verify if token-api mode is enabled
@@ -152,9 +182,10 @@ export async function registerProxyRoutes(
 
 		if (!modes.includes("token-api")) {
 			reply.status(403);
-			return reply.send(
-				"Forbidden: token-api mode is not enabled for this workspace",
-			);
+			return reply.send({
+				error: "Forbidden",
+				message: "token-api mode is not enabled for this workspace",
+			});
 		}
 
 		if (!config.auth.enabled) {
@@ -164,7 +195,10 @@ export async function registerProxyRoutes(
 		const sessKey = getSessionKey();
 		if (!sessKey) {
 			reply.status(500);
-			return reply.send("Internal Server Error: Session secret not resolved");
+			return reply.send({
+				error: "Internal Server Error",
+				message: "Session secret not resolved",
+			});
 		}
 
 		const refreshCookie = extractTokenFromCookie(
@@ -173,13 +207,19 @@ export async function registerProxyRoutes(
 		);
 		if (!refreshCookie) {
 			reply.status(401);
-			return reply.send("Unauthorized: Missing refresh cookie");
+			return reply.send({
+				error: "Unauthorized",
+				message: "Missing refresh cookie",
+			});
 		}
 
 		const decryptedRefresh = decryptRefreshToken(refreshCookie, sessKey);
 		if (!decryptedRefresh) {
 			reply.status(401);
-			return reply.send("Unauthorized: Invalid refresh cookie");
+			return reply.send({
+				error: "Unauthorized",
+				message: "Invalid refresh cookie",
+			});
 		}
 
 		try {
@@ -193,7 +233,7 @@ export async function registerProxyRoutes(
 			);
 
 			// 3. Verify user owns the workspace
-			const podSub = pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB];
+			const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
 			const userSub = extractUserIdentity(
 				result.jwtPayload,
 				config.auth.subJsonPath,
@@ -201,7 +241,10 @@ export async function registerProxyRoutes(
 
 			if (podSub !== userSub) {
 				reply.status(403);
-				return reply.send("Forbidden: You do not own this workspace");
+				return reply.send({
+					error: "Forbidden",
+					message: "You do not own this workspace",
+				});
 			}
 
 			// 4. Update cookies
@@ -237,9 +280,10 @@ export async function registerProxyRoutes(
 				error: err instanceof Error ? err.message : String(err),
 			});
 			reply.status(401);
-			return reply.send(
-				`Unauthorized: ${err instanceof Error ? err.message : String(err)}`,
-			);
+			return reply.send({
+				error: "Unauthorized",
+				message: err instanceof Error ? err.message : String(err),
+			});
 		}
 	});
 

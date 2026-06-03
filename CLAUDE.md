@@ -128,3 +128,4 @@ Slash-command workflows and always-on rules are defined in `.agents/`. Use these
 | `.agents/rules/pre-push.md` | `always_on` | Before `git push`: format → typecheck → tests → `/security`. All must pass. Never force-push `main`. |
 | `.agents/rules/code-design.md` | `always_on` | Think before coding, simplicity first, surgical changes, goal-driven execution. |
 | `.agents/rules/commit.md` | `model_decision` | Route all commit/stage requests through `/commit` workflow. Never use `git commit --no-verify`. |
+| `.agents/rules/security.md` | `always_on` | Security scan and bypass regulations. Bypasses require human review. |

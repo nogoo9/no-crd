@@ -415,7 +415,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(401);
-			expect(await resp.text()).toContain("Valid JWT token");
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Unauthorized");
+			expect(data.message).toContain("Valid JWT token required");
 		} finally {
 			delete process.env.AUTH_ENABLED;
 		}
@@ -708,7 +710,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(401);
-			expect(await resp.text()).toContain("audience");
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Unauthorized");
+			expect(data.message).toContain("audience");
 		} finally {
 			delete process.env.AUTH_ENABLED;
 			delete process.env.JWT_VERIFICATION_REQUIRED;
@@ -798,9 +802,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(403);
-			expect(await resp.text()).toContain(
-				"Forbidden: Missing required scope: mcp:read",
-			);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Forbidden");
+			expect(data.message).toContain("Missing required scope: mcp:read");
 		});
 
 		test("GET /permissions allows if read scope is present", async () => {
@@ -821,9 +825,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(403);
-			expect(await resp.text()).toContain(
-				"Forbidden: Missing required scope: mcp:read",
-			);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Forbidden");
+			expect(data.message).toContain("Missing required scope: mcp:read");
 		});
 
 		test("Proxy POST blocks if write scope is missing", async () => {
@@ -834,9 +838,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(403);
-			expect(await resp.text()).toContain(
-				"Forbidden: Missing required scope: mcp:write",
-			);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Forbidden");
+			expect(data.message).toContain("Missing required scope: mcp:write");
 		});
 
 		test("Proxy POST allows if write scope is present", async () => {
@@ -1537,9 +1541,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(403);
-			expect(await resp.text()).toContain(
-				"Forbidden: token-api mode is not enabled",
-			);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Forbidden");
+			expect(data.message).toContain("token-api mode is not enabled");
 		});
 
 		test("Authorize API - /route/:workspaceId/_auth/authorize redirects to redirect_uri if same-origin and token-api enabled", async () => {
@@ -1677,7 +1681,9 @@ users:
 			);
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(400);
-			expect(await resp.text()).toContain("redirect_uri must be same-origin");
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Bad Request");
+			expect(data.message).toContain("redirect_uri must be same-origin");
 		});
 
 		test("WS Proxy - injects headers when inject-headers mode is enabled", async () => {

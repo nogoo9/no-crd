@@ -318,10 +318,13 @@ export function registerAuthHooks(
 			);
 			reply.header("Link", `<${metadataUrl}>; rel="oauth-protected-resource"`);
 
-			const msg = authError
+			const message = authError
 				? `Unauthorized: ${authError.message}`
 				: "Unauthorized: Valid JWT token required";
-			return reply.send(msg);
+			return reply.send({
+				error: "Unauthorized",
+				message,
+			});
 		}
 	};
 
@@ -341,9 +344,10 @@ export function registerAuthHooks(
 			) {
 				reply.status(403);
 				setCorsHeaders(reply);
-				return reply.send(
-					`Forbidden: Missing required scope: ${requiredScope}`,
-				);
+				return reply.send({
+					error: "Forbidden",
+					message: `Missing required scope: ${requiredScope}`,
+				});
 			}
 
 			const requiredRole = config.auth.requiredReadRole;
@@ -353,7 +357,10 @@ export function registerAuthHooks(
 			) {
 				reply.status(403);
 				setCorsHeaders(reply);
-				return reply.send(`Forbidden: Missing required role: ${requiredRole}`);
+				return reply.send({
+					error: "Forbidden",
+					message: `Missing required role: ${requiredRole}`,
+				});
 			}
 		}
 	};
@@ -381,9 +388,10 @@ export function registerAuthHooks(
 			) {
 				reply.status(403);
 				setCorsHeaders(reply);
-				return reply.send(
-					`Forbidden: Missing required scope: ${requiredScope}`,
-				);
+				return reply.send({
+					error: "Forbidden",
+					message: `Missing required scope: ${requiredScope}`,
+				});
 			}
 
 			const requiredRole = isRead
@@ -396,7 +404,10 @@ export function registerAuthHooks(
 			) {
 				reply.status(403);
 				setCorsHeaders(reply);
-				return reply.send(`Forbidden: Missing required role: ${requiredRole}`);
+				return reply.send({
+					error: "Forbidden",
+					message: `Missing required role: ${requiredRole}`,
+				});
 			}
 		}
 	};
@@ -412,7 +423,10 @@ export function registerAuthHooks(
 		if (!workspaceId) {
 			reply.status(400);
 			setCorsHeaders(reply);
-			return reply.send("Workspace ID is required");
+			return reply.send({
+				error: "Bad Request",
+				message: "Workspace ID is required",
+			});
 		}
 
 		let userSub = "anonymous";
@@ -425,9 +439,10 @@ export function registerAuthHooks(
 			} catch (err) {
 				reply.status(401);
 				setCorsHeaders(reply);
-				return reply.send(
-					`Unauthorized: ${err instanceof Error ? err.message : String(err)}`,
-				);
+				return reply.send({
+					error: "Unauthorized",
+					message: err instanceof Error ? err.message : String(err),
+				});
 			}
 		}
 
@@ -442,35 +457,45 @@ export function registerAuthHooks(
 			if (res.items.length === 0) {
 				reply.status(404);
 				setCorsHeaders(reply);
-				return reply.send(`Workspace "${workspaceId}" not found`);
+				return reply.send({
+					error: "Not Found",
+					message: `Workspace "${workspaceId}" not found`,
+				});
 			}
 
 			const pod = res.items[0];
-			const podSub = pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB];
+			const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
 
 			if (config.auth.enabled && podSub !== userSub) {
 				reply.status(403);
 				setCorsHeaders(reply);
-				return reply.send("Forbidden: You do not own this workspace");
+				return reply.send({
+					error: "Forbidden",
+					message: "You do not own this workspace",
+				});
 			}
 
 			if (pod.status?.phase !== "Running") {
 				reply.status(503);
 				setCorsHeaders(reply);
-				return reply.send(
-					`Workspace is not running (status: ${pod.status?.phase || "Unknown"})`,
-				);
+				return reply.send({
+					error: "Service Unavailable",
+					message: `Workspace is not running (status: ${pod.status?.phase || "Unknown"})`,
+				});
 			}
 
 			const podIP = pod.status?.podIP;
 			if (!podIP) {
 				reply.status(503);
 				setCorsHeaders(reply);
-				return reply.send("Workspace IP address not assigned yet");
+				return reply.send({
+					error: "Service Unavailable",
+					message: "Workspace IP address not assigned yet",
+				});
 			}
 
 			const targetPortAnnotation =
-				pod.metadata?.annotations?.[ANNOTATION_KEYS.WORKSPACE_PORT];
+				pod.metadata?.annotations?.["nogoo9/workspace-port"];
 			let port =
 				targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000";
 
@@ -551,9 +576,10 @@ export function registerAuthHooks(
 			});
 			reply.status(500);
 			setCorsHeaders(reply);
-			return reply.send(
-				`Internal Server Error: ${err instanceof Error ? err.message : String(err)}`,
-			);
+			return reply.send({
+				error: "Internal Server Error",
+				message: err instanceof Error ? err.message : String(err),
+			});
 		}
 	};
 

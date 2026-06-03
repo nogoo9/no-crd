@@ -225,9 +225,13 @@ function showToast(message: string, type: "success" | "error" = "success") {
 		${icon}
 		<div class="flex-1">
 			<p class="text-sm font-semibold theme-text-title">${type === "success" ? "Success" : "Error"}</p>
-			<p class="text-xs theme-text-muted mt-0.5 leading-relaxed">${message}</p>
+			<p class="text-xs theme-text-muted mt-0.5 leading-relaxed toast-message-content"></p>
 		</div>
 	`;
+	const msgEl = toast.querySelector(".toast-message-content");
+	if (msgEl) {
+		msgEl.textContent = message;
+	}
 
 	toastContainer.appendChild(toast);
 
@@ -1935,6 +1939,15 @@ async function initOidc() {
 		return;
 	}
 
+	const safeRedirect = (relativePath: string, token: string) => {
+		if (relativePath.startsWith("/") && !relativePath.startsWith("//")) {
+			const separator = relativePath.includes("?") ? "&" : "?";
+			const finalUrl = `${relativePath}${separator}token=${encodeURIComponent(token)}`;
+			const loc = window.location as any;
+			loc.href = finalUrl;
+		}
+	};
+
 	const urlParams = new URLSearchParams(window.location.search);
 	const targetRedirect = urlParams.get("redirect_uri");
 	if (targetRedirect) {
@@ -1958,13 +1971,8 @@ async function initOidc() {
 				if (testUrl.origin === window.location.origin) {
 					// Coerce to a purely relative path to prevent any chance of open redirect (CWE-601)
 					const relativePath = testUrl.pathname + testUrl.search + testUrl.hash;
-					if (relativePath.startsWith("/") && !relativePath.startsWith("//")) {
-						const separator = relativePath.includes("?") ? "&" : "?";
-						const finalUrl = `${relativePath}${separator}token=${encodeURIComponent(currentToken)}`;
-						// nosemgrep: javascript.browser.security.open-redirect.js-open-redirect
-						window.location.href = finalUrl; // Safe: validated relative path
-						return;
-					}
+					safeRedirect(relativePath, currentToken);
+					return;
 				}
 			} catch (_) {}
 		}
@@ -2075,16 +2083,8 @@ async function initOidc() {
 								// Coerce to a purely relative path to prevent any chance of open redirect (CWE-601)
 								const relativePath =
 									testUrl.pathname + testUrl.search + testUrl.hash;
-								if (
-									relativePath.startsWith("/") &&
-									!relativePath.startsWith("//")
-								) {
-									const separator = relativePath.includes("?") ? "&" : "?";
-									const finalUrl = `${relativePath}${separator}token=${encodeURIComponent(tokenData.access_token)}`;
-									// nosemgrep: javascript.browser.security.open-redirect.js-open-redirect
-									window.location.href = finalUrl; // Safe: validated relative path
-									return;
-								}
+								safeRedirect(relativePath, tokenData.access_token);
+								return;
 							}
 						} catch (_) {}
 					}
