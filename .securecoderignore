@@ -21,3 +21,18 @@
 # vendor/**
 # *.generated.*
 # *.pb.go
+
+# --- Non-source folders to ignore ---
+docs/**
+infra/**
+kubernetes/**
+dist/**
+node_modules/**
+examples/**
+scripts/**
+themes/**
+templates/**
+.github/**
+.moon/**
+.agents/**
+.vitepress/**
