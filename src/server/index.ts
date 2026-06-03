@@ -192,6 +192,22 @@ export async function createFastifyApp(options?: {
 	if (app.server && !(app.server as any).closeIdleConnections) {
 		(app.server as any).closeIdleConnections = () => {};
 	}
+
+	// Resolve session secret key for cookie signing/encryption
+	try {
+		const { resolveSessionSecret } = await import("~/k8s/index.js");
+		const k8sCtx = getK8sContext();
+		await resolveSessionSecret(
+			k8sCtx ? k8sCtx.coreApi : null,
+			config.k8s.namespace,
+			3000,
+		);
+	} catch (err) {
+		logger.warn("Failed to resolve session secret key: {error}", {
+			error: err,
+		});
+	}
+
 	const basePrefix = getBasePrefix();
 
 	// CORS and path traversal hook

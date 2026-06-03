@@ -13,7 +13,7 @@ const logger = getLogger(["nogoo9", "routes", "mcp"]);
 
 export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 	const basePrefix = getBasePrefix();
-	const { requireMcpAuth } = deps.guards;
+	const { requireAuth, requireMcpAuth } = deps.guards;
 
 	// OAuth protected resource metadata endpoint
 	api.get("/.well-known/oauth-protected-resource", async (request, reply) => {
@@ -102,13 +102,72 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 			"Set-Cookie",
 			`nocr_sess=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
 		);
+		reply.header(
+			"Set-Cookie",
+			`nocr_refresh=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+		);
 
-		return reply.send("Logged out");
+		return reply.send({ message: "Logged out" });
 	};
 	api.get("/logout", logoutHandler);
 	api.get("/mcp/logout", logoutHandler);
 	api.post("/logout", logoutHandler);
 	api.post("/mcp/logout", logoutHandler);
+
+	// Refresh token setup endpoints
+	const setRefreshHandler = async (
+		request: FastifyRequest,
+		reply: FastifyReply,
+	) => {
+		setCorsHeaders(reply);
+
+		const { refresh_token } = request.body as { refresh_token?: string };
+		if (!refresh_token) {
+			reply.status(400);
+			return reply.send({
+				error: "Bad Request",
+				message: "Missing refresh_token in request body",
+			});
+		}
+
+		try {
+			const { encryptRefreshToken, getSessionKey } = await import(
+				"~/k8s/index.js"
+			);
+			const sessKey = getSessionKey();
+			if (!sessKey) {
+				reply.status(500);
+				return reply.send({
+					error: "Internal Server Error",
+					message: "Session secret not resolved",
+				});
+			}
+
+			const encrypted = encryptRefreshToken(refresh_token, sessKey);
+
+			reply.header(
+				"Set-Cookie",
+				`nocr_refresh=${encrypted}; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`,
+			);
+
+			return { ok: true };
+		} catch (err) {
+			logger.error("Failed to encrypt and store refresh token: {error}", {
+				error: err,
+			});
+			reply.status(500);
+			return reply.send({
+				error: "Internal Server Error",
+				message: "Internal Server Error",
+			});
+		}
+	};
+	api.post("/auth/set-refresh", { preHandler: requireAuth }, setRefreshHandler);
+	api.post(
+		"/mcp/auth/set-refresh",
+		{ preHandler: requireAuth },
+		setRefreshHandler,
+	);
 
 	// Permissions endpoints
 	const permissionsHandler = async (
@@ -207,6 +266,7 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 				reply.raw.end();
 			} else {
 				const arrayBuffer = await res.arrayBuffer();
+				// Safe: This is an internal routing proxy forwarding binary payload/streams from the workspace pod, not executing user input as HTML.
 				// nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
 				reply.send(Buffer.from(arrayBuffer));
 			}

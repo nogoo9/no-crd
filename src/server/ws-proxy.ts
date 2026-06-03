@@ -52,8 +52,9 @@ export function registerUpgradeHandler(
 
 		// 1. Authentication Check
 		let userSub = "anonymous";
+		let jwtPayload: any = null;
+		let token: string | null = null;
 		if (config.auth.enabled) {
-			let token: string | null = null;
 			const authHeader = req.headers.authorization;
 			if (authHeader?.toLowerCase().startsWith("bearer ")) {
 				token = authHeader.substring(7);
@@ -85,7 +86,7 @@ export function registerUpgradeHandler(
 					if (proto === "wss") proto = "https";
 					expectedAudience = `${proto}://${host}${basePrefix}`;
 				} catch (_) {}
-				const jwtPayload = await verifyToken(token, expectedAudience);
+				jwtPayload = await verifyToken(token, expectedAudience);
 
 				const requiredScope = config.auth.requiredReadScope;
 				if (
@@ -149,6 +150,7 @@ export function registerUpgradeHandler(
 		let podIP: string;
 		let port: string;
 		let upstreamPath = subpath;
+		let pod: any = null;
 
 		try {
 			const res = await k8sCtx.coreApi.listNamespacedPod({
@@ -166,7 +168,7 @@ export function registerUpgradeHandler(
 				return;
 			}
 
-			const pod = res.items[0];
+			pod = res.items[0];
 			const podSub = pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB];
 
 			if (config.auth.enabled && podSub !== userSub) {
@@ -264,7 +266,33 @@ export function registerUpgradeHandler(
 
 			const fullUpstreamPath = upstreamPath + query;
 			let rawRequest = `${req.method} ${fullUpstreamPath} HTTP/${req.httpVersion}\r\n`;
-			for (const [key, value] of Object.entries(req.headers)) {
+
+			const headersToSend = { ...req.headers };
+			const annotations = pod.metadata?.annotations || {};
+			const authMode = annotations["nogoo9/workspace-auth-mode"] || "";
+			const modes = authMode
+				.split(",")
+				.map((m: string) => m.trim().toLowerCase());
+
+			if (modes.includes("inject-headers")) {
+				if (jwtPayload) {
+					const finalUserSub =
+						userSub !== "anonymous" ? userSub : jwtPayload.sub || "anonymous";
+					headersToSend["x-user-sub"] = finalUserSub;
+					const roles = jwtPayload.realm_access?.roles || jwtPayload.roles;
+					if (roles) {
+						headersToSend["x-user-roles"] = Array.isArray(roles)
+							? roles.join(",")
+							: String(roles);
+					}
+				}
+				if (token) {
+					headersToSend["x-workspace-jwt"] = token;
+					headersToSend.authorization = `Bearer ${token}`;
+				}
+			}
+
+			for (const [key, value] of Object.entries(headersToSend)) {
 				if (Array.isArray(value)) {
 					for (const val of value) {
 						rawRequest += `${key}: ${val}\r\n`;

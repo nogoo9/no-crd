@@ -6,7 +6,16 @@ This guide details how to integrate the `@nogoo9/no-crd` MCP server with generic
 
 ## 🌐 Generic OIDC Integration Architecture
 
-At a high level, the MCP server acts as an **OAuth 2.0 Resource Server**. It consumes JSON Web Tokens (JWTs) issued by your Identity Provider to authenticate requests and enforce authorization parameters.
+At a high level, the `@nogoo9/no-crd` backend acts as an **OAuth 2.0 Resource Server & BFF (Backend-for-Frontend) Proxy**. It handles the secure login redirect loop, exchanges authorization codes for tokens, encrypts refresh credentials in session cookies, and consumes JSON Web Tokens (JWTs) to authenticate requests.
+
+<!-- 
+prompt: A sleek, modern software design diagram explaining OIDC SSO login flow and redirect loop with PKCE. It shows: 1. User Browser trying to access a secure route and getting redirected to Identity Provider (IdP/SSO) login page, 2. User logging in on the IdP login page and getting redirected back with an auth code and verifier, 3. The Backend Server exchanging the auth code for access and refresh tokens, 4. The Backend Server setting encrypted HttpOnly cookies (nocr_sess, nocr_refresh) in the browser. Use a dark mode theme, elegant neon gradients, clean arrows, and sans-serif typography.
+-->
+![OIDC SSO Login Flow](/sso_login_flow.png)
+
+### Authentication Sequence Flow
+
+The following sequence diagram shows the step-by-step communication during tool execution:
 
 ```mermaid
 sequenceDiagram
@@ -60,7 +69,8 @@ Okta organizes scopes and roles (groups) in customizable claims.
 ### 1. Okta Admin Console Configuration
 1. Register a **Single Page Application (SPA)** or **Web Application** client in Okta.
 2. Ensure **Authorization Code Flow with PKCE** is enabled.
-3. Configure the Authorization Server:
+3. Under the application's **General Settings > Allowed Grant Types**, ensure **Refresh Token** is enabled to support transparent token refresh.
+4. Configure the Authorization Server:
    - Go to **Security > API > Authorization Servers**.
    - Create or select a server (e.g. `default`).
    - In **Claims**, add a new Claim:
@@ -79,7 +89,8 @@ JWT_AUDIENCE="api://default"
 # Subject Extraction
 AUTH_SUB_JSONPATH="$.sub"
 
-# Scope checks (Okta scopes space-separated)
+# Scope checks & Custom UI Scopes (includes offline_access for refresh)
+OAUTH_SCOPES="openid profile email offline_access"
 AUTH_REQUIRED_READ_SCOPE="mcp:read"
 AUTH_REQUIRED_WRITE_SCOPE="mcp:write"
 AUTH_SCOPE_JSONPATH="$.scp" # Okta often populates scp array
@@ -102,6 +113,7 @@ Auth0 maps custom claims (like roles or permissions) using custom rules/actions 
 1. Register an **API** representing the MCP server:
    - Set Identifier/Audience (e.g., `https://mcp.company.com`).
    - Define scopes (e.g., `mcp:read`, `mcp:write`).
+   - In the API settings, ensure **Allow Offline Access** is turned on to enable issuing refresh tokens.
 2. Register a **SPA** client and authorize it to access the API.
 3. Add User Roles to Token (via Auth0 Action):
    - Go to **Actions > Flows > Login > Add Action**.
@@ -125,7 +137,8 @@ JWT_AUDIENCE="https://mcp.company.com"
 # Subject Extraction
 AUTH_SUB_JSONPATH="$.sub"
 
-# Scope checks (Auth0 permissions maps to scope parameter array/string)
+# Scope checks & Custom UI Scopes (includes offline_access for refresh)
+OAUTH_SCOPES="openid profile email offline_access"
 AUTH_REQUIRED_READ_SCOPE="mcp:read"
 AUTH_REQUIRED_WRITE_SCOPE="mcp:write"
 AUTH_SCOPE_JSONPATH="$.scope"
@@ -150,7 +163,8 @@ Microsoft Entra ID populates user groups under a `groups` claim (containing Acti
 3. Expose an API:
    - Define **Application ID URI** (e.g. `api://{clientId}`).
    - Define scopes: `mcp.read` and `mcp.write`.
-4. Configure User Groups:
+4. In **API permissions**, add standard OpenID permissions (`openid`, `offline_access`, `profile`, `email`) from the Microsoft Graph API to enable transparent session refresh.
+5. Configure User Groups:
    - In **Token configuration > Add groups claim**, select **Security groups**.
    - Note: This includes the Active Directory Group UUIDs in the `groups` claim.
 5. Alternatively, define **App roles** in the App registration to map specific roles (e.g., `MCP.Reader`, `MCP.Writer`).
@@ -165,7 +179,8 @@ JWT_AUDIENCE="api://{clientId}"
 # Subject Extraction (using Microsoft preferred_username or oid)
 AUTH_SUB_JSONPATH="$.preferred_username"
 
-# Scope Checks
+# Scope Checks & Custom UI Scopes (includes offline_access for refresh)
+OAUTH_SCOPES="openid profile email offline_access"
 AUTH_REQUIRED_READ_SCOPE="mcp.read"
 AUTH_REQUIRED_WRITE_SCOPE="mcp.write"
 AUTH_SCOPE_JSONPATH="$.scp"
@@ -194,6 +209,7 @@ Keycloak is an open-source IAM that supports flexible realm role mappings and to
 2. In **Clients > nogoo9-mcp > Client scopes**, add these scopes as **Default** or **Optional** client scopes.
 3. Configure User Roles under **Realm roles** (e.g., `nogoo9-admin` or `mcp-developer`). Assign these roles to users.
 4. Keycloak automatically outputs user roles under the `realm_access.roles` token payload.
+5. For proxy-level transparent session refresh, ensure the built-in `offline_access` scope is added as an **Optional** client scope for the `nogoo9-mcp` client, and assign the built-in realm role `offline_access` to any users/groups that need to log in to the dashboard (otherwise Keycloak will reject the token exchange with a `400 Bad Request`).
 
 ### 2. Environment Variables Configuration
 ```bash
@@ -205,7 +221,8 @@ JWT_AUDIENCE="http://{mcp-host}:3000"
 # Subject Extraction
 AUTH_SUB_JSONPATH="$.sub"
 
-# Scope Checks
+# Scope Checks & Custom UI Scopes (includes offline_access for refresh)
+OAUTH_SCOPES="openid profile email offline_access"
 AUTH_REQUIRED_READ_SCOPE="mcp:read"
 AUTH_REQUIRED_WRITE_SCOPE="mcp:write"
 AUTH_SCOPE_JSONPATH="$.scope"
@@ -230,7 +247,8 @@ PingIdentity provides enterprise identity solutions via **PingOne** (cloud-based
 1. Log in to the **PingOne Admin Console** and navigate to your environment.
 2. Go to **Connections > Applications** and click **Add Application**.
 3. Create a **Web App** or **Single Page Application (SPA)** using **Authorization Code Flow with PKCE**.
-4. To map groups to token claims:
+4. Under the application's configuration settings, ensure the **Refresh Token** grant type is enabled.
+5. To map groups to token claims:
    - Go to **Attribute Mapping** for the newly created application.
    - Click **Add Attribute**.
    - Set the **Target Claim** to `groups` or `roles`.
@@ -240,7 +258,7 @@ PingIdentity provides enterprise identity solutions via **PingOne** (cloud-based
 #### Option B: PingFederate (On-Premise)
 1. Open the **PingFederate Administration Console**.
 2. Navigate to **Applications > OAuth Clients** and register a new client.
-3. Configure the client to support the **Authorization Code** grant type.
+3. Configure the client to support the **Authorization Code** and **Refresh Token** grant types.
 4. Under **Access Token Management (ATM)**:
    - Create or select an ATM instance.
    - Extend the ATM's **Attribute Contract** to include a `groups` or `roles` claim.
@@ -269,7 +287,8 @@ JWT_AUDIENCE="api://nogoo9-mcp"
 # --- Claim Extraction ---
 AUTH_SUB_JSONPATH="$.sub"
 
-# Scope checks
+# Scope checks & Custom UI Scopes (includes offline_access for refresh)
+OAUTH_SCOPES="openid profile email offline_access"
 AUTH_REQUIRED_READ_SCOPE="mcp:read"
 AUTH_REQUIRED_WRITE_SCOPE="mcp:write"
 AUTH_SCOPE_JSONPATH="$.scope"

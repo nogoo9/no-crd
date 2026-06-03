@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
 	_resetSessionKeyForTesting,
 	createSessionCookie,
+	decryptRefreshToken,
+	encryptRefreshToken,
 	extractSessionCookieUserSub,
 	resolveSessionSecret,
 	type SessionPayload,
@@ -180,5 +182,50 @@ describe("resolveSessionSecret", () => {
 		const key1 = await resolveSessionSecret(null, "default");
 		const key2 = await resolveSessionSecret(null, "default");
 		expect(key1).toBe(key2);
+	});
+});
+
+describe("encryptRefreshToken & decryptRefreshToken", () => {
+	test("successfully encrypts and decrypts a token (round-trip)", () => {
+		const originalToken = "my-secret-refresh-token-12345!@#";
+		const encrypted = encryptRefreshToken(originalToken, TEST_SECRET);
+		expect(encrypted).not.toBe(originalToken);
+		expect(encrypted).toContain(".");
+		expect(encrypted.split(".").length).toBe(3); // iv.ciphertext.tag
+
+		const decrypted = decryptRefreshToken(encrypted, TEST_SECRET);
+		expect(decrypted).toBe(originalToken);
+	});
+
+	test("returns null if ciphertext is tampered", () => {
+		const originalToken = "refresh-token";
+		const encrypted = encryptRefreshToken(originalToken, TEST_SECRET);
+		const parts = encrypted.split(".");
+		// Tamper with the ciphertext (middle part)
+		parts[1] = `${parts[1]}abc`;
+		const tampered = parts.join(".");
+
+		const decrypted = decryptRefreshToken(tampered, TEST_SECRET);
+		expect(decrypted).toBeNull();
+	});
+
+	test("returns null if wrong secret key is used for decryption", () => {
+		const originalToken = "refresh-token";
+		const encrypted = encryptRefreshToken(originalToken, TEST_SECRET);
+
+		const decrypted = decryptRefreshToken(
+			encrypted,
+			"wrong-decryption-key-123",
+		);
+		expect(decrypted).toBeNull();
+	});
+
+	test("returns null for malformed encrypted inputs", () => {
+		expect(decryptRefreshToken("no-dots-here", TEST_SECRET)).toBeNull();
+		expect(decryptRefreshToken("one.dot", TEST_SECRET)).toBeNull();
+		expect(
+			decryptRefreshToken("too.many.dots.here.abc", TEST_SECRET),
+		).toBeNull();
+		expect(decryptRefreshToken("", TEST_SECRET)).toBeNull();
 	});
 });

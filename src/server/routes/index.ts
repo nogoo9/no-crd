@@ -6,6 +6,7 @@ import { registerThemesRoutes } from "./themes.js";
 
 export interface RouteDeps {
 	guards: {
+		requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<any>;
 		requireMcpAuth: (
 			request: FastifyRequest,
 			reply: FastifyReply,

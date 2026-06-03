@@ -31,15 +31,18 @@ For local development and testing, OIDC configuration is pre-configured and auto
   - **Flow**: Authorization Code Flow with PKCE (Standard Flow)
   - **Redirect URIs**: `*` (Wildcard for development flexibility)
   - **Web Origins**: `*` (Allow CORS requests)
-  - **Client Scopes**: Includes `mcp:read` and `mcp:write` configured as default client scopes to automatically populate scopes in issued tokens.
+  - **Client Scopes**:
+    - `mcp:read` and `mcp:write` configured as default client scopes to automatically populate scopes in issued tokens.
+    - `offline_access` configured as an optional client scope to support proxy-level transparent session refresh via offline tokens.
 - **Roles**:
   - `mcp-reader`: Default role for read-only actions (mapping to read tools/endpoints).
   - `mcp-writer`: Default role for mutation actions (mapping to write/delete tools/endpoints).
   - `nogoo9-admin`: Assigned to administrative test accounts to verify admin-only operations and pod escalation.
+  - `offline_access` (built-in): Must be assigned to users in their realm roles to authorize the issuance of offline refresh tokens.
 - **Default Users**:
-  - **Read-Only User**: `readuser` / `password` (has `mcp-reader` role)
-  - **Read-Write User**: `writeuser` / `password` (has `mcp-writer` and `mcp-reader` roles)
-  - **Admin User**: `adminuser` / `password` (has `nogoo9-admin` role)
+  - **Read-Only User**: `readuser` / `password` (has `mcp-reader` and `offline_access` roles)
+  - **Read-Write User**: `writeuser` / `password` (has `mcp-writer`, `mcp-reader`, and `offline_access` roles)
+  - **Admin User**: `adminuser` / `password` (has `nogoo9-admin` and `offline_access` roles)
 
 ---
 

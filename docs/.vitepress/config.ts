@@ -52,6 +52,7 @@ export default withMermaid(
 						{ text: "Session & Cookie Management", link: "/session-cookies" },
 						{ text: "SSO Provider Integration", link: "/sso-integration" },
 						{ text: "Advanced Auth: RBAC & ABAC", link: "/advanced-auth" },
+						{ text: "Workspace App Authorization", link: "/workspace-app-integration" },
 						{ text: "Cryptographic Hardening", link: "/auth-hardening" },
 					],
 				},
@@ -126,6 +127,10 @@ export default withMermaid(
 						{
 							text: "ADR-012: Per-Session Factory",
 							link: "/decisions/ADR-012-per-session-mcp-server-factory",
+						},
+						{
+							text: "ADR-013: Workspace App Auth",
+							link: "/decisions/ADR-013-workspace-app-authorization",
 						},
 					],
 				},

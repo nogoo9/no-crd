@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-06-03
+
+### Added
+
+- **Proxy-Level Transparent Token Refresh**: Implemented a transparent, proxy-level OIDC token refresh flow in the BFF gateway. The gateway now automatically intercepts requests with expired JWT access tokens, exchanges the HttpOnly secure session refresh token for a new pair of access/refresh tokens, and updates the client cookies and session in-flight without interrupting the user.
+- **OIDC Scopes Parameterization**: Parameterized the OIDC scopes requested by the frontend login flow via the `OAUTH_SCOPES` server environment variable (defaulting to `"openid profile email offline_access"`).
+
+### Fixed
+
+- **Keycloak Offline Access Role Mapping**: Explicitly added the `offline_access` role to the local dev realm configuration and assigned it to the default test users (`readuser`, `writeuser`, `adminuser`) to prevent `400 Bad Request` token exchange failures during OIDC PKCE flow.
+
 ## [0.5.6] — 2026-05-30
 
 ### Fixed

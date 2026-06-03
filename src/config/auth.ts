@@ -235,6 +235,18 @@ export const authSchema = {
 			return getEnv(this.env) ?? getEnv("JWT_SECRET") ?? this.defaultVal;
 		},
 	} satisfies SchemaItem<string>,
+
+	oauthScopes: {
+		cli: "-",
+		env: "OAUTH_SCOPES",
+		defaultVal: "openid profile email offline_access",
+		allowed: "Space-separated scope string",
+		description:
+			"OAuth scopes to request during authorization. Include 'offline_access' for refresh tokens.",
+		get value(): string {
+			return getEnv(this.env) ?? this.defaultVal;
+		},
+	} satisfies SchemaItem<string>,
 };
 
 export const authConfig = parseConfig(authSchema);

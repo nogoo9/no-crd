@@ -26,14 +26,20 @@ export function loadUiHtml(distDir: string, basePrefix = ""): string {
 	try {
 		logger.debug("Loading UI HTML index page from {htmlPath}", { htmlPath });
 		let html = readFileSync(htmlPath, "utf-8");
+		const oauthScopes = config.auth.oauthScopes.split(/\s+/).filter(Boolean);
+		const readScope = config.auth.requiredReadScope;
+		const writeScope = config.auth.requiredWriteScope;
+		if (readScope && !oauthScopes.includes(readScope)) {
+			oauthScopes.push(readScope);
+		}
+		if (writeScope && !oauthScopes.includes(writeScope)) {
+			oauthScopes.push(writeScope);
+		}
 		const oauthConfig = {
 			discoveryUrl: config.ui.oauth.discoveryUrl,
 			clientId: config.ui.oauth.clientId,
 			loginMethod: config.ui.oauth.loginMethod,
-			scopes: [
-				config.auth.requiredReadScope,
-				config.auth.requiredWriteScope,
-			].filter(Boolean) as string[],
+			scopes: oauthScopes,
 		};
 		const configScript = `<script>
 window.__NOCR_BASE_URL__ = ${JSON.stringify(basePrefix)};

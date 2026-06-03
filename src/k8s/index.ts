@@ -73,6 +73,8 @@ export {
 } from "./schemas.js";
 export {
 	createSessionCookie,
+	decryptRefreshToken,
+	encryptRefreshToken,
 	extractSessionCookieUserSub,
 	getSessionKey,
 	resolveSessionSecret,

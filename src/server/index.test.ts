@@ -415,7 +415,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(401);
-			expect(await resp.text()).toContain("Valid JWT token");
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Unauthorized");
+			expect(data.message).toContain("Valid JWT token required");
 		} finally {
 			delete process.env.AUTH_ENABLED;
 		}
@@ -708,7 +710,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(401);
-			expect(await resp.text()).toContain("audience");
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Unauthorized");
+			expect(data.message).toContain("audience");
 		} finally {
 			delete process.env.AUTH_ENABLED;
 			delete process.env.JWT_VERIFICATION_REQUIRED;
@@ -798,9 +802,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(403);
-			expect(await resp.text()).toContain(
-				"Forbidden: Missing required scope: mcp:read",
-			);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Forbidden");
+			expect(data.message).toContain("Missing required scope: mcp:read");
 		});
 
 		test("GET /permissions allows if read scope is present", async () => {
@@ -821,9 +825,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(403);
-			expect(await resp.text()).toContain(
-				"Forbidden: Missing required scope: mcp:read",
-			);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Forbidden");
+			expect(data.message).toContain("Missing required scope: mcp:read");
 		});
 
 		test("Proxy POST blocks if write scope is missing", async () => {
@@ -834,9 +838,9 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(403);
-			expect(await resp.text()).toContain(
-				"Forbidden: Missing required scope: mcp:write",
-			);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Forbidden");
+			expect(data.message).toContain("Missing required scope: mcp:write");
 		});
 
 		test("Proxy POST allows if write scope is present", async () => {
@@ -1336,5 +1340,641 @@ users:
 			mockSocket.destroy();
 			await new Promise<void>((resolve) => mockUpstream.close(() => resolve()));
 		}
+	});
+
+	describe("Workspace App Authorization Support", () => {
+		beforeEach(() => {
+			process.env.AUTH_ENABLED = "true";
+			process.env.JWT_VERIFICATION_REQUIRED = "false";
+			process.env.OAUTH_DISCOVERY_URL =
+				"http://keycloak/.well-known/openid-configuration";
+		});
+
+		afterEach(() => {
+			delete process.env.AUTH_ENABLED;
+			delete process.env.JWT_VERIFICATION_REQUIRED;
+			delete process.env.OAUTH_DISCOVERY_URL;
+		});
+
+		function createMockToken(payload: any, aud = "http://localhost") {
+			const header = { alg: "RS256" };
+			const p = {
+				aud,
+				exp: Math.floor(Date.now() / 1000) + 3600,
+				...payload,
+			};
+			return (
+				Buffer.from(JSON.stringify(header)).toString("base64url") +
+				"." +
+				Buffer.from(JSON.stringify(p)).toString("base64url") +
+				".sig"
+			);
+		}
+
+		test("HTTP Proxy - injects headers when inject-headers mode is enabled", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/workspace-auth-mode": "inject-headers",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({
+				sub: "user-1",
+				roles: ["admin", "user"],
+			});
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock((_url: string, init?: any) => {
+				expect(init.headers.get("x-user-sub")).toBe("user-1");
+				expect(init.headers.get("x-user-roles")).toBe("admin,user");
+				expect(init.headers.get("x-workspace-jwt")).toBe(token);
+				expect(init.headers.get("authorization")).toBe(`Bearer ${token}`);
+				return Promise.resolve(
+					new Response("proxied-response", { status: 200 }),
+				);
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const req = new Request("http://localhost/route/ws-1/subpath", {
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+				expect(await resp.text()).toBe("proxied-response");
+				expect(mockFetch).toHaveBeenCalled();
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("HTTP Proxy - does NOT inject headers when inject-headers mode is NOT enabled", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({
+				sub: "user-1",
+				roles: ["admin", "user"],
+			});
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock((_url: string, init?: any) => {
+				expect(init.headers.get("x-user-sub")).toBeNull();
+				expect(init.headers.get("x-user-roles")).toBeNull();
+				expect(init.headers.get("x-workspace-jwt")).toBeNull();
+				return Promise.resolve(
+					new Response("proxied-response", { status: 200 }),
+				);
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const req = new Request("http://localhost/route/ws-1/subpath", {
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+				expect(mockFetch).toHaveBeenCalled();
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("Token API - /route/:workspaceId/_auth/token returns token if token-api enabled", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({ sub: "user-1" });
+			const req = new Request("http://localhost/route/ws-1/_auth/token", {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			const body = await resp.json();
+			expect(body.token).toBe(token);
+		});
+
+		test("Token API - /route/:workspaceId/_auth/token returns 403 if token-api not enabled", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "inject-headers",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({ sub: "user-1" });
+			const req = new Request("http://localhost/route/ws-1/_auth/token", {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(403);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Forbidden");
+			expect(data.message).toContain("token-api mode is not enabled");
+		});
+
+		test("Authorize API - /route/:workspaceId/_auth/authorize redirects to redirect_uri if same-origin and token-api enabled", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			// Prime the server instance inside globalApp by doing a mock request
+			await handleWebRequest(
+				new Request("http://localhost/healthz", { method: "GET" }),
+			);
+
+			const addr = globalApp!.server.address();
+			const port = addr && typeof addr === "object" ? addr.port : 0;
+			const appHost = `127.0.0.1:${port}`;
+			const token = createMockToken({ sub: "user-1" }, `http://${appHost}`);
+			const redirectUri = `http://${appHost}/healthz`;
+			const req = new Request(
+				`http://${appHost}/route/ws-1/_auth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}`,
+				{
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Host: appHost,
+					},
+				},
+			);
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			expect(resp.redirected).toBe(true);
+			expect(resp.url).toContain("/healthz");
+			expect(resp.url).toContain(`token=${encodeURIComponent(token)}`);
+		});
+
+		test("Authorize API - /route/:workspaceId/_auth/authorize allows custom response_mode=query", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			// Prime the server instance inside globalApp by doing a mock request
+			await handleWebRequest(
+				new Request("http://localhost/healthz", { method: "GET" }),
+			);
+
+			const addr = globalApp!.server.address();
+			const port = addr && typeof addr === "object" ? addr.port : 0;
+			const appHost = `127.0.0.1:${port}`;
+			const tokenWithHost = createMockToken(
+				{ sub: "user-1" },
+				`http://${appHost}`,
+			);
+			const redirectUri = `http://${appHost}/healthz?foo=bar`;
+			const req = new Request(
+				`http://${appHost}/route/ws-1/_auth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query`,
+				{
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${tokenWithHost}`,
+						Host: appHost,
+					},
+				},
+			);
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			expect(resp.redirected).toBe(true);
+			expect(resp.url).toContain("/healthz");
+			expect(resp.url).toContain("foo=bar");
+			expect(resp.url).toContain(`token=${encodeURIComponent(tokenWithHost)}`);
+		});
+
+		test("Authorize API - /route/:workspaceId/_auth/authorize returns 400 if redirect_uri is not same-origin", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({ sub: "user-1" });
+			const redirectUri = "http://malicious-domain.com/callback";
+			const req = new Request(
+				`http://localhost/route/ws-1/_auth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}`,
+				{
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+						Host: "localhost",
+					},
+				},
+			);
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(400);
+			const data = (await resp.json()) as any;
+			expect(data.error).toBe("Bad Request");
+			expect(data.message).toContain("redirect_uri must be same-origin");
+		});
+
+		test("WS Proxy - injects headers when inject-headers mode is enabled", async () => {
+			const mockUpstream = net.createServer((socket) => {
+				socket.on("data", (data) => {
+					const requestStr = data.toString();
+					if (requestStr.toLowerCase().includes("upgrade: websocket")) {
+						expect(requestStr).toContain("x-user-sub: user-1");
+						expect(requestStr).toContain("x-user-roles: admin,user");
+						expect(requestStr).toContain("x-workspace-jwt: ");
+						expect(requestStr).toContain("authorization: Bearer ");
+						socket.write(
+							"HTTP/1.1 101 Switching Protocols\r\n" +
+								"Upgrade: websocket\r\n" +
+								"Connection: Upgrade\r\n" +
+								"\r\n" +
+								"hello from secure websocket",
+						);
+					}
+				});
+			});
+
+			await new Promise<void>((resolve) =>
+				mockUpstream.listen(0, "127.0.0.1", () => resolve()),
+			);
+
+			const upstreamPort = (mockUpstream.address() as net.AddressInfo).port;
+
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": String(upstreamPort),
+								"nogoo9/workspace-auth-mode": "inject-headers",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "127.0.0.1",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({
+				sub: "user-1",
+				roles: ["admin", "user"],
+			});
+
+			// Prime the server instance inside globalApp by doing a mock request
+			const initialReq = new Request("http://localhost/healthz", {
+				method: "GET",
+			});
+			await handleWebRequest(initialReq);
+
+			let resolvePromise: (value: string) => void;
+			const responsePromise = new Promise<string>((resolve) => {
+				resolvePromise = resolve;
+			});
+
+			const mockSocket = new (class extends EventEmitter {
+				writable = true;
+				destroyed = false;
+				write(chunk: any) {
+					const str = chunk.toString();
+					if (str.includes("101 Switching Protocols")) {
+						resolvePromise(str);
+					}
+					return true;
+				}
+				destroy() {
+					this.destroyed = true;
+					this.emit("close");
+				}
+			})();
+
+			const mockReq = {
+				url: `/route/ws-1/socket-path?token=${encodeURIComponent(token)}`,
+				method: "GET",
+				httpVersion: "1.1",
+				headers: {
+					host: "localhost",
+					upgrade: "websocket",
+					connection: "Upgrade",
+				},
+			};
+
+			globalApp!.server.emit(
+				"upgrade",
+				mockReq as any,
+				mockSocket as any,
+				Buffer.alloc(0),
+			);
+
+			try {
+				const response = await responsePromise;
+				expect(response).toContain("101 Switching Protocols");
+				expect(response).toContain("hello from secure websocket");
+			} finally {
+				mockSocket.destroy();
+				await new Promise<void>((resolve) =>
+					mockUpstream.close(() => resolve()),
+				);
+			}
+		});
+
+		test("POST /auth/set-refresh - encrypts and sets cookie", async () => {
+			const token = createMockToken({ sub: "user-1" });
+			const req = new Request("http://localhost/auth/set-refresh", {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${token}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ refresh_token: "my-valid-refresh-token" }),
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			const setCookie = resp.headers.get("set-cookie");
+			expect(setCookie).toContain("nocr_refresh=");
+			expect(setCookie).toContain("HttpOnly");
+			expect(setCookie).toContain("SameSite=Lax");
+		});
+
+		test("POST /route/:workspaceId/_auth/refresh - successful refresh and cookie rotation", async () => {
+			const originalFetch = globalThis.fetch;
+
+			// 1. Mock k8s API to return workspace owned by user-1
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			// 2. Mock OIDC discovery and token endpoint
+			const mockFetch = mock(async (url: string, init?: any) => {
+				if (url.includes("openid-configuration")) {
+					return new Response(
+						JSON.stringify({
+							token_endpoint: "http://keycloak/token",
+						}),
+						{ status: 200 },
+					);
+				}
+				if (url.includes("/token") && init?.method === "POST") {
+					expect(init.body).toContain("grant_type=refresh_token");
+					expect(init.body).toContain("refresh_token=old-refresh-token");
+					return new Response(
+						JSON.stringify({
+							access_token: createMockToken({ sub: "user-1" }),
+							refresh_token: "new-rotated-refresh-token",
+						}),
+						{ status: 200 },
+					);
+				}
+				return new Response("not found", { status: 404 });
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const { encryptRefreshToken, resolveSessionSecret } = await import(
+					"~/k8s/index.js"
+				);
+				const key = await resolveSessionSecret(null, "default");
+				const encryptedRefresh = encryptRefreshToken("old-refresh-token", key);
+
+				const req = new Request("http://localhost/route/ws-1/_auth/refresh", {
+					method: "POST",
+					headers: {
+						Cookie: `nocr_refresh=${encryptedRefresh}`,
+					},
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+
+				const data = await resp.json();
+				expect(data.token).toBeTruthy();
+
+				const setCookieHeaders = resp.headers.get("set-cookie");
+				expect(setCookieHeaders).toContain("nocr_sess=");
+				expect(setCookieHeaders).toContain("nocr_refresh=");
+				expect(setCookieHeaders).toContain("nocr_token=");
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("Global preHandler hook - transparently refreshes expired token", async () => {
+			const originalFetch = globalThis.fetch;
+
+			// Mock k8s API to return workspace owned by user-1
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "inject-headers",
+								"nogoo9/workspace-port": "8080",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const newAccessToken = createMockToken({ sub: "user-1" });
+
+			// Mock OIDC discovery and token endpoint
+			const mockFetch = mock(async (url: string, init?: any) => {
+				if (url.includes("openid-configuration")) {
+					return new Response(
+						JSON.stringify({
+							token_endpoint: "http://keycloak/token",
+						}),
+						{ status: 200 },
+					);
+				}
+				if (url.includes("/token") && init?.method === "POST") {
+					return new Response(
+						JSON.stringify({
+							access_token: newAccessToken,
+							refresh_token: "rotated-refresh-token",
+						}),
+						{ status: 200 },
+					);
+				}
+				if (url.includes("10.0.0.5:8080")) {
+					// Verify headers sent to upstream contain the refreshed token
+					expect(init.headers.get("x-workspace-jwt")).toBe(newAccessToken);
+					expect(init.headers.get("x-user-sub")).toBe("user-1");
+					return new Response("proxied-response-with-fresh-token", {
+						status: 200,
+					});
+				}
+				return new Response("not found", { status: 404 });
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const { encryptRefreshToken, resolveSessionSecret } = await import(
+					"~/k8s/index.js"
+				);
+				const key = await resolveSessionSecret(null, "default");
+				const encryptedRefresh = encryptRefreshToken(
+					"valid-refresh-token",
+					key,
+				);
+
+				const req = new Request("http://localhost/route/ws-1/resource", {
+					method: "GET",
+					headers: {
+						// Send expired access token and valid refresh cookie
+						Cookie: `nocr_token=expired-token; nocr_refresh=${encryptedRefresh}`,
+					},
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+				expect(await resp.text()).toBe("proxied-response-with-fresh-token");
+
+				const setCookieHeaders = resp.headers.get("set-cookie");
+				expect(setCookieHeaders).toContain("nocr_sess=");
+				expect(setCookieHeaders).toContain("nocr_refresh=");
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
 	});
 });
