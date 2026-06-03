@@ -1956,11 +1956,15 @@ async function initOidc() {
 			try {
 				const testUrl = new URL(targetRedirect, window.location.origin);
 				if (testUrl.origin === window.location.origin) {
-					const separator = targetRedirect.includes("?") ? "&" : "?";
-					const finalUrl = `${targetRedirect}${separator}token=${encodeURIComponent(currentToken)}`;
-					// nosemgrep: javascript.browser.security.open-redirect.js-open-redirect
-					window.location.href = finalUrl; // Safe: validated same-origin
-					return;
+					// Coerce to a purely relative path to prevent any chance of open redirect (CWE-601)
+					const relativePath = testUrl.pathname + testUrl.search + testUrl.hash;
+					if (relativePath.startsWith("/") && !relativePath.startsWith("//")) {
+						const separator = relativePath.includes("?") ? "&" : "?";
+						const finalUrl = `${relativePath}${separator}token=${encodeURIComponent(currentToken)}`;
+						// nosemgrep: javascript.browser.security.open-redirect.js-open-redirect
+						window.location.href = finalUrl; // Safe: validated relative path
+						return;
+					}
 				}
 			} catch (_) {}
 		}
@@ -2068,11 +2072,19 @@ async function initOidc() {
 								window.location.origin,
 							);
 							if (testUrl.origin === window.location.origin) {
-								const separator = redirectAfterLogin.includes("?") ? "&" : "?";
-								const finalUrl = `${redirectAfterLogin}${separator}token=${encodeURIComponent(tokenData.access_token)}`;
-								// nosemgrep: javascript.browser.security.open-redirect.js-open-redirect
-								window.location.href = finalUrl; // Safe: validated same-origin
-								return;
+								// Coerce to a purely relative path to prevent any chance of open redirect (CWE-601)
+								const relativePath =
+									testUrl.pathname + testUrl.search + testUrl.hash;
+								if (
+									relativePath.startsWith("/") &&
+									!relativePath.startsWith("//")
+								) {
+									const separator = relativePath.includes("?") ? "&" : "?";
+									const finalUrl = `${relativePath}${separator}token=${encodeURIComponent(tokenData.access_token)}`;
+									// nosemgrep: javascript.browser.security.open-redirect.js-open-redirect
+									window.location.href = finalUrl; // Safe: validated relative path
+									return;
+								}
 							}
 						} catch (_) {}
 					}
