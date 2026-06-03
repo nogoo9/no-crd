@@ -2,17 +2,20 @@
 
 This guide details the advanced authorization capabilities of `@nogoo9/no-crd` and documents strategies for scaling identity and access management across multiple remote applications.
 
+> [!IMPORTANT]
+> **Experimental Feature**: Advanced authorization checks and tenant isolation are available from **v0.3.0** and are currently marked as experimental.
+
 ---
 
-## 🛡️ Roles (RBAC) vs. Attributes (ABAC) in `no-crd`
+## 🛡️ Roles (RBAC) vs. Attributes (ABAC) in `no-crd` *(Available from v0.3.0)*
 
 `@nogoo9/no-crd` integrates both **Role-Based Access Control (RBAC)** and **Attribute-Based Access Control (ABAC)** to secure cluster resources.
 
 ```mermaid
 flowchart TD
     A["Authentication (JWT)"] --> B["1. RBAC (Scope & Role Check)"]
-    B -->|Verify capability: mcp:read/write <br> Verify role: mcp-reader/writer| C["2. ABAC (Tenant & Resource Isolation)"]
-    C -->|Verify ownership: Subject.sub == Resource.user-sub| D["Access Granted"]
+    B -->|"Verify capability: mcp:read/write \n Verify role: mcp-reader/writer"| C["2. ABAC (Tenant & Resource Isolation)"]
+    C -->|"Verify ownership: Subject.sub == Resource.user-sub"| D["Access Granted"]
     
     style A fill:#4F46E5,stroke:#fff,stroke-width:2px,color:#fff
     style B fill:#0EA5E9,stroke:#fff,stroke-width:2px,color:#fff
@@ -191,10 +194,10 @@ For complex deployments, decouple authentication from authorization entirely by 
 
 ```mermaid
 graph LR
-    User[User / Client] -->|1. JWT Token| Gateway[no-crd / App]
-    Gateway -->|2. Query: Token + Action + Resource| OPA[Open Policy Agent]
+    User["User / Client"] -->|1. JWT Token| Gateway["no-crd / App"]
+    Gateway -->|2. Query: Token + Action + Resource| OPA["Open Policy Agent"]
     OPA -->|3. Evaluate Rego Policy| Gateway
-    Gateway -->|4. Allow / Deny| User
+    Gateway -->|"4. Allow / Deny"| User
 ```
 
 1. **Authentication (IAM/Keycloak)**: User logs in and obtains a token containing only basic identity/organization attributes (no roles).

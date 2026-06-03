@@ -13,9 +13,9 @@ This repository is a platform for agent-driven, on-demand pod orchestration in K
 
 ```mermaid
 graph TD
-    Agent[AI Agent / Client] --> MCP[MCP Server: src/]
-    MCP --> K8s[Kubernetes API]
-    K8s --> Pod[Spawned Pod]
+    Agent["AI Agent / Client"] --> MCP["MCP Server: src/"]
+    MCP --> K8s["Kubernetes API"]
+    K8s --> Pod["Spawned Pod"]
 ```
 
 ## Repository Structure

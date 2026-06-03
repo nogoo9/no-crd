@@ -14,14 +14,14 @@ The server supports two transport protocols:
 
 ```mermaid
 graph TD
-    subgraph Stdio Integration
-        Cursor[Cursor / Claude Desktop] -->|Stdio Pipes| Cli[cli.js / index.ts]
-        Cli -->|Kubernetes API| K8s[Kubernetes Cluster]
+    subgraph "Stdio Integration"
+        Cursor["Cursor / Claude Desktop"] -->|Stdio Pipes| Cli["cli.js / index.ts"]
+        Cli -->|Kubernetes API| K8s["Kubernetes Cluster"]
     end
     
-    subgraph SSE HTTP Integration
-        WebClient[Web app / Custom SDK] -->|HTTP POST / SSE Stream| Server[server.ts]
-        Server -->|Kubernetes API| K8s2[Kubernetes Cluster]
+    subgraph "SSE HTTP Integration"
+        WebClient["Web app / Custom SDK"] -->|HTTP POST / SSE Stream| Server["server.ts"]
+        Server -->|Kubernetes API| K8s2["Kubernetes Cluster"]
     end
 ```
 
@@ -158,7 +158,7 @@ This launches a web-based inspector UI on `http://localhost:5173` where you can 
 
 ---
 
-## 💻 Programmatic SDK Integration (TypeScript)
+## 💻 Programmatic SDK Integration (TypeScript) *(Available from v0.2.0)*
 
 If you are building your own orchestrator or agent wrapper, you can consume `@nogoo9/no-crd` programmatically using the `@modelcontextprotocol/sdk`. 
 
@@ -232,7 +232,7 @@ run().catch(console.error);
 
 ---
 
-## 🖥️ Using the Embedded Pod Manager UI
+## 🖥️ Using the Embedded Pod Manager UI *(Available from v0.2.0)*
 
 The MCP server embeds a rich React-based dashboard that clients can display inside their interface if they support the MCP **application extensions** capability.
 

@@ -2,6 +2,9 @@
 
 This document details the configuration, architecture, and deployment patterns of the OIDC identity provider (Keycloak) for securing `@nogoo9/no-crd` in both local sandbox environments and production-grade Kubernetes deployments.
 
+> [!IMPORTANT]
+> **Experimental Feature**: Keycloak OIDC integration is available from **v0.3.0** and is currently marked as experimental.
+
 ---
 
 ## 1. Local Sandbox Architecture
@@ -10,8 +13,8 @@ The local development and E2E test setup uses a single-instance Keycloak contain
 
 ```mermaid
 graph TD
-    Browser[Browser / Dashboard UI] -->|Local:8080/auth| Keycloak[Keycloak Pod]
-    Browser -->|Local:8080/| MCP[MCP Server Pod]
+    Browser["Browser / Dashboard UI"] -->|Local:8080/auth| Keycloak["Keycloak Pod"]
+    Browser -->|Local:8080/| MCP["MCP Server Pod"]
     MCP -->|JWKS Resolution| Keycloak
 ```
 
@@ -95,12 +98,12 @@ Transitioning from a local developer setup to a production-grade identity infras
 
 ```mermaid
 graph TD
-    Client[Client / Dashboard UI] -->|HTTPS: Port 443| Ingress[Ingress Controller / TLS Termination]
-    Ingress -->|HTTP / Forwarded Headers| Keycloak[Keycloak Cluster Replicas]
-    Ingress -->|HTTP / Forwarded Headers| MCP[MCP Server Cluster]
+    Client["Client / Dashboard UI"] -->|HTTPS: Port 443| Ingress["Ingress Controller / TLS Termination"]
+    Ingress -->|HTTP / Forwarded Headers| Keycloak["Keycloak Cluster Replicas"]
+    Ingress -->|HTTP / Forwarded Headers| MCP["MCP Server Cluster"]
     MCP -->|Internal JWKS Request| Keycloak
-    Keycloak -->|Read/Write Session Store| DB[(PostgreSQL Database)]
-    Keycloak <-->|Clustered State / Infinispan| Keycloak
+    Keycloak -->|Read/Write Session Store| DB[("PostgreSQL Database")]
+    Keycloak ---|Clustered State / Infinispan| Keycloak
 ```
 
 ### 4.1 Production Optimization vs Developer Mode

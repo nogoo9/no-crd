@@ -39,7 +39,7 @@ Pod templates and inline specifications can declare special annotations that dir
 | `nogoo9/iam-role-arn` | Annotation (AWS Role ARN) | Instructs the spawner to provision a dedicated Kubernetes `ServiceAccount` annotated for EKS IAM Role mapping (IRSA). |
 | `nogoo9/init-image` | Annotation (Image string) | The container image to run in the dynamic `spawner-init` init-container. |
 | `nogoo9/init-command` | Annotation (Shell command) | The shell command to run in the init-container. It automatically shares the main container's volume mounts. |
-| `nogoo9/init-share-volumes` | Annotation ("true" | "false") | Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`. |
+| `nogoo9/init-share-volumes` | Annotation ("true" | "false") | Determines if the dynamic init-container shares the main container's volume mounts. Defaults to `true`. *(Available from v0.5.5)* |
 | `nogoo9/pre-stop-command` | Annotation (Shell command) | A shell command executed in a Kubernetes `preStop` lifecycle exec hook when the workspace is terminated (e.g. to save/push state). |
 | `nogoo9/pre-stop-sidecar-image` | Annotation (Image string) | If specified alongside `pre-stop-command`, runs the pre-stop command inside a dedicated sidecar container instead of the main container. |
 | `nogoo9/default-grace-period` | Annotation (Number in seconds) | Overrides the Pod's `terminationGracePeriodSeconds` (defaults to `60` if a pre-stop command is defined) to give cleanup commands time to finish. |
@@ -63,10 +63,10 @@ The diagram below shows the order in which init-containers, main containers, and
 
 ```mermaid
 sequenceDiagram
-    participant K8s as Kubernetes API
-    participant Init as Init Container (spawner-init)
-    participant Main as Main Workspace Container
-    participant Sidecar as Sidecar Container (spawner-sidecar)
+    participant K8s as "Kubernetes API"
+    participant Init as "Init Container (spawner-init)"
+    participant Main as "Main Workspace Container"
+    participant Sidecar as "Sidecar Container (spawner-sidecar)"
 
     K8s->>Init: 1. Launch Init Container (Runs init-command)
     Note over Init: e.g., git clone repository code

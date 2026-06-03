@@ -100,7 +100,7 @@ The dashboard includes:
 - **Workspace Cards**: Display status (Running/Pending/Stopped), Pod IP, target container port, and creation timestamp.
 - **Interactive Control Widgets**: Create new workspaces from templates, delete running workspaces instantly, and view live logs.
 
-## 5. Custom Themes System
+## 5. Custom Themes System *(Available from v0.4.0)*
 
 The dashboard supports custom theme stylesheets loaded dynamically at runtime. Themes are scanned, merged, and prioritized dynamically from three distinct layers (the **Three-Source Theme Merge Engine**):
 
@@ -119,12 +119,12 @@ To regenerate or extend, maintain this visual structure and list any new theme s
 -->
 ```mermaid
 graph TD
-    Client[Dashboard UI Request] --> Merger[Theme Merge Engine]
+    Client["Dashboard UI Request"] --> Merger["Theme Merge Engine"]
     Merger --> ConfigMap["1. ConfigMap (THEMES_CONFIGMAP)"]
     Merger --> LocalDir["2. Local Directory (THEMES_DIR)"]
     Merger --> BuiltIn["3. Built-In Themes"]
 
-    ConfigMap -->|Priority 1: Shadows Collisions| UI[Active Themes List]
+    ConfigMap -->|Priority 1: Shadows Collisions| UI["Active Themes List"]
     LocalDir -->|Priority 2: Added if ID Unseen| UI
     BuiltIn -->|Priority 3: Added if ID Unseen| UI
 ```

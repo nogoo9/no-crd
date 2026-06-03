@@ -12,10 +12,10 @@ The spawner dynamically intercepts template definitions to configure:
 
 ```mermaid
 sequenceDiagram
-    participant K8s as Kubernetes API
-    participant Init as Init Container
-    participant Main as Workspace Container
-    participant Sidecar as Sidecar Container
+    participant K8s as "Kubernetes API"
+    participant Init as "Init Container"
+    participant Main as "Workspace Container"
+    participant Sidecar as "Sidecar Container"
 
     K8s->>Init: 1. Launch Init Container
     Note over Init: e.g. git clone $REPO_URL

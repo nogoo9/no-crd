@@ -33,6 +33,7 @@ export default withMermaid(
 					text: "Introduction",
 					items: [
 						{ text: "Getting Started", link: "/getting-started" },
+						{ text: "Setup Cheatsheet", link: "/setup-cheatsheet" },
 						{ text: "What's New", link: "/whats-new" },
 					],
 				},

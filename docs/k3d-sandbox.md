@@ -10,27 +10,27 @@ The local development cluster routes all external traffic through a single Traef
 
 ```mermaid
 graph TD
-    subgraph Host Machine
-        HostPort[http://localhost:8080]
-        RegistryPort[localhost:5001]
+    subgraph "Host Machine"
+        HostPort["http://localhost:8080"]
+        RegistryPort["localhost:5001"]
     end
 
-    subgraph k3d Cluster (nogoo-dev)
-        Ingress[Traefik Ingress Controller] -->|/auth| KeycloakService[Keycloak Service]
-        Ingress -->|/mcp| McpService[MCP Server Service]
+    subgraph "k3d Cluster (nogoo-dev)"
+        Ingress["Traefik Ingress Controller"] -->|/auth| KeycloakService["Keycloak Service"]
+        Ingress -->|/mcp| McpService["MCP Server Service"]
         Ingress -->|/route/:id| McpService
         
-        McpService -->|Proxies dynamically| PodA[Workspace Pod A]
-        McpService -->|Proxies dynamically| PodB[Workspace Pod B]
+        McpService -->|Proxies dynamically| PodA["Workspace Pod A"]
+        McpService -->|Proxies dynamically| PodB["Workspace Pod B"]
 
         McpService -->|Dynamic JWKS Resolution| KeycloakService
         
-        PodA -->|AWS SDK S3 Sync| RustfsService[Rustfs Mock S3 Service]
+        PodA -->|AWS SDK S3 Sync| RustfsService["Rustfs Mock S3 Service"]
         PodB -->|AWS SDK S3 Sync| RustfsService
     end
 
     HostPort --> Ingress
-    RegistryPort --> LocalRegistry[Local Registry: nogoo9-registry.localhost]
+    RegistryPort --> LocalRegistry["Local Registry: nogoo9-registry.localhost"]
 ```
 
 ### Ingress Routing Rules
