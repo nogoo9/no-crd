@@ -6,7 +6,16 @@ This guide details how to integrate the `@nogoo9/no-crd` MCP server with generic
 
 ## 🌐 Generic OIDC Integration Architecture
 
-At a high level, the MCP server acts as an **OAuth 2.0 Resource Server**. It consumes JSON Web Tokens (JWTs) issued by your Identity Provider to authenticate requests and enforce authorization parameters.
+At a high level, the `@nogoo9/no-crd` backend acts as an **OAuth 2.0 Resource Server & BFF (Backend-for-Frontend) Proxy**. It handles the secure login redirect loop, exchanges authorization codes for tokens, encrypts refresh credentials in session cookies, and consumes JSON Web Tokens (JWTs) to authenticate requests.
+
+<!-- 
+prompt: A sleek, modern software design diagram explaining OIDC SSO login flow and redirect loop with PKCE. It shows: 1. User Browser trying to access a secure route and getting redirected to Identity Provider (IdP/SSO) login page, 2. User logging in on the IdP login page and getting redirected back with an auth code and verifier, 3. The Backend Server exchanging the auth code for access and refresh tokens, 4. The Backend Server setting encrypted HttpOnly cookies (nocr_sess, nocr_refresh) in the browser. Use a dark mode theme, elegant neon gradients, clean arrows, and sans-serif typography.
+-->
+![OIDC SSO Login Flow](/sso_login_flow.png)
+
+### Authentication Sequence Flow
+
+The following sequence diagram shows the step-by-step communication during tool execution:
 
 ```mermaid
 sequenceDiagram

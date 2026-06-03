@@ -2,13 +2,18 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
 2026-06-02
 
 ## Context
+
+<!-- 
+prompt: A sleek, modern software architecture diagram explaining Workspace App Authorization in a Kubernetes cluster. It illustrates: 1. User browser making a request to the gateway, 2. The gateway, labeled as the 'no-crd Backend Service / Gateway', acting as a Backend-for-Frontend (BFF) proxy and verifying cookies (nocr_sess, nocr_token, nocr_refresh), 3. 'no-crd Backend Service / Gateway' doing silent server-side token refresh with Keycloak/OIDC provider, 4. 'no-crd Backend Service / Gateway' injecting headers (X-User-Sub, Authorization) to the workspace container, 5. Frontend Single Page Apps (SPA) fetching token from path-scoped /_auth/token API. Design with dark mode aesthetics, clean gradients, sans-serif typography, and clear boxes.
+-->
+![Workspace Auth Architecture](/workspace_auth_architecture.png)
 
 The `@nogoo9/no-crd` gateway routes HTTP and WebSocket traffic to dynamically spawned workspace pods under the path `/route/:workspaceId/*`. When authentication is enabled (`AUTH_ENABLED=true`), the gateway intercepts requests and validates the user's session using cookies (`nocr_token` and `nocr_sess`).
 

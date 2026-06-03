@@ -15,6 +15,16 @@ The current proxy implementation relies on intercepting the `upgrade` event on t
 Instead of running a Fastify/Node.js server with manual raw-socket forwarding under Bun, we can conditionally boot a native **`Bun.serve`**-based proxy if Bun is detected at runtime.
 
 ### High-level Flow
+
+<!-- 
+PROMPT FOR FUTURE AGENTS:
+This image is a professional software architecture diagram for the Bun WebSocket Proxy subsystem.
+Prompt used for generation:
+"A clean, professional architecture diagram illustrating the 'Bun WebSocket Proxy Flow' in the nogoo9 sandboxing platform. Dark theme with glowing gradient accents. The diagram shows: 1. Client Browser (left) establishing a 'WebSocket Connection'; 2. Bun.serve (middle) acting as the native HTTP and WebSocket server, performing Authentication/Owner check, and triggering the native upgrade mechanism; 3. Bun.connect (right-middle) establishing a raw bidirectional TCP tunnel from the server to the upstream Kubernetes Pod (right) running ttyd or VNC on a designated container port. Glow-effect arrows connect client to Bun.serve, showing the HTTP Upgrade handshake. Double-headed arrows show the raw TCP/WebSocket bidirectional data pipeline bypassing Node.js http emulation layers. Modern tech style, clean rounded cards, crisp sans-serif typography, and subtle glowing paths."
+To regenerate or refine, use the generate_image tool with this prompt.
+-->
+![Bun WebSocket Proxy Flow](/bun_ws_proxy.png)
+
 ```
 Client (Browser) 
   ──[ WebSocket ]──> Bun.serve (Native WebSockets)
