@@ -1,0 +1,4 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+bun run scripts/validate-commit-msg.ts "$1" || exit 1

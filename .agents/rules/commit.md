@@ -10,4 +10,4 @@ When the user asks to commit, save, or stage changes, run the `/commit` workflow
 3. A Conventional Commit message is generated and confirmed by the user
 4. Changes are staged and committed atomically
 
-Never skip the safety review step. Never commit with `--no-verify`.
+Commit messages are validated automatically via the Husky `commit-msg` hook. Never skip the safety review step. Never commit with `--no-verify`.

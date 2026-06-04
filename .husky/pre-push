@@ -1,0 +1,31 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "=== Running pre-push unit tests ==="
+moon run mcp:test || exit 1
+
+# Check for GHA modifications
+echo "=== Checking for GitHub Actions workflow changes ==="
+# Compare against origin/main or fall back to HEAD~1
+REF_DIFF="origin/main"
+git rev-parse --verify origin/main >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+  REF_DIFF="HEAD~1"
+fi
+
+CHANGED_WORKFLOWS=$(git diff --name-only "$REF_DIFF" HEAD 2>/dev/null | grep "^\.github/workflows/")
+if [ -n "$CHANGED_WORKFLOWS" ]; then
+  echo "GitHub Actions workflows changed. Running security checks..."
+  if command -v zizmor >/dev/null 2>&1; then
+    zizmor . || exit 1
+  else
+    # Check if we can run via pipx or uv
+    if command -v pipx >/dev/null 2>&1; then
+      pipx run zizmor . || exit 1
+    elif command -v uv >/dev/null 2>&1; then
+      uv run zizmor . || exit 1
+    else
+      echo "Warning: zizmor is not installed. Skipping workflow security check."
+    fi
+  fi
+fi
