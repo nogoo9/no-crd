@@ -28,3 +28,5 @@ if [ -n "$CHANGED_WORKFLOWS" ]; then
     fi
   fi
 fi
+
+exit 0
