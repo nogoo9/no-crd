@@ -12,7 +12,7 @@ if [ $? -ne 0 ]; then
   REF_DIFF="HEAD~1"
 fi
 
-CHANGED_WORKFLOWS=$(git diff --name-only "$REF_DIFF" HEAD 2>/dev/null | grep "^\.github/workflows/")
+CHANGED_WORKFLOWS=$(git diff --name-only "$REF_DIFF" HEAD 2>/dev/null | grep "^\.github/workflows/" || true)
 if [ -n "$CHANGED_WORKFLOWS" ]; then
   echo "GitHub Actions workflows changed. Running security checks..."
   if command -v zizmor >/dev/null 2>&1; then
