@@ -10,4 +10,4 @@ Before pushing to a remote (`git push`), run the `/test-local` workflow in order
 3. `moon run mcp:test` — all unit tests. **Stop if any failures.**
 4. Run the `/security` workflow — Semgrep SAST scan on changed files. **Stop if any ERROR-severity findings remain unfixed.**
 
-Only push if all four pass. If any fail, fix the issues first. Never force-push to `main`.
+These checks are automatically enforced on `git push` via the Husky `pre-push` hook. Only push if all checks pass. Never bypass the Git hooks (e.g. do not use `git push --no-verify`). Never force-push to `main`.

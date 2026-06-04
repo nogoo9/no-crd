@@ -57,6 +57,7 @@
 		"run:node": "node dist/server-entry.js",
 		"build": "bun build src/index.ts --outfile dist/index.js --target node --minify && bun build src/server-entry.ts --outfile dist/server-entry.js --target node --minify && bun build src/cli.ts --outfile dist/cli.js --target node --minify && bun run scripts/build-ui.ts",
 		"prepublishOnly": "bun run build",
+		"prepare": "husky",
 		"setup": "bun run src/cli.ts",
 		"lint": "biome check . && bun run scripts/check-imports.ts",
 		"format": "biome check --write --unsafe .",
@@ -80,8 +81,10 @@
 		"@modelcontextprotocol/ext-apps": "^1.7.2",
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"fastify": "^5.8.5",
+		"husky": "^9.1.7",
 		"js-yaml": "^4.1.0",
 		"jsonpath-plus": "^10.4.0",
+		"nano-staged": "^1.0.2",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {

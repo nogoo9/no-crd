@@ -30,7 +30,7 @@ cd no-crd
 # Install pinned tool versions
 proto use
 
-# Install dependencies
+# Install dependencies (this also automatically initializes Husky Git hooks)
 bun install
 
 # Verify everything works
@@ -90,7 +90,7 @@ bun run format     # Biome lint + auto-fix
 bun run typecheck  # TypeScript strict-mode check
 ```
 
-Both must pass with zero errors before any commit. **Do not use ESLint or Prettier.**
+Both must pass with zero errors before any commit. These checks are also run automatically on `git commit` via the Husky `pre-commit` hook. **Do not use ESLint or Prettier.**
 
 ### 5. Commit
 
@@ -105,11 +105,13 @@ chore: bump dependencies
 ci: pin GitHub Actions to SHA
 ```
 
+Commit messages are automatically validated against Conventional Commit specifications on `git commit` via the Husky `commit-msg` hook.
+
 AI agents: use the `/commit` workflow which runs format, typecheck, safety review, and generates the commit message automatically.
 
 ### 6. Pre-push checks
 
-Before pushing, all local gates must pass:
+Before pushing, all local gates must pass. These checks (formatting, typechecking, and unit tests) run automatically on `git push` via the Husky `pre-push` hook.
 
 ```bash
 bun run format      # Biome lint + auto-fix
