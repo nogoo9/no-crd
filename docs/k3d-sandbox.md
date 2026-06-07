@@ -121,7 +121,7 @@ The MCP server accepts JWTs via three mechanisms:
 ### 5.3 OIDC Realm Users
 Keycloak is provisioned with a realm named `nogoo9` and two preset developer accounts:
 - **Standard User**: `testuser` / `password` (has no special roles; restricted to own workspaces).
-- **Admin User**: `adminuser` / `password` (has the `nogoo9-admin` role; possesses administrative rights).
+- **Admin User**: `admin` / `password` (has the `nogoo9-admin` role; possesses administrative rights).
 
 ### 5.4 RBAC & Tenant Isolation
 - **Resource Ownership Enforcer**: When `AUTH_ENABLED` is `true`, any invocation of pod management tools (`list_pods`, `get_pod`, `delete_pod`, `list_workspaces`, `stop_workspace`, `spawn_workspace`) automatically extracts the requester's `sub` identifier. The server then appends `nogoo9/user-sub=<extracted-sub>` as a label selector filter to all Kubernetes API queries and assigns it to created pods/workspaces.

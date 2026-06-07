@@ -31,16 +31,22 @@ let lastDiscoveryFetch = 0;
 const DISCOVERY_CACHE_TTL = 300000; // 5 minutes
 
 async function getTokenEndpoint(): Promise<string> {
+	const discoveryUrl = config.ui.oauth.discoveryUrl;
+	if (!discoveryUrl) {
+		const tokenUrl = config.auth.tokenUrl;
+		if (tokenUrl) {
+			return tokenUrl;
+		}
+		throw new Error(
+			"Neither OAUTH_DISCOVERY_URL nor OAUTH_TOKEN_URL is configured on the server",
+		);
+	}
+
 	if (
 		cachedTokenEndpoint &&
 		Date.now() - lastDiscoveryFetch < DISCOVERY_CACHE_TTL
 	) {
 		return cachedTokenEndpoint;
-	}
-
-	const discoveryUrl = config.ui.oauth.discoveryUrl;
-	if (!discoveryUrl) {
-		throw new Error("OAUTH_DISCOVERY_URL is not configured on the server");
 	}
 
 	try {

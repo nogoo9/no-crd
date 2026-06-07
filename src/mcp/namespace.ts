@@ -6,7 +6,6 @@ import { config } from "~/config/index.js";
 import {
 	errorResult,
 	evaluatePermissions,
-	extractAdminRole,
 	type K8sContext,
 	requestContextStore,
 	verifyAccessOrThrow,
@@ -232,13 +231,10 @@ export function registerNamespaceTools(
 			let isAdmin = false;
 			if (authEnabled && activeJwtPayload) {
 				try {
-					isAdmin = extractAdminRole(
-						activeJwtPayload,
-						config.auth.rolesJsonPath,
-						config.auth.adminRole,
-					);
+					verifyAccessOrThrow(activeJwtPayload, "admin");
+					isAdmin = true;
 				} catch {
-					// Not admin if extraction fails
+					isAdmin = false;
 				}
 			}
 

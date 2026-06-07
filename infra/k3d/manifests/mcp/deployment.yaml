@@ -45,6 +45,8 @@ spec:
               value: "http://localhost:8080/auth/realms/nogoo9/.well-known/openid-configuration"
             - name: AUTH_ADMIN_ROLE
               value: "nogoo9-admin"
+            - name: AUTH_REQUIRED_ADMIN_SCOPE
+              value: "nogoo9:admin"
             - name: AUTH_REQUIRED_READ_SCOPE
               value: "mcp:read"
             - name: AUTH_REQUIRED_WRITE_SCOPE

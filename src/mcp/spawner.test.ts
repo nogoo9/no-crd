@@ -41,15 +41,21 @@ describe("Spawner MCP Tools - get_workspace", () => {
 			"spawn_workspace",
 		]);
 		process.env.AUTH_ENABLED = "false";
+		process.env.AUTH_REQUIRED_READ_ROLE = "";
+		process.env.AUTH_REQUIRED_WRITE_ROLE = "";
+		process.env.AUTH_REQUIRED_READ_SCOPE = "";
+		process.env.AUTH_REQUIRED_WRITE_SCOPE = "";
 		delete process.env.AUTH_SUB_JSONPATH;
-		delete process.env.AUTH_REQUIRED_READ_SCOPE;
-		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
 		delete process.env.AUTH_SCOPE_JSONPATH;
 	});
 
 	afterEach(() => {
 		registerSpy.mockRestore();
 		spyOn(coreApi, "listNamespacedPod").mockRestore();
+		delete process.env.AUTH_REQUIRED_READ_ROLE;
+		delete process.env.AUTH_REQUIRED_WRITE_ROLE;
+		delete process.env.AUTH_REQUIRED_READ_SCOPE;
+		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
 	});
 
 	test("registers get_workspace tool", () => {
@@ -849,5 +855,185 @@ spec:
 
 			listPodsSpy.mockRestore();
 		});
+	});
+});
+
+describe("Spawner MCP Tools - Admin Capabilities", () => {
+	let registerSpy: any;
+
+	beforeEach(() => {
+		registeredTools.clear();
+		registerSpy = spyOn(extApps, "registerAppTool").mockImplementation(
+			(_server: any, name: string, _schema: any, handler: any) => {
+				registeredTools.set(name, handler);
+				return {} as any;
+			},
+		);
+		registerSpawnerTools({} as any, k8sContext, [
+			"get_workspace",
+			"list_workspaces",
+			"stop_workspace",
+			"spawn_workspace",
+		]);
+		process.env.AUTH_ENABLED = "true";
+		process.env.AUTH_ADMIN_ROLE = "admin";
+		process.env.AUTH_ROLES_JSONPATH = "$.realm_access.roles";
+		process.env.AUTH_SUB_JSONPATH = "$.sub";
+		process.env.AUTH_REQUIRED_READ_SCOPE = "";
+		process.env.AUTH_REQUIRED_WRITE_SCOPE = "";
+	});
+
+	afterEach(() => {
+		registerSpy.mockRestore();
+		spyOn(coreApi, "listNamespacedPod").mockRestore();
+		if ((coreApi as any).createNamespacedPod?.mockRestore) {
+			spyOn(coreApi, "createNamespacedPod").mockRestore();
+		}
+		delete process.env.AUTH_ENABLED;
+		delete process.env.AUTH_ADMIN_ROLE;
+		delete process.env.AUTH_ROLES_JSONPATH;
+		delete process.env.AUTH_SUB_JSONPATH;
+		delete process.env.AUTH_REQUIRED_READ_SCOPE;
+		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
+	});
+
+	test("spawn_workspace as admin allows specifying target userSub", async () => {
+		spyOn(coreApi, "listNamespacedPod").mockResolvedValue({ items: [] } as any);
+		const createSpy = spyOn(coreApi, "createNamespacedPod").mockResolvedValue({
+			body: { metadata: { name: "ws-user2-ws-1" } },
+		} as any);
+
+		const handler = registeredTools.get("spawn_workspace")!;
+		const result = await handler({
+			id: "ws-1",
+			namespace: "default",
+			spec: { containers: [{ name: "agent", image: "node" }] },
+			jwtPayload: {
+				sub: "admin-user",
+				scope: "nogoo9:admin",
+				realm_access: { roles: ["admin"] },
+			},
+			userSub: "user-target",
+		});
+
+		expect(result.isError).toBeUndefined();
+		expect(createSpy).toHaveBeenCalledTimes(1);
+		const body = (createSpy.mock.calls[0] as any)[0].body;
+		expect(body.metadata.labels["nogoo9/user-sub"]).toBe("user-target");
+		expect(body.metadata.annotations["nogoo9/user-sub"]).toBe("user-target");
+	});
+
+	test("spawn_workspace as admin blocks specifying target userSub if admin scope is missing", async () => {
+		spyOn(coreApi, "listNamespacedPod").mockResolvedValue({ items: [] } as any);
+		const createSpy = spyOn(coreApi, "createNamespacedPod").mockResolvedValue({
+			body: { metadata: { name: "ws-user2-ws-1" } },
+		} as any);
+
+		const handler = registeredTools.get("spawn_workspace")!;
+		const result = await handler({
+			id: "ws-1",
+			namespace: "default",
+			spec: { containers: [{ name: "agent", image: "node" }] },
+			jwtPayload: {
+				sub: "admin-user",
+				scope: "nogoo9:write",
+				realm_access: { roles: ["admin"] },
+			},
+			userSub: "user-target",
+		});
+
+		expect(result.isError).toBe(true);
+		expect(result.message).toContain(
+			"Forbidden: Non-admin users cannot specify a different userSub",
+		);
+		expect(createSpy).not.toHaveBeenCalled();
+	});
+
+	test("spawn_workspace as non-admin blocks specifying target userSub", async () => {
+		spyOn(coreApi, "listNamespacedPod").mockResolvedValue({ items: [] } as any);
+		const createSpy = spyOn(coreApi, "createNamespacedPod").mockResolvedValue({
+			body: { metadata: { name: "ws-user2-ws-1" } },
+		} as any);
+
+		const handler = registeredTools.get("spawn_workspace")!;
+		const result = await handler({
+			id: "ws-1",
+			namespace: "default",
+			spec: { containers: [{ name: "agent", image: "node" }] },
+			jwtPayload: {
+				sub: "non-admin-user",
+				realm_access: { roles: ["user"] },
+			},
+			userSub: "user-target",
+		});
+
+		expect(result.isError).toBe(true);
+		expect(result.message).toContain(
+			"Forbidden: Non-admin users cannot specify a different userSub",
+		);
+		expect(createSpy).not.toHaveBeenCalled();
+	});
+
+	test("list_workspaces as admin lists all workspaces without filtering by userSub", async () => {
+		const listSpy = spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+			items: [],
+		} as any);
+
+		const handler = registeredTools.get("list_workspaces")!;
+		await handler({
+			namespace: "default",
+			jwtPayload: {
+				sub: "admin-user",
+				scope: "nogoo9:admin",
+				realm_access: { roles: ["admin"] },
+			},
+		});
+
+		expect(listSpy).toHaveBeenCalledTimes(1);
+		const labelSelector = (listSpy.mock.calls[0] as any)[0].labelSelector;
+		expect(labelSelector).toBe("nogoo9/type=workspace");
+	});
+
+	test("list_workspaces as admin filters by userSub if admin scope is missing", async () => {
+		const listSpy = spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+			items: [],
+		} as any);
+
+		const handler = registeredTools.get("list_workspaces")!;
+		await handler({
+			namespace: "default",
+			jwtPayload: {
+				sub: "admin-user",
+				scope: "nogoo9:read",
+				realm_access: { roles: ["admin"] },
+			},
+		});
+
+		expect(listSpy).toHaveBeenCalledTimes(1);
+		const labelSelector = (listSpy.mock.calls[0] as any)[0].labelSelector;
+		expect(labelSelector).toBe(
+			"nogoo9/type=workspace,nogoo9/user-sub=admin-user",
+		);
+	});
+
+	test("list_workspaces as non-admin filters workspaces by caller sub", async () => {
+		const listSpy = spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+			items: [],
+		} as any);
+
+		const handler = registeredTools.get("list_workspaces")!;
+		await handler({
+			namespace: "default",
+			jwtPayload: {
+				sub: "regular-user",
+				realm_access: { roles: ["viewer"] },
+			},
+		});
+
+		expect(listSpy).toHaveBeenCalledTimes(1);
+		const labelSelector = (listSpy.mock.calls[0] as any)[0].labelSelector;
+		expect(labelSelector).toBe(
+			"nogoo9/type=workspace,nogoo9/user-sub=regular-user",
+		);
 	});
 });

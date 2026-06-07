@@ -163,7 +163,7 @@ describe("hasRequiredRole", () => {
 	});
 
 	test("returns true if user is admin (bypass)", () => {
-		const payload = { realm_access: { roles: ["nogoo9-admin"] } };
+		const payload = { realm_access: { roles: ["admin"] } };
 		expect(hasRequiredRole(payload, "some-other-role")).toBe(true);
 	});
 
@@ -237,9 +237,25 @@ describe("verifyAccessOrThrow", () => {
 	test("allows admin to bypass missing role check", () => {
 		const payload = {
 			scope: "read-scope",
-			realm_access: { roles: ["nogoo9-admin"] },
+			realm_access: { roles: ["admin"] },
 		};
 		expect(() => verifyAccessOrThrow(payload, "read")).not.toThrow();
+	});
+
+	test("passes if scope claim is completely missing but role is valid (scope bypass)", () => {
+		const payload = {
+			realm_access: { roles: ["read-role"] },
+		};
+		expect(() => verifyAccessOrThrow(payload, "read")).not.toThrow();
+	});
+
+	test("throws if role claim is completely missing but scope is valid", () => {
+		const payload = {
+			scope: "read-scope",
+		};
+		expect(() => verifyAccessOrThrow(payload, "read")).toThrow(
+			"Forbidden: Missing required role: read-role",
+		);
 	});
 });
 
@@ -320,5 +336,97 @@ describe("verifyToken with local JWKS file", () => {
 
 		const decoded2 = await verifyToken(token, "http://test-audience");
 		expect(decoded2.sub).toBe("user-123");
+	});
+});
+
+describe("defaultRole fallback checks", () => {
+	beforeEach(() => {
+		process.env.AUTH_DEFAULT_ROLE = "viewer";
+	});
+
+	afterEach(() => {
+		delete process.env.AUTH_DEFAULT_ROLE;
+	});
+
+	test("hasRequiredRole returns true if role is missing but requested role is the default role", () => {
+		const payload = {}; // missing role completely
+		expect(hasRequiredRole(payload, "viewer")).toBe(true);
+		expect(hasRequiredRole(payload, "admin")).toBe(false);
+	});
+
+	test("hasRequiredScope returns true if scope is missing completely (bypassed)", () => {
+		const payload = {}; // missing scope completely
+		expect(hasRequiredScope(payload, "viewer")).toBe(true);
+		expect(hasRequiredScope(payload, "read")).toBe(true);
+	});
+});
+
+describe("admin scope and access hierarchy", () => {
+	beforeEach(() => {
+		process.env.AUTH_ADMIN_ROLE = "admin";
+		process.env.AUTH_REQUIRED_ADMIN_SCOPE = "nogoo9:admin";
+		process.env.AUTH_REQUIRED_READ_SCOPE = "nogoo9:read";
+		process.env.AUTH_REQUIRED_WRITE_SCOPE = "nogoo9:write";
+		process.env.AUTH_REQUIRED_READ_ROLE = "viewer";
+		process.env.AUTH_REQUIRED_WRITE_ROLE = "user";
+	});
+
+	afterEach(() => {
+		delete process.env.AUTH_ADMIN_ROLE;
+		delete process.env.AUTH_REQUIRED_ADMIN_SCOPE;
+		delete process.env.AUTH_REQUIRED_READ_SCOPE;
+		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
+		delete process.env.AUTH_REQUIRED_READ_ROLE;
+		delete process.env.AUTH_REQUIRED_WRITE_ROLE;
+	});
+
+	test("verifyAccessOrThrow(payload, 'admin') passes if both admin role and admin scope are present", () => {
+		const payload = {
+			scope: "nogoo9:admin",
+			realm_access: { roles: ["admin"] },
+		};
+		expect(() => verifyAccessOrThrow(payload, "admin")).not.toThrow();
+	});
+
+	test("verifyAccessOrThrow(payload, 'admin') throws if admin role is present but admin scope is missing", () => {
+		const payload = {
+			scope: "nogoo9:read",
+			realm_access: { roles: ["admin"] },
+		};
+		expect(() => verifyAccessOrThrow(payload, "admin")).toThrow(
+			"Forbidden: Missing required scope: nogoo9:admin",
+		);
+	});
+
+	test("verifyAccessOrThrow(payload, 'admin') throws if admin scope is present but admin role is missing", () => {
+		const payload = {
+			scope: "nogoo9:admin",
+			realm_access: { roles: ["user"] },
+		};
+		expect(() => verifyAccessOrThrow(payload, "admin")).toThrow(
+			"Forbidden: Missing required role: admin",
+		);
+	});
+
+	test("verifyAccessOrThrow(payload, 'admin') passes if admin scope is missing completely but admin role is present (scope bypass)", () => {
+		const payload = {
+			realm_access: { roles: ["admin"] },
+		};
+		expect(() => verifyAccessOrThrow(payload, "admin")).not.toThrow();
+	});
+
+	test("verifyAccessOrThrow(payload, 'admin') throws if admin scope is present but role is missing completely", () => {
+		const payload = {
+			scope: "nogoo9:admin",
+		};
+		expect(() => verifyAccessOrThrow(payload, "admin")).toThrow(
+			"Forbidden: Missing required role: admin",
+		);
+	});
+
+	test("hasRequiredScope allows nogoo9:admin to satisfy nogoo9:read and nogoo9:write checks", () => {
+		const payload = { scope: "nogoo9:admin" };
+		expect(hasRequiredScope(payload, "nogoo9:read")).toBe(true);
+		expect(hasRequiredScope(payload, "nogoo9:write")).toBe(true);
 	});
 });

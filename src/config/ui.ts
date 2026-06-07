@@ -1,3 +1,4 @@
+import { authConfig } from "./auth.js";
 import { getEnv, resolveBuiltinDir } from "./helpers.js";
 import type { SchemaItem } from "./types.js";
 
@@ -143,6 +144,15 @@ export const uiConfig = {
 			},
 			get loginMethod() {
 				return uiSchema.oauthLoginMethod.value;
+			},
+			get authorizationUrl() {
+				return authConfig.authorizationUrl;
+			},
+			get tokenUrl() {
+				return authConfig.tokenUrl;
+			},
+			get endSessionUrl() {
+				return authConfig.endSessionUrl;
 			},
 		};
 	},

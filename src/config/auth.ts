@@ -155,7 +155,7 @@ export const authSchema = {
 	adminRole: {
 		cli: "-",
 		env: "AUTH_ADMIN_ROLE",
-		defaultVal: "nogoo9-admin",
+		defaultVal: "admin",
 		allowed: "String",
 		description: "Role name signifying administrator access.",
 		get value(): string {
@@ -166,48 +166,60 @@ export const authSchema = {
 	requiredReadScope: {
 		cli: "--auth-required-read-scope",
 		env: "AUTH_REQUIRED_READ_SCOPE",
-		defaultVal: undefined as string | undefined,
+		defaultVal: "nogoo9:read" as string | undefined,
 		allowed: "String",
 		description:
 			"OAuth scope required for read operations. If not set, read scope check is bypassed.",
 		get value(): string | undefined {
-			return getEnv(this.env);
+			return getEnv(this.env) ?? this.defaultVal;
 		},
 	} satisfies SchemaItem<string | undefined>,
 
 	requiredWriteScope: {
 		cli: "--auth-required-write-scope",
 		env: "AUTH_REQUIRED_WRITE_SCOPE",
-		defaultVal: undefined as string | undefined,
+		defaultVal: "nogoo9:write" as string | undefined,
 		allowed: "String",
 		description:
 			"OAuth scope required for write/mutation operations. If not set, write scope check is bypassed.",
 		get value(): string | undefined {
-			return getEnv(this.env);
+			return getEnv(this.env) ?? this.defaultVal;
+		},
+	} satisfies SchemaItem<string | undefined>,
+
+	requiredAdminScope: {
+		cli: "--auth-required-admin-scope",
+		env: "AUTH_REQUIRED_ADMIN_SCOPE",
+		defaultVal: "nogoo9:admin" as string | undefined,
+		allowed: "String",
+		description:
+			"OAuth scope required for administrator operations. If not set, admin scope check is bypassed.",
+		get value(): string | undefined {
+			return getEnv(this.env) ?? this.defaultVal;
 		},
 	} satisfies SchemaItem<string | undefined>,
 
 	requiredReadRole: {
 		cli: "--auth-required-read-role",
 		env: "AUTH_REQUIRED_READ_ROLE",
-		defaultVal: undefined as string | undefined,
+		defaultVal: "viewer" as string | undefined,
 		allowed: "String",
 		description:
 			"User role required for read operations. If not set, read role check is bypassed.",
 		get value(): string | undefined {
-			return getEnv(this.env);
+			return getEnv(this.env) ?? this.defaultVal;
 		},
 	} satisfies SchemaItem<string | undefined>,
 
 	requiredWriteRole: {
 		cli: "--auth-required-write-role",
 		env: "AUTH_REQUIRED_WRITE_ROLE",
-		defaultVal: undefined as string | undefined,
+		defaultVal: "user" as string | undefined,
 		allowed: "String",
 		description:
 			"User role required for write/mutation operations. If not set, write role check is bypassed.",
 		get value(): string | undefined {
-			return getEnv(this.env);
+			return getEnv(this.env) ?? this.defaultVal;
 		},
 	} satisfies SchemaItem<string | undefined>,
 
@@ -243,6 +255,50 @@ export const authSchema = {
 		allowed: "Space-separated scope string",
 		description:
 			"OAuth scopes to request during authorization. Include 'offline_access' for refresh tokens.",
+		get value(): string {
+			return getEnv(this.env) ?? this.defaultVal;
+		},
+	} satisfies SchemaItem<string>,
+
+	authorizationUrl: {
+		cli: "-",
+		env: "OAUTH_AUTHORIZATION_URL",
+		defaultVal: undefined as string | undefined,
+		allowed: "URL string",
+		description: "Direct OAuth authorization URL.",
+		get value(): string | undefined {
+			return getEnv(this.env);
+		},
+	} satisfies SchemaItem<string | undefined>,
+
+	tokenUrl: {
+		cli: "-",
+		env: "OAUTH_TOKEN_URL",
+		defaultVal: undefined as string | undefined,
+		allowed: "URL string",
+		description: "Direct OAuth token exchange endpoint.",
+		get value(): string | undefined {
+			return getEnv(this.env);
+		},
+	} satisfies SchemaItem<string | undefined>,
+
+	endSessionUrl: {
+		cli: "-",
+		env: "OAUTH_END_SESSION_URL",
+		defaultVal: undefined as string | undefined,
+		allowed: "URL string",
+		description: "Direct OAuth logout endpoint.",
+		get value(): string | undefined {
+			return getEnv(this.env);
+		},
+	} satisfies SchemaItem<string | undefined>,
+
+	defaultRole: {
+		cli: "-",
+		env: "AUTH_DEFAULT_ROLE",
+		defaultVal: "viewer",
+		allowed: "String",
+		description: "Fallback role if the token does not provide scopes/roles.",
 		get value(): string {
 			return getEnv(this.env) ?? this.defaultVal;
 		},

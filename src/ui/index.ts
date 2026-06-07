@@ -40,6 +40,9 @@ export function loadUiHtml(distDir: string, basePrefix = ""): string {
 			clientId: config.ui.oauth.clientId,
 			loginMethod: config.ui.oauth.loginMethod,
 			scopes: oauthScopes,
+			authorizationUrl: config.ui.oauth.authorizationUrl,
+			tokenUrl: config.ui.oauth.tokenUrl,
+			endSessionUrl: config.ui.oauth.endSessionUrl,
 		};
 		const configScript = `<script>
 window.__NOCR_BASE_URL__ = ${JSON.stringify(basePrefix)};

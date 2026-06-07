@@ -46,11 +46,13 @@ describe("Pods MCP Tools", () => {
 		]);
 		process.env.AUTH_ENABLED = "false";
 		process.env.MANAGED_ONLY = "false";
+		process.env.AUTH_ADMIN_ROLE = "nogoo9-admin";
+		process.env.AUTH_REQUIRED_READ_ROLE = "";
+		process.env.AUTH_REQUIRED_WRITE_ROLE = "";
+		process.env.AUTH_REQUIRED_READ_SCOPE = "";
+		process.env.AUTH_REQUIRED_WRITE_SCOPE = "";
 		delete process.env.AUTH_SUB_JSONPATH;
 		delete process.env.AUTH_ADMIN_JSONPATH;
-		delete process.env.AUTH_ADMIN_ROLE;
-		delete process.env.AUTH_REQUIRED_READ_SCOPE;
-		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
 		delete process.env.AUTH_SCOPE_JSONPATH;
 	});
 
@@ -62,6 +64,11 @@ describe("Pods MCP Tools", () => {
 		spyOn(coreApi, "patchNamespacedPod").mockRestore();
 		spyOn(coreApi, "readNamespacedPodLog").mockRestore();
 		delete process.env.MANAGED_ONLY;
+		delete process.env.AUTH_ADMIN_ROLE;
+		delete process.env.AUTH_REQUIRED_READ_ROLE;
+		delete process.env.AUTH_REQUIRED_WRITE_ROLE;
+		delete process.env.AUTH_REQUIRED_READ_SCOPE;
+		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
 	});
 
 	test("registers all pod tools", () => {
@@ -115,6 +122,7 @@ describe("Pods MCP Tools", () => {
 				namespace: "default",
 				jwtPayload: {
 					sub: "admin-user",
+					scope: "nogoo9:admin",
 					realm_access: { roles: ["nogoo9-admin"] },
 				},
 			});
@@ -122,6 +130,27 @@ describe("Pods MCP Tools", () => {
 			expect(listSpy).toHaveBeenCalledTimes(1);
 			const firstCall = listSpy.mock.calls[0] as any;
 			expect(firstCall[0].labelSelector).toBeUndefined();
+		});
+
+		test("appends user sub filter when admin but admin scope is missing", async () => {
+			process.env.AUTH_ENABLED = "true";
+			const listSpy = spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+				items: [],
+			} as any);
+
+			const handler = registeredTools.get("list_pods")!;
+			await handler({
+				namespace: "default",
+				jwtPayload: {
+					sub: "admin-user",
+					scope: "nogoo9:read",
+					realm_access: { roles: ["nogoo9-admin"] },
+				},
+			});
+
+			expect(listSpy).toHaveBeenCalledTimes(1);
+			const firstCall = listSpy.mock.calls[0] as any;
+			expect(firstCall[0].labelSelector).toBe("nogoo9/user-sub=admin-user");
 		});
 	});
 
@@ -171,12 +200,36 @@ describe("Pods MCP Tools", () => {
 				name: "pod-1",
 				jwtPayload: {
 					sub: "admin-user",
+					scope: "nogoo9:admin",
 					realm_access: { roles: ["nogoo9-admin"] },
 				},
 			});
 
 			expect(readSpy).toHaveBeenCalledTimes(1);
 			expect(result.isError).toBeUndefined();
+		});
+
+		test("blocks reading other user's pod when admin but admin scope is missing", async () => {
+			process.env.AUTH_ENABLED = "true";
+			const _readSpy = spyOn(coreApi, "readNamespacedPod").mockResolvedValue({
+				metadata: {
+					name: "pod-1",
+					labels: { "nogoo9/user-sub": "someone-else" },
+				},
+			} as any);
+
+			const handler = registeredTools.get("get_pod")!;
+			const result = await handler({
+				name: "pod-1",
+				jwtPayload: {
+					sub: "admin-user",
+					scope: "nogoo9:read",
+					realm_access: { roles: ["nogoo9-admin"] },
+				},
+			});
+
+			expect(result.isError).toBe(true);
+			expect(result.message).toContain("Pod pod-1 not found or access denied");
 		});
 	});
 
@@ -195,6 +248,7 @@ describe("Pods MCP Tools", () => {
 				name: "pod-1",
 				jwtPayload: {
 					sub: "admin-user",
+					scope: "nogoo9:admin",
 					realm_access: { roles: ["nogoo9-admin"] },
 				},
 			});
@@ -202,6 +256,28 @@ describe("Pods MCP Tools", () => {
 			expect(readSpy).toHaveBeenCalledTimes(0);
 			expect(deleteSpy).toHaveBeenCalledTimes(1);
 			expect(result.isError).toBeUndefined();
+		});
+
+		test("blocks deleting other user's pod when admin but admin scope is missing", async () => {
+			process.env.AUTH_ENABLED = "true";
+			const _readSpy = spyOn(coreApi, "readNamespacedPod").mockResolvedValue({
+				metadata: { name: "pod-1", labels: { "nogoo9/user-sub": "user-abc" } },
+			} as any);
+			const deleteSpy = spyOn(coreApi, "deleteNamespacedPod");
+
+			const handler = registeredTools.get("delete_pod")!;
+			const result = await handler({
+				name: "pod-1",
+				jwtPayload: {
+					sub: "admin-user",
+					scope: "nogoo9:write",
+					realm_access: { roles: ["nogoo9-admin"] },
+				},
+			});
+
+			expect(deleteSpy).toHaveBeenCalledTimes(0);
+			expect(result.isError).toBe(true);
+			expect(result.message).toContain("Pod pod-1 not found or access denied");
 		});
 
 		test("admin always reads pod first when managed-only is enabled", async () => {
@@ -225,6 +301,7 @@ describe("Pods MCP Tools", () => {
 				name: "pod-1",
 				jwtPayload: {
 					sub: "admin-user",
+					scope: "nogoo9:admin",
 					realm_access: { roles: ["nogoo9-admin"] },
 				},
 			});

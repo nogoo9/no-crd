@@ -6,63 +6,104 @@
   <title>nogoo9 Pod Manager</title>
   <!-- Tailwind CSS v4 Browser Build -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <!-- Google Fonts: EB Garamond, Inter, JetBrains Mono -->
+  <!-- Google Fonts: Hanken Grotesk, Source Serif 4, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,300..900;1,8..60,300..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg-color: #faf9f5; /* Canvas (warm cream) */
-      --text-color: #3d3d3a; /* Body */
-      --text-title: #141413; /* Ink */
-      --text-muted: #6c6a64; /* Muted */
-      --panel-bg: #efe9de; /* Surface card */
-      --panel-border: #e6dfd8; /* Hairline */
-      --item-border: #e6dfd8; /* Hairline */
-      --modal-bg: #faf9f5; /* Canvas */
-      --input-bg: #faf9f5; /* Canvas */
-      --input-border: #e6dfd8; /* Hairline */
-      --input-text: #141413; /* Ink */
-      --badge-bg: #efe9de; /* Surface card */
-      --badge-text: #3d3d3a; /* Body */
-      --accent-color: #cc785c; /* Primary Coral */
-      --accent-active: #a9583e; /* Primary active */
+    :root,
+    html[data-theme="light"] {
+      --font-serif: "Source Serif 4", Georgia, serif;
+      --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
+
+      --bg-color: #faf9f5; /* --paper */
+      --text-color: #65625b; /* --ink-2 */
+      --text-title: #29261b; /* --ink */
+      --text-muted: #9a968c; /* --ink-3 */
+      --panel-bg: #ffffff; /* --card */
+      --panel-hover-bg: #f1eee5; /* --surface */
+      --panel-border: #e7e2d6; /* --line */
+      --item-border: #d9d3c5; /* --line-2 */
+      --modal-bg: #ffffff; /* --card */
+      --input-bg: #faf9f5;
+      --input-border: #d9d3c5;
+      --input-text: #29261b;
+      --badge-bg: #f1eee5;
+      --badge-text: #65625b;
+      --accent-color: #D97757; /* terracotta */
+      --accent-active: #b1543a;
       --success-color: #5db872;
       --error-color: #c64545;
       --warning-color: #d4a017;
       --panel-hover-bg: #f5f0e8; /* surface-soft */
       --accent-amber: #e8a55a;
     }
-    :root.dark {
-      --bg-color: #181715; /* Surface dark */
-      --text-color: #a09d96; /* On dark soft */
-      --text-title: #faf9f5; /* On dark */
-      --text-muted: #a09d96; /* On dark soft */
-      --panel-bg: #1f1e1b; /* Surface dark soft */
-      --panel-border: #252320; /* Surface dark elevated */
-      --item-border: #252320; /* Surface dark elevated */
-      --modal-bg: #1f1e1b; /* Surface dark soft */
-      --input-bg: #181715; /* Surface dark */
-      --input-border: #252320; /* Surface dark elevated */
-      --input-text: #faf9f5; /* On dark */
-      --badge-bg: #252320; /* Surface dark elevated */
-      --badge-text: #a09d96; /* On dark soft */
-      --accent-color: #cc785c; /* Primary Coral */
-      --accent-active: #a9583e; /* Primary active */
-      --success-color: #5db872;
-      --error-color: #c64545;
-      --warning-color: #d4a017;
-      --panel-hover-bg: #252320; /* surface-dark-elevated */
-      --accent-amber: #e8a55a;
+    html.dark,
+    html[data-theme="dark"] {
+      --bg-color: #1b1a17; /* --paper */
+      --text-color: #a6a199; /* --ink-2 */
+      --text-title: #f3f0e9; /* --ink */
+      --text-muted: #726e66; /* --ink-3 */
+      --panel-bg: #2a2825; /* --card */
+      --panel-hover-bg: #232220; /* --surface */
+      --panel-border: #34322d; /* --line */
+      --item-border: #423f39; /* --line-2 */
+      --modal-bg: #2a2825;
+      --input-bg: #1b1a17;
+      --input-border: #423f39;
+      --input-text: #f3f0e9;
+      --badge-bg: #232220;
+      --badge-text: #a6a199;
     }
+
+    /* Density comfortable */
+    :root,
+    html[data-density="comfortable"] {
+      --fs-base: 15px;
+      --card-pad: 22px;
+      --grid-gap: 20px;
+      --row-pad: 13px;
+      --section-gap: 44px;
+    }
+    /* Density compact */
+    html[data-density="compact"] {
+      --fs-base: 13px;
+      --card-pad: 14px;
+      --grid-gap: 11px;
+      --row-pad: 8px;
+      --section-gap: 30px;
+    }
+
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: var(--font-sans);
       background-color: var(--bg-color) !important;
       color: var(--text-color) !important;
+      font-size: var(--fs-base) !important;
       transition: background-color 0.3s, color 0.3s;
     }
+
+    /* Density overrides for container layouts */
+    html[data-density="compact"] .p-6,
+    html[data-density="compact"] .px-6 {
+      padding-left: var(--card-pad) !important;
+      padding-right: var(--card-pad) !important;
+      padding-top: var(--card-pad) !important;
+      padding-bottom: var(--card-pad) !important;
+    }
+    html[data-density="compact"] .py-5 {
+      padding-top: calc(var(--card-pad) * 0.8) !important;
+      padding-bottom: calc(var(--card-pad) * 0.8) !important;
+    }
+    html[data-density="compact"] .gap-6,
+    html[data-density="compact"] .gap-8 {
+      gap: var(--grid-gap) !important;
+    }
+    html[data-density="compact"] .space-y-8 > * + * {
+      margin-top: var(--section-gap) !important;
+    }
     h1, h2, h3, h4, .font-serif {
-      font-family: 'EB Garamond', Garamond, Georgia, serif !important;
+      font-family: var(--font-serif) !important;
       font-weight: 500 !important;
       letter-spacing: -0.02em !important;
       background: none !important;
@@ -488,6 +529,7 @@
           <span class="theme-status-success-dot"></span>
           <span class="text-xs theme-text-muted font-medium">User:</span>
           <span id="user-badge-name" class="text-xs font-bold font-mono theme-text-title">Anonymous</span>
+          <span id="user-admin-badge" class="hidden text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">Admin</span>
         </button>
         <button id="logout-btn" title="Sign Out" class="theme-button-secondary px-3 py-2 flex items-center justify-center cursor-pointer hidden theme-text-error">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -515,6 +557,49 @@
       </svg>
       <div class="text-sm font-medium theme-text-error" id="error-message">Failed to connect to Kubernetes cluster.</div>
     </div>
+
+    <!-- Toolbar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 mt-2">
+      <!-- Search Input -->
+      <div class="relative flex-1 max-w-md">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg class="h-4 w-4 theme-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input type="text" id="local-search-input" class="theme-text-input w-full pl-9 pr-4 py-2 text-sm outline-none transition" placeholder="Search workspaces, templates, or pods..." />
+      </div>
+
+      <!-- Controls Group -->
+      <div class="flex items-center gap-3">
+        <!-- Layout Toggle -->
+        <div class="flex items-center border theme-border rounded-lg overflow-hidden bg-[var(--panel-bg)]">
+          <button id="view-grid-btn" type="button" title="Grid View" class="px-3 py-2 text-xs font-medium theme-text-muted hover:bg-[var(--panel-hover-bg)] transition-colors cursor-pointer">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </button>
+          <button id="view-list-btn" type="button" title="List View" class="px-3 py-2 text-xs font-medium theme-text-muted hover:bg-[var(--panel-hover-bg)] transition-colors border-l theme-border cursor-pointer">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Density Dropdown -->
+        <div class="relative inline-block">
+          <select id="density-select" class="theme-button-secondary text-xs px-3 py-2 pr-8 appearance-none cursor-pointer outline-none rounded-lg font-medium bg-transparent">
+            <option value="comfortable" class="theme-text-title bg-neutral-900">Comfortable Density</option>
+            <option value="compact" class="theme-text-title bg-neutral-900">Compact Density</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 theme-text-muted">
+            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
  
     <!-- Main Content Grid -->
     <main class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -523,31 +608,39 @@
       <section class="lg:col-span-2 space-y-8">
         
         <!-- Active Workspaces -->
-        <div class="theme-feature-card rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
-          <div class="px-6 py-5 theme-card-header flex items-center justify-between">
-            <div class="flex items-center gap-2.5">
-              <h2 class="text-xl font-bold tracking-tight theme-text-title">Active Workspaces</h2>
-              <span id="ws-count" class="px-2 py-0.5 theme-badge-pill text-xs font-bold rounded-full">0</span>
-            </div>
-            <p class="text-xs theme-text-muted">Agent sandboxes running inside the cluster.</p>
+        <section class="space-y-4">
+          <div class="flex items-center gap-2.5 py-2">
+            <span class="theme-text-muted flex shrink-0">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </span>
+            <h2 class="text-xs font-bold uppercase tracking-wider theme-text-title whitespace-nowrap">Active Workspaces</h2>
+            <span id="ws-count" class="font-mono text-xs theme-text-muted">0</span>
+            <div class="flex-grow h-[1px] bg-[var(--panel-border)]"></div>
+            <p class="text-[11px] theme-text-muted italic shrink-0 hidden sm:block">Agent sandboxes running inside the cluster.</p>
           </div>
-          <div id="workspaces-list" class="flex flex-col gap-6 p-6">
+          <div id="workspaces-list" class="flex flex-col gap-6">
             <!-- Dynamic workspace items inserted here -->
             <div class="py-8 text-center theme-text-muted text-sm">No active workspaces. Click a template to spawn one.</div>
           </div>
-        </div>
+        </section>
  
         <!-- Pod List -->
-        <div class="theme-feature-card rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
-          <div class="px-6 py-5 theme-card-header flex items-center justify-between">
-            <div class="flex items-center gap-2.5">
-              <h2 class="text-xl font-bold tracking-tight theme-text-title">Kubernetes Pods</h2>
-              <span id="pods-count" class="px-2 py-0.5 theme-badge-pill text-xs font-bold rounded-full">0</span>
-              <span id="unmanaged-count-info" class="text-[10px] theme-text-muted hidden"></span>
-            </div>
-            <p class="text-xs theme-text-muted">Managed pods in namespace.</p>
+        <section class="space-y-4">
+          <div class="flex items-center gap-2.5 py-2">
+            <span class="theme-text-muted flex shrink-0">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            </span>
+            <h2 class="text-xs font-bold uppercase tracking-wider theme-text-title whitespace-nowrap">Kubernetes Pods</h2>
+            <span id="pods-count" class="font-mono text-xs theme-text-muted">0</span>
+            <span id="unmanaged-count-info" class="text-[10px] theme-text-muted hidden"></span>
+            <div class="flex-grow h-[1px] bg-[var(--panel-border)]"></div>
+            <p class="text-[11px] theme-text-muted italic shrink-0 hidden sm:block">Managed pods in namespace.</p>
           </div>
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto border theme-border rounded-xl bg-[var(--panel-bg)]">
             <table class="w-full text-left text-sm border-collapse">
               <thead>
                 <tr class="theme-table-header text-xs uppercase font-semibold">
@@ -567,33 +660,35 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
  
       </section>
  
       <!-- Right Column: Templates -->
-      <section class="space-y-8">
+      <section class="space-y-4">
         
         <!-- ConfigMap Templates -->
-        <div class="theme-feature-card rounded-2xl shadow-xl overflow-hidden backdrop-blur-md">
-          <div class="px-6 py-5 theme-card-header flex items-center justify-between">
-            <div>
-              <h2 class="text-xl font-bold tracking-tight theme-text-title">Pod Templates</h2>
-              <p class="mt-1 text-xs theme-text-muted">Reusable ConfigMaps for sandboxes.</p>
-            </div>
-            <button id="create-tmpl-btn" class="theme-button-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer">
-              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        <div class="flex items-center justify-between gap-2.5 py-2">
+          <div class="flex items-center gap-2.5 min-w-0 flex-1">
+            <span class="theme-text-muted flex shrink-0">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
               </svg>
-              Create
-            </button>
+            </span>
+            <h2 class="text-xs font-bold uppercase tracking-wider theme-text-title whitespace-nowrap">Pod Templates</h2>
+            <div class="flex-grow h-[1px] bg-[var(--panel-border)]"></div>
           </div>
-          <div id="templates-list" class="theme-divide-y max-h-[600px] overflow-y-auto">
-            <!-- Dynamic templates inserted here -->
-            <div class="p-6 text-center theme-text-muted text-sm">No templates registered.</div>
-          </div>
+          <button id="create-tmpl-btn" class="theme-button-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer shrink-0">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Create
+          </button>
         </div>
- 
+        <div id="templates-list" class="theme-divide-y max-h-[600px] overflow-y-auto border theme-border rounded-xl bg-[var(--panel-bg)]">
+          <!-- Dynamic templates inserted here -->
+          <div class="p-6 text-center theme-text-muted text-sm">No templates registered.</div>
+        </div>
       </section>
     </main>
 
@@ -655,6 +750,11 @@
         <div>
           <label for="workspace-name" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Workspace Name (Optional display name)</label>
           <input type="text" id="workspace-name" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm outline-none transition" placeholder="e.g. My Dev Sandbox" />
+        </div>
+
+        <div id="target-user-container" class="hidden">
+          <label for="target-user-sub" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Target User ID (Admin Only)</label>
+          <input type="text" id="target-user-sub" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm font-mono outline-none transition" placeholder="e.g. user-abc" />
         </div>
 
         <div id="context-variables-container" class="hidden space-y-3">

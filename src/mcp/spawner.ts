@@ -137,12 +137,25 @@ export function registerSpawnerTools(
 					}
 					try {
 						verifyAccessOrThrow(activeJwtPayload, "read");
-						const sub = extractUserIdentity(
-							activeJwtPayload,
-							config.auth.subJsonPath,
-						);
-						logger.debug("Extracted user identity subject: {sub}", { sub });
-						labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
+						let isAdmin = false;
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
+						if (!isAdmin) {
+							const sub = extractUserIdentity(
+								activeJwtPayload,
+								config.auth.subJsonPath,
+							);
+							logger.debug("Extracted user identity subject: {sub}", { sub });
+							labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
+						} else {
+							logger.debug(
+								"Admin listing all workspaces (bypassing userSub filter)",
+							);
+						}
 					} catch (err) {
 						logger.error("Failed to extract user identity: {error}", {
 							error: err,
@@ -261,12 +274,25 @@ export function registerSpawnerTools(
 					}
 					try {
 						verifyAccessOrThrow(activeJwtPayload, "read");
-						const sub = extractUserIdentity(
-							activeJwtPayload,
-							config.auth.subJsonPath,
-						);
-						logger.debug("Extracted user identity subject: {sub}", { sub });
-						labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
+						let isAdmin = false;
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
+						if (!isAdmin) {
+							const sub = extractUserIdentity(
+								activeJwtPayload,
+								config.auth.subJsonPath,
+							);
+							logger.debug("Extracted user identity subject: {sub}", { sub });
+							labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
+						} else {
+							logger.debug(
+								"Admin getting workspace (bypassing userSub filter)",
+							);
+						}
 					} catch (err) {
 						logger.error("Failed to extract user identity: {error}", {
 							error: err,
@@ -426,12 +452,25 @@ export function registerSpawnerTools(
 					}
 					try {
 						verifyAccessOrThrow(activeJwtPayload, "write");
-						const sub = extractUserIdentity(
-							activeJwtPayload,
-							config.auth.subJsonPath,
-						);
-						logger.debug("Extracted user identity subject: {sub}", { sub });
-						labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
+						let isAdmin = false;
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
+						if (!isAdmin) {
+							const sub = extractUserIdentity(
+								activeJwtPayload,
+								config.auth.subJsonPath,
+							);
+							logger.debug("Extracted user identity subject: {sub}", { sub });
+							labelSelector += `,${ANNOTATION_KEYS.USER_SUB}=${sub}`;
+						} else {
+							logger.debug(
+								"Admin stopping workspace (bypassing userSub filter)",
+							);
+						}
 					} catch (err) {
 						logger.error("Failed to extract user identity: {error}", {
 							error: err,
@@ -521,6 +560,12 @@ export function registerSpawnerTools(
 						.optional()
 						.describe("Environment variables to satisfy required-context"),
 					jwtPayload: z.record(z.string(), z.unknown()).optional(),
+					userSub: z
+						.string()
+						.optional()
+						.describe(
+							"Target user subject for whom the workspace is spawned (admin only)",
+						),
 				},
 				outputSchema: SpawnWorkspaceOutputSchema.shape,
 				_meta: UI_META,
@@ -534,6 +579,7 @@ export function registerSpawnerTools(
 				namespace,
 				context,
 				jwtPayload,
+				userSub: inputUserSub,
 			}) => {
 				// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
 				const VAR_USER = "${{user}}";
@@ -594,10 +640,29 @@ export function registerSpawnerTools(
 					}
 					try {
 						verifyAccessOrThrow(activeJwtPayload, "write");
-						userSub = extractUserIdentity(
+						const callerSub = extractUserIdentity(
 							activeJwtPayload,
 							config.auth.subJsonPath,
 						);
+						if (inputUserSub) {
+							try {
+								verifyAccessOrThrow(activeJwtPayload, "admin");
+							} catch (_err) {
+								const finalErr = new Error(
+									"Forbidden: Non-admin users cannot specify a different userSub",
+								);
+								logger.error("Spawn workspace failed: {error}", {
+									error: finalErr,
+								});
+								return errorResult(k8sContext.kc, finalErr, {
+									id,
+									podName: "",
+								});
+							}
+							userSub = inputUserSub;
+						} else {
+							userSub = callerSub;
+						}
 						logger.debug("Extracted user identity subject: {sub}", {
 							sub: userSub,
 						});
@@ -607,9 +672,15 @@ export function registerSpawnerTools(
 						});
 						return errorResult(k8sContext.kc, err, { id, podName: "" });
 					}
+				} else {
+					if (inputUserSub) {
+						userSub = inputUserSub;
+					}
 				}
 				let templateUser = "guest";
-				if (activeJwtPayload) {
+				if (authEnabled) {
+					templateUser = userSub;
+				} else if (activeJwtPayload) {
 					try {
 						templateUser = extractUserIdentity(
 							activeJwtPayload,

@@ -570,6 +570,8 @@ users:
 
 	test("Routing proxy - authenticates with Cookie header and sets Set-Cookie", async () => {
 		process.env.AUTH_ENABLED = "true";
+		process.env.AUTH_REQUIRED_READ_SCOPE = "";
+		process.env.AUTH_REQUIRED_WRITE_SCOPE = "";
 		mockListNamespacedPod.mockResolvedValue({
 			items: [
 				{
@@ -637,6 +639,8 @@ users:
 			globalThis.fetch = originalFetch;
 			delete process.env.AUTH_ENABLED;
 			delete process.env.JWT_VERIFICATION_REQUIRED;
+			delete process.env.AUTH_REQUIRED_READ_SCOPE;
+			delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
 		}
 	});
 
@@ -649,7 +653,7 @@ users:
 		expect(resp.status).toBe(200);
 		const body = await resp.json();
 		expect(body.resource).toBe("http://localhost");
-		expect(body.scopes_supported).toEqual(["mcp"]);
+		expect(body.scopes_supported).toEqual(["nogoo9:read", "nogoo9:write"]);
 		expect(body.bearer_methods_supported).toEqual(["header"]);
 
 		// Test dynamic scopes response
@@ -723,6 +727,8 @@ users:
 		process.env.AUTH_ENABLED = "true";
 		process.env.INTROSPECTION_ENDPOINT = "https://auth.company.com/introspect";
 		process.env.OAUTH_CLIENT_ID = "mcp-server";
+		process.env.AUTH_REQUIRED_READ_SCOPE = "";
+		process.env.AUTH_REQUIRED_WRITE_SCOPE = "";
 
 		const originalFetch = globalThis.fetch;
 		const mockFetch = mock((url: string, init: any) => {
@@ -761,6 +767,8 @@ users:
 			delete process.env.AUTH_ENABLED;
 			delete process.env.INTROSPECTION_ENDPOINT;
 			delete process.env.OAUTH_CLIENT_ID;
+			delete process.env.AUTH_REQUIRED_READ_SCOPE;
+			delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
 		}
 	});
 
@@ -770,6 +778,8 @@ users:
 			process.env.JWT_VERIFICATION_REQUIRED = "false";
 			process.env.AUTH_REQUIRED_READ_SCOPE = "mcp:read";
 			process.env.AUTH_REQUIRED_WRITE_SCOPE = "mcp:write";
+			process.env.AUTH_REQUIRED_READ_ROLE = "";
+			process.env.AUTH_REQUIRED_WRITE_ROLE = "";
 		});
 
 		afterEach(() => {
@@ -777,6 +787,8 @@ users:
 			delete process.env.JWT_VERIFICATION_REQUIRED;
 			delete process.env.AUTH_REQUIRED_READ_SCOPE;
 			delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
+			delete process.env.AUTH_REQUIRED_READ_ROLE;
+			delete process.env.AUTH_REQUIRED_WRITE_ROLE;
 		});
 
 		function createMockToken(payload: any) {
@@ -1348,12 +1360,20 @@ users:
 			process.env.JWT_VERIFICATION_REQUIRED = "false";
 			process.env.OAUTH_DISCOVERY_URL =
 				"http://keycloak/.well-known/openid-configuration";
+			process.env.AUTH_REQUIRED_READ_ROLE = "";
+			process.env.AUTH_REQUIRED_WRITE_ROLE = "";
+			process.env.AUTH_REQUIRED_READ_SCOPE = "";
+			process.env.AUTH_REQUIRED_WRITE_SCOPE = "";
 		});
 
 		afterEach(() => {
 			delete process.env.AUTH_ENABLED;
 			delete process.env.JWT_VERIFICATION_REQUIRED;
 			delete process.env.OAUTH_DISCOVERY_URL;
+			delete process.env.AUTH_REQUIRED_READ_ROLE;
+			delete process.env.AUTH_REQUIRED_WRITE_ROLE;
+			delete process.env.AUTH_REQUIRED_READ_SCOPE;
+			delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
 		});
 
 		function createMockToken(payload: any, aud = "http://localhost") {

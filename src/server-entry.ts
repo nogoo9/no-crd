@@ -52,6 +52,14 @@ const logger = getLogger(["nogoo9", "main"]);
  * and hooks SIGTERM exit handlers.
  */
 async function main(): Promise<void> {
+	if (config.auth.enabled) {
+		if (!config.ui.oauth.discoveryUrl && !config.auth.authorizationUrl) {
+			throw new Error(
+				"Startup validation failed: When AUTH_ENABLED=true, either OAUTH_DISCOVERY_URL or OAUTH_AUTHORIZATION_URL must be provided.",
+			);
+		}
+	}
+
 	const isStdio = TRANSPORT === "stdio" || TRANSPORT === "both";
 
 	if (isStdio) {

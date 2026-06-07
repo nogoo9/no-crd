@@ -22,6 +22,7 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-011](./ADR-011-ui-base-url-and-cookie-path-consistency.md) | UI BASE_URL Contract and Cookie Path Consistency | Accepted |
 | [ADR-012](./ADR-012-per-session-mcp-server-factory.md) | Per-Session McpServer Factory Pattern | Accepted |
 | [ADR-013](./ADR-013-workspace-app-authorization.md) | Workspace App Authorization Support | Proposed |
+| [ADR-014](./ADR-014-admin-access-hardening-and-role-mapping.md) | Hardened Administrator Access with Scope and Role Mapping | Accepted |
 
 ## How to Read ADRs
 
@@ -50,6 +51,7 @@ graph LR
     ADR005 -.- ADR011
     ADR009 --> ADR012["ADR-012: Per-Session Factory"]
     ADR011 --> ADR013["ADR-013: Workspace Auth"]
+    ADR008 --> ADR014["ADR-014: Admin Hardening"]
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -63,6 +65,7 @@ graph LR
     style ADR011 fill:#4a9eff,color:#fff
     style ADR012 fill:#f59e0b,color:#fff
     style ADR013 fill:#4a9eff,color:#fff
+    style ADR014 fill:#f59e0b,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain

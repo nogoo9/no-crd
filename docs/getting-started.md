@@ -129,14 +129,19 @@ The server can be configured via environment variables or CLI flags:
 | - | `AUTH_SUB_JSONPATH` | `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. |
 | `--auth-scope-jsonpath` | `AUTH_SCOPE_JSONPATH` | `$.scope` | JSONPath | Payload path to extract scopes claim from JWT payload. |
 | `--auth-roles-jsonpath` | `AUTH_ROLES_JSONPATH`, `AUTH_ADMIN_JSONPATH` | `$.realm_access.roles` | JSONPath | Payload path to extract user roles from JWT payload. |
-| - | `AUTH_ADMIN_ROLE` | `nogoo9-admin` | String | Role name signifying administrator access. |
-| `--auth-required-read-scope` | `AUTH_REQUIRED_READ_SCOPE` | - | String | OAuth scope required for read operations. If not set, read scope check is bypassed. |
-| `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | - | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
-| `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | - | String | User role required for read operations. If not set, read role check is bypassed. |
-| `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | - | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
+| - | `AUTH_ADMIN_ROLE` | `admin` | String | Role name signifying administrator access. |
+| `--auth-required-read-scope` | `AUTH_REQUIRED_READ_SCOPE` | `nogoo9:read` | String | OAuth scope required for read operations. If not set, read scope check is bypassed. |
+| `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | `nogoo9:write` | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
+| `--auth-required-admin-scope` | `AUTH_REQUIRED_ADMIN_SCOPE` | `nogoo9:admin` | String | OAuth scope required for administrator operations. If not set, admin scope check is bypassed. |
+| `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | `viewer` | String | User role required for read operations. If not set, read role check is bypassed. |
+| `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | `user` | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
 | - | `PROXY_SESSION_TTL` | `1800` | Number | Session cookie expiration lifetime in seconds (sliding window duration). |
 | - | `PROXY_SESSION_SECRET` | `""` | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 | - | `OAUTH_SCOPES` | `openid profile email offline_access` | Space-separated scope string | OAuth scopes to request during authorization. Include 'offline_access' for refresh tokens. |
+| - | `OAUTH_AUTHORIZATION_URL` | - | URL string | Direct OAuth authorization URL. |
+| - | `OAUTH_TOKEN_URL` | - | URL string | Direct OAuth token exchange endpoint. |
+| - | `OAUTH_END_SESSION_URL` | - | URL string | Direct OAuth logout endpoint. |
+| - | `AUTH_DEFAULT_ROLE` | `viewer` | String | Fallback role if the token does not provide scopes/roles. |
 
 ### 🖥️ UI & Themes Configuration
 
