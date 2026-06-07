@@ -320,14 +320,19 @@ The server and command-line utility are configurable using CLI options or enviro
 | - | `AUTH_SUB_JSONPATH` | `$.sub` | JSONPath | Payload path to extract unique user identity from JWT payload. |
 | `--auth-scope-jsonpath` | `AUTH_SCOPE_JSONPATH` | `$.scope` | JSONPath | Payload path to extract scopes claim from JWT payload. |
 | `--auth-roles-jsonpath` | `AUTH_ROLES_JSONPATH`, `AUTH_ADMIN_JSONPATH` | `$.realm_access.roles` | JSONPath | Payload path to extract user roles from JWT payload. |
-| - | `AUTH_ADMIN_ROLE` | `nogoo9-admin` | String | Role name signifying administrator access. |
-| `--auth-required-read-scope` | `AUTH_REQUIRED_READ_SCOPE` | - | String | OAuth scope required for read operations. If not set, read scope check is bypassed. |
-| `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | - | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
-| `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | - | String | User role required for read operations. If not set, read role check is bypassed. |
-| `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | - | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
+| - | `AUTH_ADMIN_ROLE` | `admin` | String | Role name signifying administrator access. |
+| `--auth-required-read-scope` | `AUTH_REQUIRED_READ_SCOPE` | `nogoo9:read` | String | OAuth scope required for read operations. If not set, read scope check is bypassed. |
+| `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | `nogoo9:write` | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
+| `--auth-required-admin-scope` | `AUTH_REQUIRED_ADMIN_SCOPE` | `nogoo9:admin` | String | OAuth scope required for administrator operations. If not set, admin scope check is bypassed. |
+| `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | `viewer` | String | User role required for read operations. If not set, read role check is bypassed. |
+| `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | `user` | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
 | - | `PROXY_SESSION_TTL` | `1800` | Number | Session cookie expiration lifetime in seconds (sliding window duration). |
 | - | `PROXY_SESSION_SECRET` | `""` | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 | - | `OAUTH_SCOPES` | `openid profile email offline_access` | Space-separated scope string | OAuth scopes to request during authorization. Include 'offline_access' for refresh tokens. |
+| - | `OAUTH_AUTHORIZATION_URL` | - | URL string | Direct OAuth authorization URL. |
+| - | `OAUTH_TOKEN_URL` | - | URL string | Direct OAuth token exchange endpoint. |
+| - | `OAUTH_END_SESSION_URL` | - | URL string | Direct OAuth logout endpoint. |
+| - | `AUTH_DEFAULT_ROLE` | `viewer` | String | Fallback role if the token does not provide scopes/roles. |
 
 ### 🖥️ UI & Themes Configuration
 
@@ -627,11 +632,14 @@ The server includes a built-in reverse proxy routing service. HTTP requests targ
 are dynamically proxied directly to the running workspace pod's IP address inside the cluster.
 
 If `AUTH_ENABLED` is true:
-- The proxy requires a valid Bearer token in the `Authorization` header or a `?token=` query parameter.
-- The workspace pod's `nogoo9/user-sub` label must match the JWT's subject claim, preventing unauthorized access to other users' workspaces.
-- The proxy target port inside the workspace pod defaults to `3000` or can be overridden via pod annotation `nogoo9/workspace-port` or the `DEFAULT_WORKSPACE_PORT` environment variable.
+- **Token Bootstrapping & Path-Scoped Cookies**: Since standard browser navigations (links, iframes) cannot transmit custom HTTP headers, the client passes the active JWT via a `?token=` query parameter on initial redirect. The proxy validates it and issues a secure, path-scoped cookie (`nocr_token`), allowing subsequent resource requests (JS, CSS, images, WebSockets) to authenticate seamlessly without URL parameters.
+- **Direct Access Redirect (SSO)**: Accessing a workspace URL directly without active credentials redirects you to the main dashboard's login screen. Once logged in, the dashboard automatically routes you back to the target workspace URL with a fresh bootstrap token.
+- **Resource Ownership Verification**: The workspace pod's `nogoo9/user-sub` label must match the JWT's subject claim, preventing unauthorized access to other users' workspaces.
+- **Proxy target port**: Inside the workspace pod defaults to `3000` or can be overridden via pod annotation `nogoo9/workspace-port` or the `DEFAULT_WORKSPACE_PORT` environment variable.
 - **Multi-Port / Custom API Routing**: You can expose and route additional APIs inside the pod (e.g., a web terminal or secondary service) by defining custom annotations in the template (e.g., `nogoo9/api.terminal.port: "7681"`, `nogoo9/api.terminal.path: "/terminal"`). The proxy will dynamically handle subpath routing and method checks.
 - A **stateless signed session cookie** (`nocr_sess`) is minted on first successful JWT validation, enabling workspace traffic to survive short-lived token expiry. *(Available from v0.4.0)* See [ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md) and [ADR-003](docs/decisions/ADR-003-peer-discovery-session-key.md) for design details.
+
+For a detailed breakdown of the redirection lifecycle, Keycloak configuration, and JWT claims, see the [Authentication & Authorization Overview](docs/auth-overview.md).
 
 ### 3. OAuth Resource Discovery (RFC 9728)
 

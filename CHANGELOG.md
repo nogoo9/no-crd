@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-06-07
+
+### Added
+
+- **Hardened Admin Access and Role Mapping** ([ADR-014](docs/decisions/ADR-014-admin-access-hardening-and-role-mapping.md)): Implemented a secure authentication model where admin actions require both the admin role (`AUTH_ADMIN_ROLE`) and the admin scope (`AUTH_REQUIRED_ADMIN_SCOPE`, default `"nogoo9:admin"`). Introduced an admin scope hierarchy that lets the admin scope satisfy standard read/write scope requirements.
+- **Scope Bypass for Scope-less Credentials**: Permitted credentials that do not contain a scope claim to bypass scope validation, maintaining backward compatibility for role-only authorization configurations.
+- **Proxy Token-to-Cookie Bootstrapping**: Implemented dynamic query-parameter-based JWT verification in the reverse routing proxy, which automatically sets a path-scoped, secure session cookie (`nocr_token`) on first access to enable seamless workspace subresource loading.
+- **Direct Workspace SSO Redirection**: Added automatic SSO challenge redirecting when direct workspace URLs are loaded without active authorization. Users are routed to the dashboard to login and then returned transparently to their workspace.
+- **Ada Space Minimalist UI Realignment**: Revamped the UI to clean up double-borders and optimize spacing. Integrated new tools: comfort/compact layout density toggle, grid/list workspaces layout toggle, and local dashboard search filter.
+- **Direct OAuth Endpoint Config**: Added server support for direct URL parameters (`OAUTH_AUTHORIZATION_URL`, `OAUTH_TOKEN_URL`, `OAUTH_END_SESSION_URL`) as alternatives to dynamic OIDC discovery lookup.
+- **Husky & Nano-staged Pre-commit Hooks**: Integrated automated code-quality hooks to enforce Biome check and type verification before committing code.
+
+### Fixed
+
+- **Workspace Header Overlap Bug**: Resolved a bug where desktop grid containers crushed the workspace card header, causing the status badge to overlap the monitor icon on small screens. Now uses flexible wrapping layouts.
+- **Keycloak Offline Role Assignments**: Updated Keycloak realm configs and E2E test scripts to support the new admin scopes and offline access rules.
+- **VitePress Docs Refactoring**: Corrected Mermaid syntax errors, updated permissions mappings, and consolidated documentation guides.
+
 ## [0.6.0] — 2026-06-03
 
 ### Added

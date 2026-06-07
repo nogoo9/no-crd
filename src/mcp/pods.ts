@@ -9,7 +9,6 @@ import {
 	createPodFromArgs,
 	DEFAULT_NAMESPACE,
 	errorResult,
-	extractAdminRole,
 	extractUserIdentity,
 	getAccessibleNamespaces,
 	type K8sContext,
@@ -177,11 +176,12 @@ export function registerPodTools(
 							activeJwtPayload,
 							config.auth.subJsonPath,
 						);
-						isAdmin = extractAdminRole(
-							activeJwtPayload,
-							config.auth.rolesJsonPath,
-							config.auth.adminRole,
-						);
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, { pods: [] });
 					}
@@ -316,11 +316,12 @@ export function registerPodTools(
 							activeJwtPayload,
 							config.auth.subJsonPath,
 						);
-						isAdmin = extractAdminRole(
-							activeJwtPayload,
-							config.auth.rolesJsonPath,
-							config.auth.adminRole,
-						);
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, { pod: {} });
 					}
@@ -506,11 +507,12 @@ export function registerPodTools(
 							activeJwtPayload,
 							config.auth.subJsonPath,
 						);
-						isAdmin = extractAdminRole(
-							activeJwtPayload,
-							config.auth.rolesJsonPath,
-							config.auth.adminRole,
-						);
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
 					}
@@ -618,11 +620,12 @@ export function registerPodTools(
 							activeJwtPayload,
 							config.auth.subJsonPath,
 						);
-						isAdmin = extractAdminRole(
-							activeJwtPayload,
-							config.auth.rolesJsonPath,
-							config.auth.adminRole,
-						);
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, {
 							name: "",
@@ -794,11 +797,12 @@ export function registerPodTools(
 							activeJwtPayload,
 							config.auth.subJsonPath,
 						);
-						isAdmin = extractAdminRole(
-							activeJwtPayload,
-							config.auth.rolesJsonPath,
-							config.auth.adminRole,
-						);
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, { logs: "" });
 					}

@@ -35,6 +35,13 @@ data:
           "attributes": {
             "include.in.token.scope": "true"
           }
+        },
+        {
+          "name": "nogoo9:admin",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "true"
+          }
         }
       ],
       "roles": {
@@ -100,10 +107,10 @@ data:
           ]
         },
         {
-          "username": "adminuser",
+          "username": "admin",
           "enabled": true,
           "emailVerified": true,
-          "email": "adminuser@localhost",
+          "email": "admin@localhost",
           "firstName": "Admin",
           "lastName": "User",
           "requiredActions": [],
@@ -141,7 +148,8 @@ data:
             "profile",
             "email",
             "mcp:read",
-            "mcp:write"
+            "mcp:write",
+            "nogoo9:admin"
           ],
           "optionalClientScopes": [
             "offline_access"

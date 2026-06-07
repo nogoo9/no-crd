@@ -9,7 +9,7 @@ async function fetchToken(username: string): Promise<string> {
 		username,
 		password: "password",
 		grant_type: "password",
-		scope: "openid mcp:read mcp:write",
+		scope: "openid mcp:read mcp:write nogoo9:admin",
 	});
 
 	const response = await fetch(TOKEN_URL, {
@@ -111,9 +111,9 @@ async function main() {
 	console.log("\n[2/7] Fetching access tokens from Keycloak...");
 	const readToken = await fetchToken("readuser");
 	const writeToken = await fetchToken("writeuser");
-	const adminToken = await fetchToken("adminuser");
+	const adminToken = await fetchToken("admin");
 	console.log(
-		"    ✅ Successfully retrieved readuser, writeuser, and adminuser tokens.",
+		"    ✅ Successfully retrieved readuser, writeuser, and admin tokens.",
 	);
 
 	function decodeJwt(token: string): any {
@@ -196,10 +196,10 @@ async function main() {
 			},
 		],
 	};
-	const adminuserPodSpec = {
+	const adminPodSpec = {
 		labels: {
 			"nogoo9/type": "workspace",
-			"nogoo9/workspace-id": "adminuser-e2e-pod",
+			"nogoo9/workspace-id": "admin-e2e-pod",
 		},
 		containers: [
 			{
@@ -229,18 +229,15 @@ async function main() {
 		);
 	}
 
-	console.log("    Creating pod 'adminuser-e2e-pod' owned by adminuser...");
-	const createAdminuserPod = await makeMcpCall(adminToken, "tools/call", {
+	console.log("    Creating pod 'admin-e2e-pod' owned by admin...");
+	const createAdminPod = await makeMcpCall(adminToken, "tools/call", {
 		name: "create_pod",
-		arguments: { name: "adminuser-e2e-pod", ...adminuserPodSpec },
+		arguments: { name: "admin-e2e-pod", ...adminPodSpec },
 	});
-	if (
-		createAdminuserPod.status !== 200 ||
-		createAdminuserPod.data?.result?.isError
-	) {
-		console.error("DEBUG: createAdminuserPod result:", createAdminuserPod);
+	if (createAdminPod.status !== 200 || createAdminPod.data?.result?.isError) {
+		console.error("DEBUG: createAdminPod result:", createAdminPod);
 		throw new Error(
-			`Failed to create adminuser pod: ${JSON.stringify(createAdminuserPod.data || createAdminuserPod)}`,
+			`Failed to create admin pod: ${JSON.stringify(createAdminPod.data || createAdminPod)}`,
 		);
 	}
 	console.log("    ✅ Both test pods provisioned successfully.");
@@ -263,9 +260,7 @@ async function main() {
 			"      Pods seen by readuser:\n",
 			listAsRead.data.result.content[0].text,
 		);
-		const readHasAdminPod = readPods.some((p) =>
-			p.includes("adminuser-e2e-pod"),
-		);
+		const readHasAdminPod = readPods.some((p) => p.includes("admin-e2e-pod"));
 		const readHasWritePod = readPods.some((p) =>
 			p.includes("writeuser-e2e-pod"),
 		);
@@ -288,21 +283,19 @@ async function main() {
 			"      Pods seen by writeuser:\n",
 			listAsWrite.data.result.content[0].text,
 		);
-		const writeHasAdminPod = writePods.some((p) =>
-			p.includes("adminuser-e2e-pod"),
-		);
+		const writeHasAdminPod = writePods.some((p) => p.includes("admin-e2e-pod"));
 		const writeHasWritePod = writePods.some((p) =>
 			p.includes("writeuser-e2e-pod"),
 		);
 		if (writeHasAdminPod) {
-			throw new Error("Isolation failure: writeuser can list adminuser's pod!");
+			throw new Error("Isolation failure: writeuser can list admin's pod!");
 		}
 		if (!writeHasWritePod) {
 			throw new Error("Expected writeuser to see 'writeuser-e2e-pod'");
 		}
 		console.log("      -> writeuser sees only owned pods. Correct.");
 
-		console.log("    Listing pods as 'adminuser' (admin role enabled)...");
+		console.log("    Listing pods as 'admin' (admin role enabled)...");
 		const listAsAdmin = await makeMcpCall(adminToken, "tools/call", {
 			name: "list_pods",
 			arguments: {},
@@ -311,19 +304,17 @@ async function main() {
 			"\n",
 		);
 		console.log(
-			"      Pods seen by adminuser:\n",
+			"      Pods seen by admin:\n",
 			listAsAdmin.data.result.content[0].text,
 		);
-		const adminHasAdminPod = adminPods.some((p) =>
-			p.includes("adminuser-e2e-pod"),
-		);
+		const adminHasAdminPod = adminPods.some((p) => p.includes("admin-e2e-pod"));
 		const adminHasWritePod = adminPods.some((p) =>
 			p.includes("writeuser-e2e-pod"),
 		);
 		if (!adminHasAdminPod || !adminHasWritePod) {
 			throw new Error("Admin escalation failure: admin cannot see all pods!");
 		}
-		console.log("      -> adminuser can see all pods. Correct.");
+		console.log("      -> admin can see all pods. Correct.");
 
 		// 6. Test specific resource access block
 		console.log(
@@ -333,7 +324,7 @@ async function main() {
 		console.log("    Querying admin pod as 'writeuser'...");
 		const getAdminPodAsWrite = await makeMcpCall(writeToken, "tools/call", {
 			name: "get_pod",
-			arguments: { name: "adminuser-e2e-pod" },
+			arguments: { name: "admin-e2e-pod" },
 		});
 		if (getAdminPodAsWrite.data.result?.isError !== true) {
 			throw new Error(
@@ -342,7 +333,7 @@ async function main() {
 		}
 		console.log("      -> Access successfully denied to writeuser.");
 
-		console.log("    Querying write pod as 'adminuser' (admin escalation)...");
+		console.log("    Querying write pod as 'admin' (admin escalation)...");
 		const getTestPodAsAdmin = await makeMcpCall(adminToken, "tools/call", {
 			name: "get_pod",
 			arguments: { name: "writeuser-e2e-pod" },
@@ -424,7 +415,7 @@ async function main() {
 		});
 		await makeMcpCall(adminToken, "tools/call", {
 			name: "delete_pod",
-			arguments: { name: "adminuser-e2e-pod", gracePeriodSeconds: 0 },
+			arguments: { name: "admin-e2e-pod", gracePeriodSeconds: 0 },
 		});
 	}
 

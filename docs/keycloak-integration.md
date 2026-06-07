@@ -45,7 +45,7 @@ For local development and testing, OIDC configuration is pre-configured and auto
 - **Default Users**:
   - **Read-Only User**: `readuser` / `password` (has `mcp-reader` and `offline_access` roles)
   - **Read-Write User**: `writeuser` / `password` (has `mcp-writer`, `mcp-reader`, and `offline_access` roles)
-  - **Admin User**: `adminuser` / `password` (has `nogoo9-admin` and `offline_access` roles)
+  - **Admin User**: `admin` / `password` (has `nogoo9-admin` and `offline_access` roles)
 
 ---
 
@@ -80,13 +80,13 @@ moon run mcp:test-e2e-auth
 
 The test script automatically performs the following actions:
 1. **Challenge Verification**: Calls the `/mcp` tools list without a token to verify it returns a `401 Unauthorized` challenge with compliance headers (`WWW-Authenticate` and `Link` as per RFC 9728).
-2. **Token Retrieval**: Authenticates against Keycloak using direct access password grants to retrieve OIDC JWT tokens for `readuser`, `writeuser`, and `adminuser`.
+2. **Token Retrieval**: Authenticates against Keycloak using direct access password grants to retrieve OIDC JWT tokens for `readuser`, `writeuser`, and `admin`.
 3. **RBAC Validation**: Verifies that requests with a valid token load `/permissions` and successfully authenticate against the `/mcp` SSE/HTTP endpoints.
 4. **Tenant Isolation**: 
-   - Spawns a pod (`writeuser-e2e-pod`) as `writeuser` and another (`adminuser-e2e-pod`) as `adminuser`.
+   - Spawns a pod (`writeuser-e2e-pod`) as `writeuser` and another (`admin-e2e-pod`) as `admin`.
    - Verifies that `readuser` (lacking `mcp-writer` role) is blocked from creating a pod.
-   - Verifies that `writeuser` can only see/list `writeuser-e2e-pod` and is blocked from reading `adminuser-e2e-pod` (`403 Forbidden`).
-   - Verifies that `adminuser` can list all pods and access `writeuser-e2e-pod` via admin escalation.
+   - Verifies that `writeuser` can only see/list `writeuser-e2e-pod` and is blocked from reading `admin-e2e-pod` (`403 Forbidden`).
+   - Verifies that `admin` can list all pods and access `writeuser-e2e-pod` via admin escalation.
 5. **Proxy Cookie Auth**: Initiates a proxy request to the pod via `/route/writeuser-e2e-pod/` and asserts that a path-scoped session cookie (`nocr_token`) is returned. It then makes subsequent sub-resource requests using only the cookie to verify authentication state persistence.
 6. **Cleanup**: Gracefully deletes all created pods.
 

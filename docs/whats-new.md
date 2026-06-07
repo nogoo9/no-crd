@@ -3,6 +3,14 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.7.0
+
+- **Hardened Admin Access and Role Mapping** ([ADR-014](/decisions/ADR-014-admin-access-hardening-and-role-mapping)): Added a dedicated `AUTH_REQUIRED_ADMIN_SCOPE` (defaulting to `"nogoo9:admin"`). All administrative actions now require both the admin role (`AUTH_ADMIN_ROLE`) and the admin scope. An admin scope hierarchy makes the admin scope a superset that automatically satisfies standard read and write scope requirements. Bypassed scope validation for tokens that do not possess any scope claim (backwards compatibility).
+- **SSO Redirection and Token Bootstrapping**: Implemented a token-to-cookie bootstrapping flow for workspace proxy access. Direct workspace hits redirect unauthorized HTML requests back to the SSO sign-in page, which routes users back with query-parameter tokens to establish the session.
+- **Ada Space Inspired UI Realignment**: Cleaned up the dashboard by removing redundant borders, improving layouts to prevent overlaps, and adding features like grid/list view layout toggles, client-side search bar filtering, and comfortable/compact density controls.
+- **Direct OAuth URL Configuration**: Supported direct token/authorization endpoints as alternatives to OIDC discovery URLs.
+- **Husky & Nano-Staged Git Hooks**: Integrated git hooks to automate linting, formatting, and safety checks on commit.
+
 ## What's New in v0.6.0
 
 - **Proxy-Level Transparent Token Refresh**: Implemented a transparent, proxy-level OIDC token refresh flow in the BFF gateway. The gateway now automatically intercepts requests with expired JWT access tokens, exchanges the HttpOnly secure session refresh token for a new pair of access/refresh tokens, and updates the client cookies and session in-flight without interrupting the user.

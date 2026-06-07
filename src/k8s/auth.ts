@@ -518,16 +518,28 @@ export function hasRequiredScope(
 			scopesVal = (jwtPayload as any).scope ?? (jwtPayload as any).scp;
 		}
 
-		if (scopesVal === undefined || scopesVal === null) {
-			return false;
+		if (
+			scopesVal === undefined ||
+			scopesVal === null ||
+			(Array.isArray(scopesVal) && scopesVal.length === 0) ||
+			(typeof scopesVal === "string" && scopesVal.trim() === "")
+		) {
+			return true;
 		}
 
+		const adminScope = config.auth.requiredAdminScope;
 		if (Array.isArray(scopesVal)) {
-			return scopesVal.some((s) => String(s) === requiredScope);
+			return (
+				scopesVal.some((s) => String(s) === requiredScope) ||
+				(adminScope ? scopesVal.some((s) => String(s) === adminScope) : false)
+			);
 		}
 		if (typeof scopesVal === "string") {
 			const parts = scopesVal.split(/\s+/);
-			return parts.includes(requiredScope);
+			return (
+				parts.includes(requiredScope) ||
+				(adminScope ? parts.includes(adminScope) : false)
+			);
 		}
 		return false;
 	} catch (err) {
@@ -608,7 +620,15 @@ export function hasRequiredRole(
 				(jwtPayload as any).roles ?? (jwtPayload as any).realm_access?.roles;
 		}
 
-		if (rolesVal === undefined || rolesVal === null) {
+		if (
+			rolesVal === undefined ||
+			rolesVal === null ||
+			(Array.isArray(rolesVal) && rolesVal.length === 0) ||
+			(typeof rolesVal === "string" && rolesVal.trim() === "")
+		) {
+			if (requiredRole === config.auth.defaultRole) {
+				return true;
+			}
 			return false;
 		}
 
@@ -649,13 +669,15 @@ export function verifyRoleOrThrow(
  */
 export function verifyAccessOrThrow(
 	jwtPayload: unknown,
-	action: "read" | "write",
+	action: "read" | "write" | "admin",
 ): void {
 	// 1. Verify Scope
 	const requiredScope =
-		action === "read"
-			? config.auth.requiredReadScope
-			: config.auth.requiredWriteScope;
+		action === "admin"
+			? config.auth.requiredAdminScope
+			: action === "read"
+				? config.auth.requiredReadScope
+				: config.auth.requiredWriteScope;
 	const scopeJsonPath = config.auth.scopeJsonPath;
 	if (
 		requiredScope &&
@@ -666,9 +688,11 @@ export function verifyAccessOrThrow(
 
 	// 2. Verify Role
 	const requiredRole =
-		action === "read"
-			? config.auth.requiredReadRole
-			: config.auth.requiredWriteRole;
+		action === "admin"
+			? config.auth.adminRole
+			: action === "read"
+				? config.auth.requiredReadRole
+				: config.auth.requiredWriteRole;
 	const rolesJsonPath = config.auth.rolesJsonPath;
 	if (
 		requiredRole &&

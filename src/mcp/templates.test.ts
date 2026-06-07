@@ -33,6 +33,8 @@ describe("Templates MCP Tools", () => {
 			"create_pod_from_template",
 		]);
 		process.env.AUTH_ENABLED = "false";
+		process.env.AUTH_REQUIRED_READ_SCOPE = "";
+		process.env.AUTH_REQUIRED_WRITE_SCOPE = "";
 		delete process.env.AUTH_SUB_JSONPATH;
 	});
 
@@ -44,6 +46,8 @@ describe("Templates MCP Tools", () => {
 		if ((coreApi as any).createNamespacedPod?.mockRestore) {
 			spyOn(coreApi, "createNamespacedPod").mockRestore();
 		}
+		delete process.env.AUTH_REQUIRED_READ_SCOPE;
+		delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
 	});
 
 	test("registers create_pod_from_template tool", () => {
@@ -129,7 +133,10 @@ describe("Templates MCP Tools", () => {
 			templateRef: "tmpl-test",
 			name: "ws-pod",
 			namespace: "default",
-			jwtPayload: { sub: "alice-123" },
+			jwtPayload: {
+				sub: "alice-123",
+				realm_access: { roles: ["user"] },
+			},
 		});
 
 		expect(result.isError).toBeUndefined();

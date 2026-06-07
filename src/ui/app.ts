@@ -144,9 +144,15 @@ const contextVariablesContainer = document.getElementById(
 );
 const contextInputs = document.getElementById("context-inputs");
 
+const targetUserContainer = document.getElementById("target-user-container");
+const targetUserSubInput = document.getElementById(
+	"target-user-sub",
+) as HTMLInputElement;
+
 // Token Modal Elements
 const _userBadgeBtn = document.getElementById("user-badge-btn");
 const userBadgeName = document.getElementById("user-badge-name");
+const userAdminBadge = document.getElementById("user-admin-badge");
 const tokenModal = document.getElementById("token-modal");
 const _tokenForm = document.getElementById("token-form");
 const jwtTokenInput = document.getElementById(
@@ -309,6 +315,7 @@ function updateUserBadge(token: string) {
 		if (logoutBtn) logoutBtn.classList.add("hidden");
 	}
 	userBadgeName.textContent = "Anonymous";
+	if (userAdminBadge) userAdminBadge.classList.add("hidden");
 }
 
 function getJwtPayload() {
@@ -352,6 +359,13 @@ async function refreshAll() {
 				authEnabled: cap.authEnabled ?? false,
 				isAdmin: cap.isAdmin ?? false,
 			};
+			if (userAdminBadge) {
+				if (capabilities.isAdmin) {
+					userAdminBadge.classList.remove("hidden");
+				} else {
+					userAdminBadge.classList.add("hidden");
+				}
+			}
 		}
 
 		// 1. Get current namespace and mode
@@ -457,12 +471,29 @@ function renderAll() {
 
 function renderWorkspaces() {
 	if (!wsCount || !workspacesList) return;
-	wsCount.textContent = String(workspaces.length);
 
-	if (workspaces.length === 0) {
+	if (currentLayout === "grid") {
+		workspacesList.className = "grid grid-cols-1 md:grid-cols-2 gap-6 py-4";
+	} else {
+		workspacesList.className = "flex flex-col gap-6 py-4";
+	}
+
+	const filteredWorkspaces = workspaces.filter((ws) => {
+		if (!searchQuery) return true;
+		return (
+			ws.id.toLowerCase().includes(searchQuery) ||
+			ws.name.toLowerCase().includes(searchQuery) ||
+			ws.templateRef?.toLowerCase().includes(searchQuery) ||
+			ws.status.toLowerCase().includes(searchQuery)
+		);
+	});
+
+	wsCount.textContent = String(filteredWorkspaces.length);
+
+	if (filteredWorkspaces.length === 0) {
 		workspacesList.innerHTML = `
       <div class="py-8 text-center theme-text-muted text-sm">
-        No active workspaces. Click a template to spawn one.
+        ${searchQuery ? "No matching workspaces found." : "No active workspaces. Click a template to spawn one."}
       </div>
     `;
 		return;
@@ -475,17 +506,25 @@ function renderWorkspaces() {
 		collapsedIds = JSON.parse(collapsedListStr);
 	} catch (_) {}
 
-	workspacesList.innerHTML = workspaces
+	workspacesList.innerHTML = filteredWorkspaces
 		.map((ws) => {
 			const isCollapsed = collapsedIds.includes(ws.id);
 			let statusClass = "status-unknown";
 			let pulseDot = "";
 			if (ws.status === "Running") {
 				statusClass = "status-running";
-				pulseDot = `<span class="w-1.5 h-1.5 status-pulse-running rounded-full animate-ping"></span>`;
+				pulseDot = `
+					<span class="relative flex h-1.5 w-1.5 shrink-0">
+						<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+						<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+					</span>`;
 			} else if (ws.status === "Pending") {
 				statusClass = "status-pending";
-				pulseDot = `<span class="w-1.5 h-1.5 status-pulse-pending rounded-full animate-pulse"></span>`;
+				pulseDot = `
+					<span class="relative flex h-1.5 w-1.5 shrink-0">
+						<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
+						<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+					</span>`;
 			} else if (ws.status === "Failed") {
 				statusClass = "status-failed";
 			}
@@ -619,9 +658,9 @@ function renderWorkspaces() {
 			return `
       <div data-ws-id="${ws.id}" class="theme-card-row w-full p-6 flex flex-col justify-between transition workspace-card ${isCollapsed ? "is-collapsed" : ""}">
         <!-- Card Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex items-center gap-3 min-w-0 flex-1">
-            <button class="toggle-details-btn p-1 rounded hover:bg-neutral-200 dark:hover:bg-neutral-800 transition cursor-pointer shrink-0" data-ws-id="${ws.id}" title="Toggle Details">
+        <div class="flex flex-wrap items-center justify-between gap-4 w-full">
+          <div class="flex items-center gap-3 min-w-0">
+            <button class="toggle-details-btn p-1 rounded hover:bg-[var(--panel-hover-bg)] transition cursor-pointer shrink-0" data-ws-id="${ws.id}" title="Toggle Details">
               <svg class="w-4 h-4 transform transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
@@ -641,7 +680,7 @@ function renderWorkspaces() {
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
             <span class="px-2.5 py-1 text-[11px] font-bold rounded-lg flex items-center gap-1.5 shrink-0 ${statusClass}">
               ${pulseDot}
               ${ws.status}
@@ -740,7 +779,17 @@ function renderWorkspaces() {
 
 function renderPods() {
 	if (!podsCount || !podsTableBody) return;
-	podsCount.textContent = String(pods.length);
+
+	const filteredPods = pods.filter((pod) => {
+		if (!searchQuery) return true;
+		return (
+			pod.name.toLowerCase().includes(searchQuery) ||
+			pod.phase.toLowerCase().includes(searchQuery) ||
+			pod.podIP?.toLowerCase().includes(searchQuery)
+		);
+	});
+
+	podsCount.textContent = String(filteredPods.length);
 
 	// Show unmanaged count info
 	const unmanagedInfo = document.getElementById("unmanaged-count-info");
@@ -753,16 +802,18 @@ function renderPods() {
 		}
 	}
 
-	if (pods.length === 0) {
+	if (filteredPods.length === 0) {
 		podsTableBody.innerHTML = `
       <tr>
-        <td colspan="6" class="px-6 py-8 text-center theme-text-muted">No active pods in namespace.</td>
+        <td colspan="6" class="px-6 py-8 text-center theme-text-muted">
+          ${searchQuery ? "No matching pods found." : "No active pods in namespace."}
+        </td>
       </tr>
     `;
 		return;
 	}
 
-	podsTableBody.innerHTML = pods
+	podsTableBody.innerHTML = filteredPods
 		.map((pod) => {
 			let phaseClass = "status-unknown";
 			if (pod.phase === "Running") {
@@ -824,16 +875,25 @@ function renderPods() {
 function renderTemplates() {
 	if (!templatesList) return;
 
-	if (templates.length === 0) {
+	const filteredTemplates = templates.filter((tmpl) => {
+		if (!searchQuery) return true;
+		return (
+			tmpl.name.toLowerCase().includes(searchQuery) ||
+			tmpl.tag?.toLowerCase().includes(searchQuery) ||
+			tmpl.description?.toLowerCase().includes(searchQuery)
+		);
+	});
+
+	if (filteredTemplates.length === 0) {
 		templatesList.innerHTML = `
       <div class="p-6 text-center theme-text-muted text-sm">
-        No templates registered in the cluster.
+        ${searchQuery ? "No matching templates found." : "No templates registered in the cluster."}
       </div>
     `;
 		return;
 	}
 
-	templatesList.innerHTML = templates
+	templatesList.innerHTML = filteredTemplates
 		.map((tmpl) => {
 			let apisHtml = "";
 			if (tmpl.apis && tmpl.apis.length > 0) {
@@ -1095,6 +1155,15 @@ async function openSpawnModal(tmplName: string) {
 		}
 	}
 
+	if (targetUserContainer) {
+		if (capabilities.isAdmin) {
+			targetUserContainer.classList.remove("hidden");
+			if (targetUserSubInput) targetUserSubInput.value = "";
+		} else {
+			targetUserContainer.classList.add("hidden");
+		}
+	}
+
 	if (spawnModal) spawnModal.classList.remove("hidden");
 }
 
@@ -1110,6 +1179,7 @@ if (spawnForm) {
 		let wsId = workspaceIdInput.value.trim();
 		if (!wsId) wsId = workspaceIdInput.placeholder;
 		const wsName = workspaceNameInput?.value.trim() || undefined;
+		const userSub = targetUserSubInput?.value.trim() || undefined;
 
 		// Collect context values
 		const context: Record<string, string> = {};
@@ -1138,6 +1208,7 @@ if (spawnForm) {
 					namespace: currentNamespace,
 					context,
 					jwtPayload: getJwtPayload(),
+					...(capabilities.isAdmin && userSub ? { userSub } : {}),
 				},
 			});
 			if (res.isError) {
@@ -1772,6 +1843,107 @@ async function callServerToolFallback(name: string, args: any): Promise<any> {
 	return json.result;
 }
 
+// Density handling
+function getDensity(): string {
+	return localStorage.getItem("nocr_density") || "comfortable";
+}
+
+function applyDensity(density: string) {
+	document.documentElement.setAttribute("data-density", density);
+	const densitySelect = document.getElementById(
+		"density-select",
+	) as HTMLSelectElement;
+	if (densitySelect) {
+		densitySelect.value = density;
+	}
+}
+
+function initDensity() {
+	const currentDensity = getDensity();
+	applyDensity(currentDensity);
+
+	const densitySelect = document.getElementById("density-select");
+	if (densitySelect) {
+		densitySelect.addEventListener("change", (e) => {
+			const target = e.target as HTMLSelectElement;
+			const nextDensity = target.value;
+			localStorage.setItem("nocr_density", nextDensity);
+			applyDensity(nextDensity);
+			showToast(`Density set to: ${nextDensity}`, "success");
+		});
+	}
+}
+
+// Layout handling
+let currentLayout = "grid";
+function getLayout(): string {
+	return localStorage.getItem("nocr_layout") || "grid";
+}
+
+function applyLayout(layout: string) {
+	currentLayout = layout;
+	const gridBtn = document.getElementById("view-grid-btn");
+	const listBtn = document.getElementById("view-list-btn");
+	if (gridBtn && listBtn) {
+		if (layout === "grid") {
+			gridBtn.classList.add("bg-[var(--panel-hover-bg)]", "theme-text-title");
+			gridBtn.classList.remove("theme-text-muted");
+			listBtn.classList.remove(
+				"bg-[var(--panel-hover-bg)]",
+				"theme-text-title",
+			);
+			listBtn.classList.add("theme-text-muted");
+		} else {
+			listBtn.classList.add("bg-[var(--panel-hover-bg)]", "theme-text-title");
+			listBtn.classList.remove("theme-text-muted");
+			gridBtn.classList.remove(
+				"bg-[var(--panel-hover-bg)]",
+				"theme-text-title",
+			);
+			gridBtn.classList.add("theme-text-muted");
+		}
+	}
+	// Re-render workspaces to apply layout-specific classes
+	renderWorkspaces();
+}
+
+function initLayout() {
+	const layout = getLayout();
+	applyLayout(layout);
+
+	const gridBtn = document.getElementById("view-grid-btn");
+	const listBtn = document.getElementById("view-list-btn");
+	if (gridBtn) {
+		gridBtn.addEventListener("click", () => {
+			localStorage.setItem("nocr_layout", "grid");
+			applyLayout("grid");
+		});
+	}
+	if (listBtn) {
+		listBtn.addEventListener("click", () => {
+			localStorage.setItem("nocr_layout", "list");
+			applyLayout("list");
+		});
+	}
+}
+
+// Search handling
+let searchQuery = "";
+function initSearch() {
+	const searchInput = document.getElementById(
+		"local-search-input",
+	) as HTMLInputElement;
+	if (searchInput) {
+		searchInput.addEventListener("input", (e) => {
+			const target = e.target as HTMLInputElement;
+			searchQuery = target.value.trim().toLowerCase();
+			renderWorkspaces();
+			renderTemplates();
+			renderPods();
+		});
+	}
+}
+
 // Theme handling
 const THEMES = ["system", "light", "dark"] as const;
 type Theme = (typeof THEMES)[number];
@@ -1788,8 +1960,10 @@ function applyTheme(theme: Theme) {
 
 	if (isDark) {
 		document.documentElement.classList.add("dark");
+		document.documentElement.setAttribute("data-theme", "dark");
 	} else {
 		document.documentElement.classList.remove("dark");
+		document.documentElement.setAttribute("data-theme", "light");
 	}
 
 	if (themeIcon) {
@@ -2311,6 +2485,9 @@ app.ontoolresult = (params) => {
 // Initialize authentication and settings listeners
 initToken();
 initTheme();
+initDensity();
+initLayout();
+initSearch();
 void initOidc();
 
 if (logoutBtn) {
