@@ -59,7 +59,7 @@ Configure session durations and custom OAuth login URLs for the Dashboard UI:
 | `OAUTH_AUTHORIZATION_URL`| *None* | Server relies on OAUTH_DISCOVERY_URL. | Direct URL to OIDC authorization page. <br> **Example**: `OAUTH_AUTHORIZATION_URL="https://auth.example.com/oauth/authorize"` |
 | `OAUTH_TOKEN_URL` | *None* | Server relies on OAUTH_DISCOVERY_URL. | Direct URL to OIDC token endpoint. <br> **Example**: `OAUTH_TOKEN_URL="https://auth.example.com/oauth/token"` |
 | `OAUTH_END_SESSION_URL` | *None* | Server relies on OAUTH_DISCOVERY_URL. UI logout clears cookies without routing to IdP logout. | Direct URL to OIDC logout endpoint. <br> **Example**: `OAUTH_END_SESSION_URL="https://auth.example.com/oauth/logout"` |
-| `PROXY_SESSION_SECRET` | *None* | Session cookies fall back to using `JWT_SECRET`. If `JWT_SECRET` is also unset, startup throws an error. | 32+ byte key used to encrypt and sign stateless session cookies (`nocr_token` / `nocr_sess`). <br> **Example**: `PROXY_SESSION_SECRET="4a8b...2f9c"` |
+| `PROXY_SESSION_SECRET` | *None* | Falls back to `JWT_SECRET`. If that is also unset, the server resolves it via a cascade: querying/creating a Kubernetes Secret (`nogoo9-session-key`), adopting from peer pods, or generating a random key in-memory. | 32+ byte key used to encrypt and sign stateless session cookies (`nocr_token` / `nocr_sess`). <br> **Example**: `PROXY_SESSION_SECRET="4a8b...2f9c"` |
 | `PROXY_SESSION_TTL` | `1800` | Defaults to 1800 seconds (30 minutes) expiration sliding window. | Session cookie expiration lifetime in seconds. <br> **Example**: `PROXY_SESSION_TTL="3600"` |
 
 ---
