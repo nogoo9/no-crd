@@ -10,6 +10,7 @@
 			"src/**/*.ts",
 			"src/*.ts",
 			"scripts/**/*.ts",
+			"docs/.vitepress/config.ts",
 			"package.json",
 			"biome.json",
 			"tsconfig.json",

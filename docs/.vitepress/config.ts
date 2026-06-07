@@ -1,14 +1,13 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
-import typedocSidebar from "../api/typedoc-sidebar.json";
 
 const getBaseUrl = () => {
 	let base = process.env.BASE_URL || "/no-crd/";
 	if (!base.startsWith("/")) {
-		base = "/" + base;
+		base = `/${base}`;
 	}
 	if (!base.endsWith("/")) {
-		base = base + "/";
+		base = `${base}/`;
 	}
 	return base;
 };
@@ -49,8 +48,15 @@ export default withMermaid(
 				{
 					text: "Security, Auth & Identity",
 					items: [
-						{ text: "Authentication & Authorization Overview", link: "/auth-overview" },
-						{ text: "Workspace App Integration & Sessions", link: "/workspace-app-integration" },
+						{
+							text: "Authentication & Authorization Overview",
+							link: "/auth-overview",
+						},
+						{ text: "Auth Setup Cheatsheet", link: "/auth-cheatsheet" },
+						{
+							text: "Workspace App Integration & Sessions",
+							link: "/workspace-app-integration",
+						},
 						{ text: "SSO Provider Integration", link: "/sso-integration" },
 						{ text: "Advanced Auth: RBAC & ABAC", link: "/advanced-auth" },
 					],
@@ -131,12 +137,16 @@ export default withMermaid(
 							text: "ADR-013: Workspace App Auth",
 							link: "/decisions/ADR-013-workspace-app-authorization",
 						},
+						{
+							text: "ADR-014: Admin Hardening",
+							link: "/decisions/ADR-014-admin-access-hardening-and-role-mapping",
+						},
 					],
 				},
 			],
 			socialLinks: [
 				{ icon: "github", link: "https://github.com/nogoo9/no-crd" },
-				{ icon: "npm", link: "https://www.npmjs.com/package/@nogoo9/no-crd" }
+				{ icon: "npm", link: "https://www.npmjs.com/package/@nogoo9/no-crd" },
 			],
 		},
 	}),
