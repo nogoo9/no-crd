@@ -1,6 +1,6 @@
 # Authentication & Authorization Cheatsheet
 
-This cheatsheet lists all available authentication and authorization environment variables, their defaults, and step-by-step examples for common deployment patterns.
+This cheatsheet lists all available authentication and authorization environment variables, their defaults, behaviors if unset, and step-by-step examples for common deployment patterns.
 
 ---
 
@@ -8,59 +8,59 @@ This cheatsheet lists all available authentication and authorization environment
 
 ### 🔐 Core Settings
 
-| Environment Variable | Default Value | Allowed Values | Description & Purpose | Example |
-| :--- | :--- | :--- | :--- | :--- |
-| `AUTH_ENABLED` | `false` | `true`, `false` | Enables JWT token authentication on MCP tools, static assets, and the routing proxy. | `AUTH_ENABLED="true"` |
-| `JWT_VERIFICATION_REQUIRED` | `true` | `true`, `false` | Enables/disables JWT cryptographic signature verification. Useful to disable temporarily when debugging or running mock tokens. | `JWT_VERIFICATION_REQUIRED="false"` |
-| `JWT_AUDIENCE` | *None* | String | The expected token audience (`aud` claim). Defaults to `OAUTH_CLIENT_ID` if not specified. | `JWT_AUDIENCE="https://api.nogoo9.io"` |
-| `AUTH_ISSUER` <br> (or `JWT_ISSUER`) | *None* | URL String | The expected token issuer (`iss` claim). | `AUTH_ISSUER="https://keycloak.example.com/realms/nogoo9"` |
+| Environment Variable | Default Value | Behavior if Unset | Description & Examples |
+| :--- | :--- | :--- | :--- |
+| `AUTH_ENABLED` | `false` | Authentication is disabled. All MCP tools and routing proxies are open, and user isolation is bypassed. | Enables JWT token authentication on MCP tools, static assets, and the routing proxy. <br> **Example**: `AUTH_ENABLED="true"` |
+| `JWT_VERIFICATION_REQUIRED` | `true` | JWT signature verification is strictly enforced. | Enables/disables JWT signature verification. Set to `false` only during local debugging or integration tests to accept mock tokens. <br> **Example**: `JWT_VERIFICATION_REQUIRED="false"` |
+| `JWT_AUDIENCE` | *None* | Audience verification is skipped (or falls back to `OAUTH_CLIENT_ID` if configured). | The expected token audience (`aud` claim). <br> **Example**: `JWT_AUDIENCE="https://api.nogoo9.io"` |
+| `AUTH_ISSUER` <br> (or `JWT_ISSUER`) | *None* | Issuer claim is not validated against incoming tokens, and discovery lists no issuer. | The expected token issuer (`iss` claim) advertised in oauth-protected-resource metadata discovery. <br> **Example**: `AUTH_ISSUER="https://keycloak.example.com/realms/nogoo9"` |
 
 ---
 
 ### 🔑 Token Verification Methods
-You must configure **exactly one** of these options if `JWT_VERIFICATION_REQUIRED="true"`:
+If `JWT_VERIFICATION_REQUIRED="true"`, you must configure **exactly one** of these options. If none are configured, token verification will fail.
 
-| Environment Variable | Default Value | Description / Purpose | Example |
+| Environment Variable | Default Value | Behavior if Unset | Description & Examples |
 | :--- | :--- | :--- | :--- |
-| `JWKS_URI` | *None* | Remote JWKS endpoint URL to dynamically fetch OIDC public keys. | `JWKS_URI="https://keycloak.example.com/realms/nogoo9/protocol/openid-connect/certs"` |
-| `JWT_PUBLIC_KEY` | *None* | PEM-encoded RSA/ECDSA public key string for asymmetric signature verification. | `JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMIIBIjANB..."` |
-| `JWT_SECRET` | *None* | Symmetric HMAC-SHA256 secret key. | `JWT_SECRET="my-super-secret-key-32-bytes-long"` |
-| `INTROSPECTION_ENDPOINT` <br> (or `JWT_INTROSPECTION_ENDPOINT`) | *None* | RFC 7662 token introspection endpoint URL for token verification. | `INTROSPECTION_ENDPOINT="https://keycloak.example.com/realms/nogoo9/protocol/openid-connect/token/introspect"` |
+| `JWKS_URI` | *None* | Remote dynamic public key retrieval is disabled. | Remote JWKS endpoint URL to dynamically fetch OIDC public keys. <br> **Example**: `JWKS_URI="https://keycloak.example.com/realms/nogoo9/protocol/openid-connect/certs"` |
+| `JWT_PUBLIC_KEY` | *None* | Asymmetric verification using a local key string is disabled. | PEM-encoded RSA/ECDSA public key string for offline signature verification. <br> **Example**: `JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMIIBIjANB..."` |
+| `JWT_SECRET` | *None* | Symmetric signature verification is disabled. | Symmetric HMAC-SHA256 secret key. <br> **Example**: `JWT_SECRET="my-super-secret-key-32-bytes-long"` |
+| `INTROSPECTION_ENDPOINT` <br> (or `JWT_INTROSPECTION_ENDPOINT`) | *None* | Online token verification is disabled. Signature checks are performed offline instead. | URL to delegate validation check online via OAuth 2.0 Token Introspection (RFC 7662). <br> **Example**: `INTROSPECTION_ENDPOINT="https://keycloak.example.com/.../introspect"` |
 
 ---
 
 ### 🏷️ Scopes, Roles & JSONPaths
 Configure how user identity, client scopes, and user roles are extracted from the JWT token:
 
-| Environment Variable | Default Value | Allowed Values | Description / Purpose | Example |
-| :--- | :--- | :--- | :--- | :--- |
-| `AUTH_SUB_JSONPATH` | `$.sub` | JSONPath | Extracts the unique user ID (used as the workspace owner's identity). | `AUTH_SUB_JSONPATH="$.preferred_username"` |
-| `AUTH_SCOPE_JSONPATH` | `$.scope` | JSONPath | Extracts client scopes. Falls back to `$.scp` if empty. | `AUTH_SCOPE_JSONPATH="$.scopes"` |
-| `AUTH_ROLES_JSONPATH` <br> (or `AUTH_ADMIN_JSONPATH`) | `$.realm_access.roles` | JSONPath | Extracts user roles from the JWT payload. | `AUTH_ROLES_JSONPATH="$.groups"` |
-| `AUTH_DEFAULT_ROLE` | `viewer` | String | Fallback role if the token does not contain any roles or scopes. | `AUTH_DEFAULT_ROLE="viewer"` |
-| `AUTH_REQUIRED_READ_SCOPE` | `nogoo9:read` | String | OAuth scope required for read operations. | `AUTH_REQUIRED_READ_SCOPE="read:workspaces"` |
-| `AUTH_REQUIRED_WRITE_SCOPE` | `nogoo9:write` | String | OAuth scope required for write operations. | `AUTH_REQUIRED_WRITE_SCOPE="write:workspaces"` |
-| `AUTH_REQUIRED_ADMIN_SCOPE` | `nogoo9:admin` | String | OAuth scope required for administrative operations. | `AUTH_REQUIRED_ADMIN_SCOPE="admin:workspaces"` |
-| `AUTH_REQUIRED_READ_ROLE` | `viewer` | String | User role required for read operations. | `AUTH_REQUIRED_READ_ROLE="view-only"` |
-| `AUTH_REQUIRED_WRITE_ROLE` | `user` | String | User role required for write/mutation operations. | `AUTH_REQUIRED_WRITE_ROLE="developer"` |
-| `AUTH_ADMIN_ROLE` | `admin` | String | User role name that grants administrative bypass. | `AUTH_ADMIN_ROLE="cluster-admin"` |
+| Environment Variable | Default Value | Behavior if Unset | Description & Examples |
+| :--- | :--- | :--- | :--- |
+| `AUTH_SUB_JSONPATH` | `$.sub` | Defaults to extracting identity from `$.sub`. If missing, authentication fails. | JSONPath expression to extract unique user identity from JWT payload. <br> **Example**: `AUTH_SUB_JSONPATH="$.preferred_username"` |
+| `AUTH_SCOPE_JSONPATH` | `$.scope` | Defaults to extracting scopes from `$.scope` (or `$.scp`). If empty, scope validation is bypassed. | JSONPath expression to extract scopes from JWT payload. <br> **Example**: `AUTH_SCOPE_JSONPATH="$.scopes"` |
+| `AUTH_ROLES_JSONPATH` <br> (or `AUTH_ADMIN_JSONPATH`) | `$.realm_access.roles` | Defaults to `$.realm_access.roles`. If empty, roles are treated as none (failing role validation). | JSONPath expression to extract user roles. <br> **Example**: `AUTH_ROLES_JSONPATH="$.groups"` |
+| `AUTH_DEFAULT_ROLE` | `viewer` | Defaults to `"viewer"` if no roles or scopes are present in the token. | Fallback role assigned if the token does not contain any roles or scopes. <br> **Example**: `AUTH_DEFAULT_ROLE="viewer"` |
+| `AUTH_REQUIRED_READ_SCOPE` | `nogoo9:read` | Defaults to `nogoo9:read`. If explicitly configured to empty, read scope checks are bypassed. | OAuth scope required for read operations (e.g. list workspaces). <br> **Example**: `AUTH_REQUIRED_READ_SCOPE="read:workspaces"` |
+| `AUTH_REQUIRED_WRITE_SCOPE` | `nogoo9:write` | Defaults to `nogoo9:write`. If explicitly configured to empty, write scope checks are bypassed. | OAuth scope required for write/mutation operations (e.g. spawn workspace). <br> **Example**: `AUTH_REQUIRED_WRITE_SCOPE="write:workspaces"` |
+| `AUTH_REQUIRED_ADMIN_SCOPE` | `nogoo9:admin` | Defaults to `nogoo9:admin`. If explicitly configured to empty, admin scope checks are bypassed. | OAuth scope required for administrator operations (e.g. spawn on behalf of others). <br> **Example**: `AUTH_REQUIRED_ADMIN_SCOPE="admin:workspaces"` |
+| `AUTH_REQUIRED_READ_ROLE` | `viewer` | Defaults to `viewer`. If explicitly configured to empty, read role checks are bypassed. | User role required for read operations. <br> **Example**: `AUTH_REQUIRED_READ_ROLE="view-only"` |
+| `AUTH_REQUIRED_WRITE_ROLE` | `user` | Defaults to `user`. If explicitly configured to empty, write role checks are bypassed. | User role required for write/mutation operations. <br> **Example**: `AUTH_REQUIRED_WRITE_ROLE="developer"` |
+| `AUTH_ADMIN_ROLE` | `admin` | Defaults to `"admin"`. If disabled, administrative bypass capabilities are unavailable. | User role name that grants administrative privilege escalation. <br> **Example**: `AUTH_ADMIN_ROLE="cluster-admin"` |
 
 ---
 
 ### 🌐 Direct OAuth Configuration & Sessions
 Configure session durations and custom OAuth login URLs for the Dashboard UI:
 
-| Environment Variable | Default Value | Allowed Values | Description / Purpose | Example |
-| :--- | :--- | :--- | :--- | :--- |
-| `OAUTH_CLIENT_ID` | *None* | String | The client ID registered with your OAuth 2.0 / OIDC provider. | `OAUTH_CLIENT_ID="nogoo9-mcp-client"` |
-| `OAUTH_CLIENT_SECRET` | *None* | String | Client secret for backend token exchange. | `OAUTH_CLIENT_SECRET="client-secret-here"` |
-| `OAUTH_SCOPES` | `openid profile email offline_access` | Space-separated string | Scopes requested by the dashboard during PKCE login. | `OAUTH_SCOPES="openid email offline_access"` |
-| `OAUTH_DISCOVERY_URL` | *None* | URL String | OIDC metadata discovery endpoint. | `OAUTH_DISCOVERY_URL="https://auth.example.com/.well-known/openid-configuration"` |
-| `OAUTH_AUTHORIZATION_URL`| *None* | URL String | Direct OAuth authorization page. Used if OIDC discovery is unavailable. | `OAUTH_AUTHORIZATION_URL="https://auth.example.com/oauth/authorize"` |
-| `OAUTH_TOKEN_URL` | *None* | URL String | Direct OAuth token endpoint. Used if OIDC discovery is unavailable. | `OAUTH_TOKEN_URL="https://auth.example.com/oauth/token"` |
-| `OAUTH_END_SESSION_URL` | *None* | URL String | Direct OAuth logout page. Used if OIDC discovery is unavailable. | `OAUTH_END_SESSION_URL="https://auth.example.com/oauth/logout"` |
-| `PROXY_SESSION_SECRET` | *None* | String | 32+ byte string used to encrypt/sign stateless session cookies (`nocr_token` / `nocr_sess`). | `PROXY_SESSION_SECRET="4a8b...2f9c"` |
-| `PROXY_SESSION_TTL` | `1800` | Number | Session cookie lifetime in seconds (default: 30 minutes). | `PROXY_SESSION_TTL="3600"` |
+| Environment Variable | Default Value | Behavior if Unset | Description & Examples |
+| :--- | :--- | :--- | :--- |
+| `OAUTH_CLIENT_ID` | *None* | OAuth client identifier is empty. Audience validation falls back to checking only standard audience. | Client ID registered with your OAuth 2.0 / OIDC provider. <br> **Example**: `OAUTH_CLIENT_ID="nogoo9-mcp-client"` |
+| `OAUTH_CLIENT_SECRET` | *None* | Direct token exchanges and introspection are performed without a client secret. | Client secret for backend authentication. Required by confidential clients. <br> **Example**: `OAUTH_CLIENT_SECRET="client-secret-here"` |
+| `OAUTH_SCOPES` | `openid profile email offline_access` | Defaults to requesting `"openid profile email offline_access"`. | Space-separated list of scopes requested during dashboard sign-in. <br> **Example**: `OAUTH_SCOPES="openid email offline_access"` |
+| `OAUTH_DISCOVERY_URL` | *None* | Server relies on direct URL configurations below. If they are also empty, startup fails when `AUTH_ENABLED="true"`. | OIDC metadata discovery endpoint. <br> **Example**: `OAUTH_DISCOVERY_URL="https://auth.example.com/.well-known/openid-configuration"` |
+| `OAUTH_AUTHORIZATION_URL`| *None* | Server relies on OAUTH_DISCOVERY_URL. | Direct URL to OIDC authorization page. <br> **Example**: `OAUTH_AUTHORIZATION_URL="https://auth.example.com/oauth/authorize"` |
+| `OAUTH_TOKEN_URL` | *None* | Server relies on OAUTH_DISCOVERY_URL. | Direct URL to OIDC token endpoint. <br> **Example**: `OAUTH_TOKEN_URL="https://auth.example.com/oauth/token"` |
+| `OAUTH_END_SESSION_URL` | *None* | Server relies on OAUTH_DISCOVERY_URL. UI logout clears cookies without routing to IdP logout. | Direct URL to OIDC logout endpoint. <br> **Example**: `OAUTH_END_SESSION_URL="https://auth.example.com/oauth/logout"` |
+| `PROXY_SESSION_SECRET` | *None* | Session cookies fall back to using `JWT_SECRET`. If `JWT_SECRET` is also unset, startup throws an error. | 32+ byte key used to encrypt and sign stateless session cookies (`nocr_token` / `nocr_sess`). <br> **Example**: `PROXY_SESSION_SECRET="4a8b...2f9c"` |
+| `PROXY_SESSION_TTL` | `1800` | Defaults to 1800 seconds (30 minutes) expiration sliding window. | Session cookie expiration lifetime in seconds. <br> **Example**: `PROXY_SESSION_TTL="3600"` |
 
 ---
 
