@@ -3,6 +3,17 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.8.0
+
+- **Consolidated Workspace UI & Event Logs** ([ADR-015](/decisions/ADR-015-workspace-view-consolidation-and-template-upgrades)): Streamlined the frontend dashboard by removing the separate "Pods" list and merging log streaming, pod lifecycle events, and upgrade status directly into the single Workspace card view. Added a new `get_workspace_events` MCP tool to pull real-time Kubernetes pod events into the UI.
+- **Template Versioning and Outdated Detection**: Introduced the `nogoo9/template-version` annotation (defaulting to `"1.0.0"`) on pod templates. The `list_workspaces` and `get_workspace` tools now compare the pod's running template version against the latest version available in the registry, returning `isOutdated: true` for older versions so the UI can display warnings and upgrade options.
+- **Safe Template Upgrades**: Implemented a state-preserving workspace upgrade flow (`upgrade_workspace` and `upgrade_all_workspaces` MCP tools) that retains PersistentVolumeClaim (PVC) attachments and custom environment variables, polling Kubernetes until the old pod is fully terminated before spawning the new pod to prevent volume attach conflicts.
+- **Workspace Authentication Modes**: Added support for `WORKSPACE_AUTH_MODE` configuration mapping, allowing workspaces to run in four modes: `inject-headers` (inject OIDC identity headers to downstream proxy), `same-origin` (redirect workspaces to local token-api for same-origin authentication), `token-api` (expose OIDC token generation directly via a secure local endpoint), and `no-auth` (bypass authorization checks entirely for routing proxy and delegate auth check directly to the workspace).
+- **Default Auth Mode and Bypasses**: When `AUTH_ENABLED` is true, the `inject-headers` auth mode is enabled by default for all workspaces regardless of whether the annotation is provided. Added detailed annotations mapping documentation.
+- **Frictionless STDIO Developer Tools Support**: Configured the server to dynamically bypass JWT token validation when running on `TRANSPORT=stdio`, allowing local debugging tools like the MCP Inspector and Claude Desktop to function seamlessly while preserving full authentication checks on network connections.
+- **Global OAuth Metadata Discovery**: Implemented a global interception hook for `/.well-known/oauth-protected-resource` and its subpaths, returning discovery metadata with `Access-Control-Allow-Origin: *` to prevent CORS blocks from local developer interfaces.
+- **Collapsible Template Groups & UI Polish**: Enabled template group carets and headers to collapse/expand workspace templates, persisting their states in `localStorage`. Optimized workspace card footers into a split toolbar layout (developer utilities on the left, life cycle action on the right) with borderless flat buttons, terracotta hover overlays, and distinct icons.
+
 ## What's New in v0.7.0
 
 - **Hardened Admin Access and Role Mapping** ([ADR-014](/decisions/ADR-014-admin-access-hardening-and-role-mapping)): Added a dedicated `AUTH_REQUIRED_ADMIN_SCOPE` (defaulting to `"nogoo9:admin"`). All administrative actions now require both the admin role (`AUTH_ADMIN_ROLE`) and the admin scope. An admin scope hierarchy makes the admin scope a superset that automatically satisfies standard read and write scope requirements. Bypassed scope validation for tokens that do not possess any scope claim (backwards compatibility).
@@ -53,7 +64,7 @@ Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'l
 - **Graceful ConfigMap Template Fallback** ([ADR-010](/decisions/ADR-010-graceful-configmap-template-fallback)): Template tools now degrade gracefully when the service account lacks `configmaps` RBAC permissions. `list_templates` catches ConfigMap errors and continues to return local/built-in templates with a warning. `spawn_workspace` falls back to local templates when ConfigMap reads fail.
 - **Template Read Tools Always Available**: `list_templates` and `get_template` are no longer gated behind ConfigMap permissions — they are unconditionally registered, ensuring agents always have access to the local and built-in template catalog even in minimal RBAC deployments.
 
-## What's New in v0.4.2
+## What's New in v0.5.0
 
 - **Managed-Only Pod Access Control** ([ADR-008](/decisions/ADR-008-managed-only-pod-access-control)): Pod tools (`list_pods`, `get_pod`, `delete_pod`, `patch_pod`, `get_pod_logs`) now only operate on pods labeled `nogoo9/managed-by=nogoo9-spawner` when `MANAGED_ONLY=true` (default). No one bypasses this — not even admins.
 - **Unmanaged Pod Count**: `list_pods` reports `unmanagedCount` — the number of pods in the namespace not managed by this server — without leaking details.

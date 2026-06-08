@@ -9,6 +9,7 @@ data:
       "id": "nogoo9",
       "realm": "nogoo9",
       "enabled": true,
+      "accessTokenLifespan": 30,
       "clientScopes": [
         {
           "name": "openid",
@@ -134,10 +135,12 @@ data:
           "publicClient": true,
           "protocol": "openid-connect",
           "redirectUris": [
-            "*"
+            "*",
+            "http://localhost:6274/*"
           ],
           "webOrigins": [
-            "*"
+            "*",
+            "http://localhost:6274"
           ],
           "standardFlowEnabled": true,
           "implicitFlowEnabled": false,

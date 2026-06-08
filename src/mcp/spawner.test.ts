@@ -10,6 +10,9 @@ const coreApi = {
 	listNamespacedPod: async () => ({ items: [] }),
 	createNamespacedPod: async (args: any) => ({ body: args.body }),
 	readNamespacedConfigMap: async (_args: any) => ({}) as any,
+	listNamespacedEvent: async () => ({ items: [] }),
+	deleteNamespacedPod: async () => ({}) as any,
+	readNamespacedPod: async () => ({}) as any,
 };
 const kc = {
 	getCurrentCluster: () => null,
@@ -39,6 +42,9 @@ describe("Spawner MCP Tools - get_workspace", () => {
 			"list_workspaces",
 			"stop_workspace",
 			"spawn_workspace",
+			"get_workspace_events",
+			"upgrade_workspace",
+			"upgrade_all_workspaces",
 		]);
 		process.env.AUTH_ENABLED = "false";
 		process.env.AUTH_REQUIRED_READ_ROLE = "";
@@ -118,6 +124,10 @@ describe("Spawner MCP Tools - get_workspace", () => {
 			templateRef: undefined,
 			apis: [],
 			userSub: "anonymous",
+			podName: "ws-pod-123",
+			templateVersion: "1.0.0",
+			latestTemplateVersion: undefined,
+			isOutdated: false,
 			annotations: {
 				"nogoo9/workspace-port": "8081",
 				"nogoo9/preview-path": "/preview",
@@ -874,6 +884,9 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 			"list_workspaces",
 			"stop_workspace",
 			"spawn_workspace",
+			"get_workspace_events",
+			"upgrade_workspace",
+			"upgrade_all_workspaces",
 		]);
 		process.env.AUTH_ENABLED = "true";
 		process.env.AUTH_ADMIN_ROLE = "admin";
@@ -1035,5 +1048,178 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 		expect(labelSelector).toBe(
 			"nogoo9/type=workspace,nogoo9/user-sub=regular-user",
 		);
+	});
+
+	describe("get_workspace_events", () => {
+		test("get_workspace_events retrieves and returns sorted pod events", async () => {
+			const mockPod = {
+				metadata: { name: "ws-pod-abc" },
+			};
+			const listSpy = spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+				items: [mockPod],
+			} as any);
+
+			const mockEvents = {
+				items: [
+					{
+						type: "Warning",
+						reason: "Failed",
+						message: "Error spawning container",
+						lastTimestamp: new Date("2026-06-08T10:00:00Z"),
+					},
+					{
+						type: "Normal",
+						reason: "Created",
+						message: "Created container",
+						lastTimestamp: new Date("2026-06-08T09:00:00Z"),
+					},
+				],
+			};
+
+			const eventsSpy = spyOn(coreApi, "listNamespacedEvent").mockResolvedValue(
+				mockEvents as any,
+			);
+
+			const handler = registeredTools.get("get_workspace_events")!;
+			const result = await handler({
+				id: "ws-abc",
+				namespace: "default",
+				jwtPayload: {
+					sub: "admin-user",
+					scope: "nogoo9:admin",
+					realm_access: { roles: ["admin"] },
+				},
+			});
+
+			expect(listSpy).toHaveBeenCalledTimes(1);
+			expect(eventsSpy).toHaveBeenCalledTimes(1);
+			expect((eventsSpy.mock.calls[0] as any)[0].fieldSelector).toBe(
+				"involvedObject.name=ws-pod-abc",
+			);
+
+			expect(result.structuredContent.events).toHaveLength(2);
+			expect(result.structuredContent.events[0].reason).toBe("Failed");
+			expect(result.structuredContent.events[1].reason).toBe("Created");
+
+			eventsSpy.mockRestore();
+		});
+	});
+
+	describe("upgrade_workspace", () => {
+		test("upgrade_workspace deletes old pod and spawns new pod preserving PVC/env state", async () => {
+			const mockPod = {
+				metadata: {
+					name: "ws-pod-xyz",
+					labels: {
+						"nogoo9/workspace-id": "ws-xyz",
+						"nogoo9/user-sub": "user-abc",
+						"nogoo9/type": "workspace",
+					},
+					annotations: {
+						"nogoo9/template-ref": "default/node-template",
+						"nogoo9/template-version": "1.0.0",
+						"nogoo9/workspace-name": "My Node Sandbox",
+					},
+				},
+				spec: {
+					serviceAccountName: "ws-sa-ws-xyz",
+					containers: [
+						{
+							name: "workspace",
+							image: "node:18",
+							env: [{ name: "CUSTOM_ENV", value: "custom-value" }],
+							volumeMounts: [{ name: "data-volume", mountPath: "/workspace" }],
+						},
+					],
+					volumes: [
+						{
+							name: "data-volume",
+							persistentVolumeClaim: { claimName: "pvc-xyz" },
+						},
+					],
+				},
+			};
+
+			const mockTemplateCM = {
+				metadata: {
+					name: "node-template",
+					annotations: {
+						"nogoo9/template-version": "2.0.0",
+					},
+				},
+				data: {
+					spec: JSON.stringify({
+						containers: [
+							{
+								name: "workspace",
+								image: "node:20",
+								env: [{ name: "TEMPLATE_ENV", value: "template-default" }],
+							},
+						],
+					}),
+				},
+			};
+
+			const listSpy = spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+				items: [mockPod],
+			} as any);
+
+			const readCMSpy = spyOn(
+				coreApi,
+				"readNamespacedConfigMap",
+			).mockResolvedValue(mockTemplateCM as any);
+			const deleteSpy = spyOn(coreApi, "deleteNamespacedPod").mockResolvedValue(
+				{} as any,
+			);
+			const createSpy = spyOn(coreApi, "createNamespacedPod").mockResolvedValue(
+				{ body: { metadata: { name: "ws-pod-xyz" } } } as any,
+			);
+
+			// Mock readNamespacedPod for deletion check to throw 404 (indicating deletion complete)
+			const readPodSpy = spyOn(coreApi, "readNamespacedPod").mockRejectedValue({
+				response: { statusCode: 404 },
+			} as any);
+
+			const handler = registeredTools.get("upgrade_workspace")!;
+			const result = await handler({
+				id: "ws-xyz",
+				namespace: "default",
+				jwtPayload: {
+					sub: "admin-user",
+					scope: "nogoo9:admin",
+					realm_access: { roles: ["admin"] },
+				},
+			});
+
+			expect(result.isError).toBeUndefined();
+			expect(result.structuredContent.status).toBe("Running");
+
+			expect(listSpy).toHaveBeenCalledTimes(1);
+			expect(readCMSpy).toHaveBeenCalledTimes(1);
+			expect(deleteSpy).toHaveBeenCalledTimes(1);
+			expect(createSpy).toHaveBeenCalledTimes(1);
+
+			const createCallBody = (createSpy.mock.calls[0] as any)[0].body;
+			expect(
+				createCallBody.metadata.annotations["nogoo9/template-version"],
+			).toBe("2.0.0");
+			expect(createCallBody.spec.containers[0].image).toBe("node:20"); // image upgraded
+			expect(createCallBody.spec.containers[0].env).toContainEqual({
+				name: "CUSTOM_ENV",
+				value: "custom-value",
+			}); // custom env preserved
+			expect(createCallBody.spec.containers[0].env).toContainEqual({
+				name: "TEMPLATE_ENV",
+				value: "template-default",
+			}); // template default env added
+			expect(
+				createCallBody.spec.volumes[0].persistentVolumeClaim.claimName,
+			).toBe("pvc-xyz"); // PVC volume preserved
+
+			readCMSpy.mockRestore();
+			deleteSpy.mockRestore();
+			createSpy.mockRestore();
+			readPodSpy.mockRestore();
+		});
 	});
 });

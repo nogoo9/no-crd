@@ -1,11 +1,11 @@
-$schema: 'https://moonrepo.dev/schemas/project.json'
+$schema: "https://moonrepo.dev/schemas/project.json"
 
-language: 'typescript'
-layer: 'application'
+language: "typescript"
+layer: "application"
 
 tasks:
   dev:
-    command: 'bun run src/index.ts'
+    command: "bun run src/index.ts"
     env:
       TRANSPORT: http
     options:
@@ -13,7 +13,7 @@ tasks:
       persistent: true
 
   dev-stdio:
-    command: 'bun run src/index.ts'
+    command: "bun run src/index.ts"
     env:
       TRANSPORT: stdio
     options:
@@ -21,52 +21,68 @@ tasks:
       persistent: true
 
   docs-dev:
-    command: 'bun run docs:dev'
+    command: "bun run docs:dev"
     options:
       runInCI: false
       persistent: true
 
-  inspect:
-    command: 'bunx @modelcontextprotocol/inspector bun run dist/index.js'
+  inspector:
+    command: "bunx @modelcontextprotocol/inspector bun run dist/server-entry.js"
     env:
       TRANSPORT: stdio
+      MODE: cluster
+      NAMESPACE: nogoo9
+      AUTH_ENABLED: "true"
+      JWKS_URI: "http://localhost:8080/auth/realms/nogoo9/protocol/openid-connect/certs"
+      AUTH_ISSUER: "http://localhost:8080/auth/realms/nogoo9"
+      OAUTH_CLIENT_ID: "nogoo9-mcp"
+      OAUTH_DISCOVERY_URL: "http://localhost:8080/auth/realms/nogoo9/.well-known/openid-configuration"
+      AUTH_ADMIN_ROLE: "nogoo9-admin"
+      AUTH_REQUIRED_ADMIN_SCOPE: "nogoo9:admin"
+      AUTH_REQUIRED_READ_SCOPE: "mcp:read"
+      AUTH_REQUIRED_WRITE_SCOPE: "mcp:write"
+      AUTH_SCOPE_JSONPATH: "$.scope"
+      AUTH_REQUIRED_READ_ROLE: "mcp-reader"
+      AUTH_REQUIRED_WRITE_ROLE: "mcp-writer"
+      AUTH_ROLES_JSONPATH: "$.realm_access.roles"
     deps:
-      - 'build'
+      - "build"
     options:
       runInCI: false
 
   build:
-    command: 'bun run build'
+    command: "bun run build"
     inputs:
-      - 'src/**/*'
-      - 'scripts/**/*'
-      - 'package.json'
+      - "src/**/*"
+      - "scripts/**/*"
+      - "package.json"
     outputs:
-      - 'dist/index.js'
-      - 'dist/server-entry.js'
-      - 'dist/cli.js'
-      - 'dist/ui/index.html'
+      - "dist/index.js"
+      - "dist/server-entry.js"
+      - "dist/cli.js"
+      - "dist/ui/index.html"
+      - "dist/ui/error.html"
 
   typecheck:
-    command: 'bun x tsc --noEmit'
+    command: "bun x tsc --noEmit"
     inputs:
-      - 'src/**/*'
-      - 'tsconfig.json'
+      - "src/**/*"
+      - "tsconfig.json"
 
   test:
-    command: 'bun test src/**/*.test.ts src/*.test.ts'
+    command: "bun test src/**/*.test.ts src/*.test.ts"
     inputs:
-      - 'src/**/*'
-      - '**/*.test.ts'
+      - "src/**/*"
+      - "**/*.test.ts"
 
   test-lifecycle:
-    command: 'bun run scripts/test-lifecycle.ts'
+    command: "bun run scripts/test-lifecycle.ts"
     options:
       runInCI: false
       cache: false
 
   test-e2e-auth:
-    command: 'bun run scripts/test-e2e-auth.ts'
+    command: "bun run scripts/test-e2e-auth.ts"
     options:
       runInCI: false
       cache: false
@@ -78,7 +94,7 @@ tasks:
       cache: false
 
   test-antigravity:
-    command: 'bun run scripts/run-antigravity-test.ts'
+    command: "bun run scripts/run-antigravity-test.ts"
     options:
       runInCI: false
       cache: false
@@ -101,6 +117,6 @@ tasks:
       cache: false
 
   undeploy:
-    command: 'kubectl delete -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ --ignore-not-found'
+    command: "kubectl delete -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ --ignore-not-found"
     options:
       runInCI: false

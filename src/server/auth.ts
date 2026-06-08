@@ -137,6 +137,30 @@ export async function performTokenRefresh(
 	};
 }
 
+function sendErrorResponse(
+	request: FastifyRequest,
+	reply: FastifyReply,
+	status: number,
+	error: string,
+	message: string,
+	basePrefix: string,
+) {
+	const acceptHeader = request.headers.accept || "";
+	if (request.method === "GET" && acceptHeader.includes("text/html")) {
+		const redirectUrl = `${basePrefix || ""}/error.html?error=${encodeURIComponent(
+			error,
+		)}&message=${encodeURIComponent(message)}`;
+		return reply.redirect(redirectUrl);
+	}
+
+	reply.status(status);
+	setCorsHeaders(reply);
+	return reply.send({
+		error,
+		message,
+	});
+}
+
 export function registerAuthHooks(
 	api: FastifyInstance,
 	deps: {
@@ -275,6 +299,7 @@ export function registerAuthHooks(
 							"Set-Cookie",
 							`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`,
 						);
+						reply.header("x-refreshed-token", token);
 					}
 				} catch (err) {
 					logger.warn("Failed transparent token refresh: {error}", {
@@ -316,8 +341,6 @@ export function registerAuthHooks(
 			const { host, proto } = getRequestHostAndProto(request);
 			const metadataUrl = `${proto}://${host}${basePrefix}/.well-known/oauth-protected-resource`;
 
-			reply.status(401);
-			setCorsHeaders(reply);
 			reply.header(
 				"WWW-Authenticate",
 				`Bearer resource_metadata="${metadataUrl}"`,
@@ -325,12 +348,16 @@ export function registerAuthHooks(
 			reply.header("Link", `<${metadataUrl}>; rel="oauth-protected-resource"`);
 
 			const message = authError
-				? `Unauthorized: ${authError.message}`
-				: "Unauthorized: Valid JWT token required";
-			return reply.send({
-				error: "Unauthorized",
+				? `Unauthorized: ${authError.message}. Access token is missing, expired, or invalid.`
+				: "Unauthorized: Valid JWT token required. Please check your credentials/cookies.";
+			return sendErrorResponse(
+				request,
+				reply,
+				401,
+				"Unauthorized",
 				message,
-			});
+				basePrefix,
+			);
 		}
 	};
 
@@ -348,12 +375,15 @@ export function registerAuthHooks(
 				requiredScope &&
 				!hasRequiredScope(jwtPayload, requiredScope, config.auth.scopeJsonPath)
 			) {
-				reply.status(403);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Forbidden",
-					message: `Missing required scope: ${requiredScope}`,
-				});
+				const presentScopes = jwtPayload.scope || jwtPayload.scp || "";
+				return sendErrorResponse(
+					request,
+					reply,
+					403,
+					"Forbidden",
+					`Missing required scope: "${requiredScope}". The scopes present in your token are: "${presentScopes || "none"}". Scope check JSONPath configuration is "${config.auth.scopeJsonPath}".`,
+					basePrefix,
+				);
 			}
 
 			const requiredRole = config.auth.requiredReadRole;
@@ -361,12 +391,16 @@ export function registerAuthHooks(
 				requiredRole &&
 				!hasRequiredRole(jwtPayload, requiredRole, config.auth.rolesJsonPath)
 			) {
-				reply.status(403);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Forbidden",
-					message: `Missing required role: ${requiredRole}`,
-				});
+				const userRoles =
+					jwtPayload.realm_access?.roles || jwtPayload.roles || [];
+				return sendErrorResponse(
+					request,
+					reply,
+					403,
+					"Forbidden",
+					`Missing required role: "${requiredRole}". The roles present in your token are: ${JSON.stringify(userRoles)}. Role check JSONPath configuration is "${config.auth.rolesJsonPath}".`,
+					basePrefix,
+				);
 			}
 		}
 	};
@@ -392,12 +426,15 @@ export function registerAuthHooks(
 				requiredScope &&
 				!hasRequiredScope(jwtPayload, requiredScope, config.auth.scopeJsonPath)
 			) {
-				reply.status(403);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Forbidden",
-					message: `Missing required scope: ${requiredScope}`,
-				});
+				const presentScopes = jwtPayload.scope || jwtPayload.scp || "";
+				return sendErrorResponse(
+					request,
+					reply,
+					403,
+					"Forbidden",
+					`Missing required scope: "${requiredScope}". The scopes present in your token are: "${presentScopes || "none"}". Scope check JSONPath configuration is "${config.auth.scopeJsonPath}".`,
+					basePrefix,
+				);
 			}
 
 			const requiredRole = isRead
@@ -408,12 +445,16 @@ export function registerAuthHooks(
 				requiredRole &&
 				!hasRequiredRole(jwtPayload, requiredRole, config.auth.rolesJsonPath)
 			) {
-				reply.status(403);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Forbidden",
-					message: `Missing required role: ${requiredRole}`,
-				});
+				const userRoles =
+					jwtPayload.realm_access?.roles || jwtPayload.roles || [];
+				return sendErrorResponse(
+					request,
+					reply,
+					403,
+					"Forbidden",
+					`Missing required role: "${requiredRole}". The roles present in your token are: ${JSON.stringify(userRoles)}. Role check JSONPath configuration is "${config.auth.rolesJsonPath}".`,
+					basePrefix,
+				);
 			}
 		}
 	};
@@ -422,38 +463,21 @@ export function registerAuthHooks(
 		request: FastifyRequest,
 		reply: FastifyReply,
 	) => {
-		await requireRouteAuth(request, reply);
-		if (reply.sent) return;
-
 		const { workspaceId } = request.params as { workspaceId: string };
 		if (!workspaceId) {
-			reply.status(400);
-			setCorsHeaders(reply);
-			return reply.send({
-				error: "Bad Request",
-				message: "Workspace ID is required",
-			});
-		}
-
-		let userSub = "anonymous";
-		if (config.auth.enabled) {
-			try {
-				userSub = extractUserIdentity(
-					(request as any).jwtPayload,
-					config.auth.subJsonPath,
-				);
-			} catch (err) {
-				reply.status(401);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Unauthorized",
-					message: err instanceof Error ? err.message : String(err),
-				});
-			}
+			return sendErrorResponse(
+				request,
+				reply,
+				400,
+				"Bad Request",
+				"Workspace ID is required",
+				basePrefix,
+			);
 		}
 
 		const ns = resolveNamespace(undefined, MODE, DEFAULT_NAMESPACE);
 		const k8sCtx = deps.getK8sContext();
+		let pod: any;
 		try {
 			const res = await k8sCtx.coreApi.listNamespacedPod({
 				namespace: ns,
@@ -461,43 +485,102 @@ export function registerAuthHooks(
 			});
 
 			if (res.items.length === 0) {
-				reply.status(404);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Not Found",
-					message: `Workspace "${workspaceId}" not found`,
-				});
+				await requireRouteAuth(request, reply);
+				if (reply.sent) return;
+
+				return sendErrorResponse(
+					request,
+					reply,
+					404,
+					"Not Found",
+					`Workspace "${workspaceId}" not found in Kubernetes namespace "${ns}".`,
+					basePrefix,
+				);
+			}
+			pod = res.items[0];
+		} catch (err) {
+			logger.error("Failed to list pods in proxyPreHandler: {error}", {
+				error: err,
+			});
+			return sendErrorResponse(
+				request,
+				reply,
+				500,
+				"Internal Server Error",
+				"Failed to retrieve workspace status from cluster.",
+				basePrefix,
+			);
+		}
+
+		const annotations = pod.metadata?.annotations || {};
+		const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
+		const modes = authMode
+			.split(",")
+			.map((m: string) => m.trim().toLowerCase());
+		const isNoAuth = modes.includes("no-auth");
+
+		// Expose workspace annotations early for downstream access (e.g. headers injection)
+		(request as any).workspaceAnnotations = annotations;
+
+		if (!isNoAuth) {
+			await requireRouteAuth(request, reply);
+			if (reply.sent) return;
+
+			let userSub = "anonymous";
+			if (config.auth.enabled) {
+				try {
+					userSub = extractUserIdentity(
+						(request as any).jwtPayload,
+						config.auth.subJsonPath,
+					);
+				} catch (err) {
+					return sendErrorResponse(
+						request,
+						reply,
+						401,
+						"Unauthorized",
+						`Failed to extract user identity from JWT: ${err instanceof Error ? err.message : String(err)}. Check AUTH_SUB_JSONPATH setting (currently: ${config.auth.subJsonPath}).`,
+						basePrefix,
+					);
+				}
 			}
 
-			const pod = res.items[0];
 			const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
 
 			if (config.auth.enabled && podSub !== userSub) {
-				reply.status(403);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Forbidden",
-					message: "You do not own this workspace",
-				});
+				return sendErrorResponse(
+					request,
+					reply,
+					403,
+					"Forbidden",
+					`You do not own this workspace. Workspace owner identity is "${podSub || "none"}", but your authenticated identity is "${userSub}".`,
+					basePrefix,
+				);
 			}
+		}
 
+		try {
 			if (pod.status?.phase !== "Running") {
-				reply.status(503);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Service Unavailable",
-					message: `Workspace is not running (status: ${pod.status?.phase || "Unknown"})`,
-				});
+				return sendErrorResponse(
+					request,
+					reply,
+					503,
+					"Service Unavailable",
+					`Workspace is not running. Current pod phase is "${pod.status?.phase || "Unknown"}". Waiting for pod to start.`,
+					basePrefix,
+				);
 			}
 
 			const podIP = pod.status?.podIP;
 			if (!podIP) {
-				reply.status(503);
-				setCorsHeaders(reply);
-				return reply.send({
-					error: "Service Unavailable",
-					message: "Workspace IP address not assigned yet",
-				});
+				return sendErrorResponse(
+					request,
+					reply,
+					503,
+					"Service Unavailable",
+					"Workspace IP address not assigned yet by Kubernetes cluster scheduler.",
+					basePrefix,
+				);
 			}
 
 			const targetPortAnnotation =
@@ -580,12 +663,14 @@ export function registerAuthHooks(
 				workspaceId,
 				error: err,
 			});
-			reply.status(500);
-			setCorsHeaders(reply);
-			return reply.send({
-				error: "Internal Server Error",
-				message: err instanceof Error ? err.message : String(err),
-			});
+			return sendErrorResponse(
+				request,
+				reply,
+				500,
+				"Internal Server Error",
+				`Failed to query or route to workspace: ${err instanceof Error ? err.message : String(err)}`,
+				basePrefix,
+			);
 		}
 	};
 

@@ -24,9 +24,41 @@ export const ANNOTATION_KEYS = {
 	WORKSPACE_NAME: "nogoo9/workspace-name",
 	TEMPLATE_REF: "nogoo9/template-ref",
 	INIT_SHARE_VOLUMES: "nogoo9/init-share-volumes",
+	TEMPLATE_VERSION: "nogoo9/template-version",
+	WORKSPACE_AUTH_MODE: "nogoo9/workspace-auth-mode",
 } as const;
 
 export const ANNOTATION_METADATA: AnnotationParam[] = [
+	{
+		key: ANNOTATION_KEYS.WORKSPACE_AUTH_MODE,
+		type: "Annotation (Comma-separated)",
+		description:
+			"Configures authorization modes for the workspace proxy. Comma-separated list of: `token-api` (exposes token retrieval endpoints at `_auth/token` & `_auth/authorize` for SPAs), `inject-headers` (rewrites headers to forward user identity like `x-user-sub` and JWTs to container; enabled by default if `AUTH_ENABLED=true`), `no-auth` (bypasses all auth/owner checks for public workspaces). *(Available from v0.6.0, no-auth from v0.8.0)*",
+	},
+	{
+		key: ANNOTATION_KEYS.TEMPLATE_VERSION,
+		type: "Annotation (String)",
+		description:
+			"Specifies the version of the pod template. Used to track if workspaces are outdated. *(Available from v0.8.0)*",
+	},
+	{
+		key: ANNOTATION_KEYS.WORKSPACE_NAME,
+		type: "Annotation (String)",
+		description:
+			"Stores the user-defined display name of the workspace. *(Available from v0.4.0)*",
+	},
+	{
+		key: ANNOTATION_KEYS.TEMPLATE_REF,
+		type: "Annotation (String)",
+		description:
+			"The reference to the pod template used to spawn the workspace (e.g. `default/workspace-terminal`). *(Available from v0.4.0)*",
+	},
+	{
+		key: ANNOTATION_KEYS.MANAGED_BY,
+		type: "Label (String)",
+		description:
+			"Used to label workspace pods created by this MCP server to restrict operational scope. *(Available from v0.5.0)*",
+	},
 	{
 		key: ANNOTATION_KEYS.POD_TEMPLATE,
 		type: 'Label (`"true"`)',

@@ -50,11 +50,55 @@ export function registerUpgradeHandler(
 			{ workspaceId, subpath },
 		);
 
-		// 1. Authentication Check
+		// 1. Resolve target pod & port first
+		const ns = resolveNamespace(undefined, MODE, DEFAULT_NAMESPACE);
+		const k8sCtx = deps.getK8sContext();
+		let podIP: string;
+		let port: string;
+		let upstreamPath = subpath;
+		let pod: any = null;
+
+		try {
+			const res = await k8sCtx.coreApi.listNamespacedPod({
+				namespace: ns,
+				labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${workspaceId}`,
+			});
+
+			if (res.items.length === 0) {
+				logger.warn(
+					"WebSocket upgrade failed: Workspace {workspaceId} not found",
+					{ workspaceId },
+				);
+				socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+				socket.destroy();
+				return;
+			}
+
+			pod = res.items[0];
+		} catch (err) {
+			logger.error("Failed to list pods during WebSocket upgrade: {error}", {
+				error: err,
+			});
+			socket.write(
+				"HTTP/1.1 500 Internal Server Error\r\nConnection: close\r\n\r\n",
+			);
+			socket.destroy();
+			return;
+		}
+
+		// Inspect workspace auth mode annotations
+		const annotations = pod.metadata?.annotations || {};
+		const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
+		const modes = authMode
+			.split(",")
+			.map((m: string) => m.trim().toLowerCase());
+		const isNoAuth = modes.includes("no-auth");
+
+		// 2. Authentication Check (only if NOT no-auth)
 		let userSub = "anonymous";
 		let jwtPayload: any = null;
 		let token: string | null = null;
-		if (config.auth.enabled) {
+		if (config.auth.enabled && !isNoAuth) {
 			const authHeader = req.headers.authorization;
 			if (authHeader?.toLowerCase().startsWith("bearer ")) {
 				token = authHeader.substring(7);
@@ -144,34 +188,11 @@ export function registerUpgradeHandler(
 			}
 		}
 
-		// 2. Resolve target pod & port
-		const ns = resolveNamespace(undefined, MODE, DEFAULT_NAMESPACE);
-		const k8sCtx = deps.getK8sContext();
-		let podIP: string;
-		let port: string;
-		let upstreamPath = subpath;
-		let pod: any = null;
-
 		try {
-			const res = await k8sCtx.coreApi.listNamespacedPod({
-				namespace: ns,
-				labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${workspaceId}`,
-			});
-
-			if (res.items.length === 0) {
-				logger.warn(
-					"WebSocket upgrade failed: Workspace {workspaceId} not found",
-					{ workspaceId },
-				);
-				socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
-				socket.destroy();
-				return;
-			}
-
-			pod = res.items[0];
+			// 3. Status and Ownership Checks
 			const podSub = pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB];
 
-			if (config.auth.enabled && podSub !== userSub) {
+			if (config.auth.enabled && !isNoAuth && podSub !== userSub) {
 				logger.warn("WebSocket upgrade failed: Forbidden owner mismatch");
 				socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
 				socket.destroy();
@@ -269,12 +290,15 @@ export function registerUpgradeHandler(
 
 			const headersToSend = { ...req.headers };
 			const annotations = pod.metadata?.annotations || {};
-			const authMode = annotations["nogoo9/workspace-auth-mode"] || "";
+			const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
 			const modes = authMode
 				.split(",")
 				.map((m: string) => m.trim().toLowerCase());
 
-			if (modes.includes("inject-headers")) {
+			const injectHeaders =
+				config.auth.enabled || modes.includes("inject-headers");
+
+			if (injectHeaders) {
 				if (jwtPayload) {
 					const finalUserSub =
 						userSub !== "anonymous" ? userSub : jwtPayload.sub || "anonymous";

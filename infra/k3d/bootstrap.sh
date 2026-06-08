@@ -79,8 +79,9 @@ kubectl -n nogoo9 wait --for=condition=available deployment/keycloak --timeout=1
 echo "==> Waiting for RustFS to be ready..."
 kubectl -n nogoo9 wait --for=condition=available deployment/rustfs --timeout=120s
 
-echo "==> Pre-creating default S3 bucket 'nogoo9-test-bucket' in RustFS..."
-kubectl run aws-cli-mb-bootstrap --rm -i --image=nogoo9-registry.localhost:5001/amazon/aws-cli:latest -n nogoo9 --restart=Never --env AWS_ACCESS_KEY_ID=test-access-key --env AWS_SECRET_ACCESS_KEY=test-secret-key --env AWS_ENDPOINT_URL=http://rustfs.nogoo9.svc.cluster.local:80 -- s3 mb s3://nogoo9-test-bucket || true
+echo "==> Pre-creating default S3 buckets ('nogoo9-test-bucket' and 'nogoo9-agent-workspace') in RustFS..."
+kubectl run aws-cli-mb-bootstrap-1 --rm -i --image=nogoo9-registry.localhost:5001/amazon/aws-cli:latest -n nogoo9 --restart=Never --env AWS_ACCESS_KEY_ID=test-access-key --env AWS_SECRET_ACCESS_KEY=test-secret-key --env AWS_ENDPOINT_URL=http://rustfs.nogoo9.svc.cluster.local:80 -- s3 mb s3://nogoo9-test-bucket || true
+kubectl run aws-cli-mb-bootstrap-2 --rm -i --image=nogoo9-registry.localhost:5001/amazon/aws-cli:latest -n nogoo9 --restart=Never --env AWS_ACCESS_KEY_ID=test-access-key --env AWS_SECRET_ACCESS_KEY=test-secret-key --env AWS_ENDPOINT_URL=http://rustfs.nogoo9.svc.cluster.local:80 -- s3 mb s3://nogoo9-agent-workspace || true
 
 kubectl apply -f "$SCRIPT_DIR/manifests/mcp/"
 

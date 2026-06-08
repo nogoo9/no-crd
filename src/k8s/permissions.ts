@@ -29,6 +29,17 @@ export const REQUIRED_PERMISSIONS: Record<string, RbacPermission[]> = {
 	spawn_workspace: [{ verb: "create", resource: "pods" }],
 	stop_workspace: [{ verb: "delete", resource: "pods" }],
 	get_workspace: [{ verb: "get", resource: "pods" }],
+	get_workspace_events: [{ verb: "list", resource: "events" }],
+	upgrade_workspace: [
+		{ verb: "get", resource: "pods" },
+		{ verb: "delete", resource: "pods" },
+		{ verb: "create", resource: "pods" },
+	],
+	upgrade_all_workspaces: [
+		{ verb: "list", resource: "pods" },
+		{ verb: "delete", resource: "pods" },
+		{ verb: "create", resource: "pods" },
+	],
 };
 
 export interface PermissionReport {

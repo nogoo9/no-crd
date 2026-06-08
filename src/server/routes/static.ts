@@ -8,7 +8,7 @@ import {
 	getBasePrefix,
 	setCorsHeaders,
 } from "~/server/helpers.js";
-import { loadUiHtml } from "~/ui/index.js";
+import { loadErrorHtml, loadUiHtml } from "~/ui/index.js";
 import type { RouteDeps } from "./index.js";
 
 export async function registerStaticRoutes(
@@ -48,9 +48,26 @@ export async function registerStaticRoutes(
 		}
 	};
 
+	const errorHtmlHandler = async (
+		_request: FastifyRequest,
+		reply: FastifyReply,
+	) => {
+		try {
+			const html = loadErrorHtml(deps.distDir, basePrefix);
+			reply.type("text/html; charset=utf-8");
+			setCorsHeaders(reply);
+			return reply.send(html);
+		} catch (err) {
+			reply.status(500);
+			setCorsHeaders(reply);
+			return reply.send(err instanceof Error ? err.message : String(err));
+		}
+	};
+
 	api.get("/", uiHtmlHandler);
 	api.get("/ui", uiHtmlHandler);
 	api.get("/ui/", uiHtmlHandler);
+	api.get("/error.html", errorHtmlHandler);
 
 	// Static documentation site
 	const docsEnvDir = config.ui.docsDir;

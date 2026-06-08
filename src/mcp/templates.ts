@@ -4,7 +4,7 @@ import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { config } from "~/config/index.js";
+import { ANNOTATION_KEYS, config } from "~/config/index.js";
 import {
 	createPodFromArgs,
 	DEFAULT_NAMESPACE,
@@ -48,6 +48,7 @@ export const ListTemplatesOutputSchema = z.object({
 			namespace: z.string(),
 			description: z.string(),
 			tag: z.string(),
+			version: z.string(),
 			requiredContext: z.array(z.string()).optional(),
 			workspacePath: z.string().optional(),
 			workspaceType: z.string().optional(),
@@ -61,6 +62,7 @@ export const GetTemplateOutputSchema = z.object({
 	namespace: z.string(),
 	description: z.string(),
 	tag: z.string(),
+	version: z.string(),
 	labels: z.record(z.string(), z.string()).optional(),
 	annotations: z.record(z.string(), z.string()).optional(),
 	spec: z.record(z.string(), z.unknown()),
@@ -114,6 +116,7 @@ function localTemplateToMeta(
 	namespace: string;
 	description: string;
 	tag: string;
+	version: string;
 	requiredContext: string[];
 	workspacePath: string;
 	workspaceType: string;
@@ -126,6 +129,7 @@ function localTemplateToMeta(
 		namespace: ns,
 		description: a[DESCRIPTION_ANNOTATION] ?? "",
 		tag: a[TAG_ANNOTATION] ?? "",
+		version: tmpl.version,
 		requiredContext: reqRaw
 			? reqRaw
 					.split(",")
@@ -393,12 +397,15 @@ export function registerTemplateResources(
 							annotations["nogoo9/preview-type"] ??
 							"html";
 						const tmplName = cm.metadata?.name ?? "";
+						const version =
+							annotations[ANNOTATION_KEYS.TEMPLATE_VERSION] || "1.0.0";
 						seenNames.add(tmplName);
 						return {
 							name: tmplName,
 							namespace: ns,
 							description: annotations[DESCRIPTION_ANNOTATION] ?? "",
 							tag: annotations[TAG_ANNOTATION] ?? "",
+							version,
 							requiredContext,
 							workspacePath,
 							workspaceType,
@@ -562,6 +569,7 @@ export function registerTemplateResources(
 							namespace: ns,
 							description: annotations[DESCRIPTION_ANNOTATION] ?? "",
 							tag: annotations[TAG_ANNOTATION] ?? "",
+							version: annotations[ANNOTATION_KEYS.TEMPLATE_VERSION] || "1.0.0",
 							labels: cm.metadata?.labels ?? {},
 							annotations,
 							spec,
@@ -622,6 +630,7 @@ export function registerTemplateResources(
 						workspacePath: "",
 						workspaceType: "",
 						apis: [],
+						version: "",
 					});
 				}
 			},

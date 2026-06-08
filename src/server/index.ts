@@ -9,7 +9,12 @@ import { initK8sContext, type K8sContext } from "~/k8s/index.js";
 import { createMcpServer } from "~/mcp/server.js";
 import { registerUiApp } from "~/ui/index.js";
 import { registerAuthHooks } from "./auth.js";
-import { getBasePrefix, setCorsHeaders, uuidv7 } from "./helpers.js";
+import {
+	getBasePrefix,
+	getRequestHostAndProto,
+	setCorsHeaders,
+	uuidv7,
+} from "./helpers.js";
 import { registerRoutes } from "./routes/index.js";
 import { registerUpgradeHandler } from "./ws-proxy.js";
 
@@ -218,6 +223,39 @@ export async function createFastifyApp(options?: {
 			return;
 		}
 		const url = request.raw.url || "";
+		const pathname = url.split("?")[0];
+		if (
+			pathname === "/.well-known/oauth-protected-resource" ||
+			pathname.startsWith("/.well-known/oauth-protected-resource/")
+		) {
+			const { host, proto } = getRequestHostAndProto(request);
+			const suffix = pathname.startsWith(
+				"/.well-known/oauth-protected-resource/",
+			)
+				? pathname.substring("/.well-known/oauth-protected-resource".length)
+				: basePrefix;
+			const resourceUrl = `${proto}://${host}${suffix}`;
+			const authIssuer = config.auth.issuer;
+			const scopesSupported = new Set<string>();
+			if (config.auth.requiredReadScope) {
+				scopesSupported.add(config.auth.requiredReadScope);
+			}
+			if (config.auth.requiredWriteScope) {
+				scopesSupported.add(config.auth.requiredWriteScope);
+			}
+			if (scopesSupported.size === 0) {
+				scopesSupported.add("mcp");
+			}
+
+			setCorsHeaders(reply);
+			reply.status(200).send({
+				resource: resourceUrl,
+				authorization_servers: authIssuer ? [authIssuer] : [],
+				scopes_supported: Array.from(scopesSupported),
+				bearer_methods_supported: ["header"],
+			});
+			return;
+		}
 		if (url.includes("/docs/") && (url.includes("%2e") || url.includes(".."))) {
 			reply.status(403);
 			reply.send("Forbidden");

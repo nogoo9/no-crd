@@ -422,6 +422,22 @@ async function refreshToken() {
           <button class="btn btn-primary" onclick="explicitRefresh()">Call POST ./_auth/refresh</button>
           <pre id="explicit-refresh-pre" style="background:#000; border-radius:6px; padding:1rem; font-family:'JetBrains Mono', monospace; font-size:0.8rem; overflow-x:auto; color:var(--text-body); border: 1px solid var(--card-border); margin-top: 1rem; display: none;"></pre>
         </div>
+
+        <div style="margin-top: 1rem; border-top: 1px solid var(--card-border); padding-top: 1.5rem;">
+          <h4 style="color: var(--accent-color); font-size: 0.95rem; margin-bottom: 0.5rem; font-family: 'JetBrains Mono', monospace;">4. Call Dummy API (Verify Auto-Refresh)</h4>
+          <p class="desc" style="font-size: 0.85rem; margin-bottom: 1rem;">Click below to send a request to <code>GET ./api/dummy-token</code>. If cookies/tokens have expired or were deleted, the gateway should auto-refresh them transparently, and this API will show the decoded access token.</p>
+          <button class="btn btn-primary" onclick="callDummyApi()">Call GET ./api/dummy-token</button>
+          <pre id="dummy-api-pre" style="background:#000; border-radius:6px; padding:1rem; font-family:'JetBrains Mono', monospace; font-size:0.8rem; overflow-x:auto; color:var(--text-body); border: 1px solid var(--card-border); margin-top: 1rem; display: none;"></pre>
+        </div>
+
+        <div style="margin-top: 1rem; border-top: 1px solid var(--card-border); padding-top: 1.5rem;">
+          <h4 style="color: var(--accent-color); font-size: 0.95rem; margin-bottom: 0.5rem; font-family: 'JetBrains Mono', monospace;">5. Trigger Auth/Routing Errors (Test error.html)</h4>
+          <p class="desc" style="font-size: 0.85rem; margin-bottom: 1rem;">Click the buttons below to open new tabs that trigger routing or authentication errors in the gateway. The gateway will intercept the GET requests and display the new themed <code>error.html</code> page.</p>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="triggerNotFoundError()">Trigger Workspace Not Found (404)</button>
+            <button class="btn btn-secondary" onclick="triggerForbiddenError()">Trigger Missing Scope/Auth (403/401)</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -557,6 +573,30 @@ async function refreshToken() {
       } catch (err) {
         pre.textContent = `Error: ${err.message}`;
       }
+    }
+
+    async function callDummyApi() {
+      const pre = document.getElementById('dummy-api-pre');
+      pre.style.display = 'block';
+      pre.textContent = 'Calling GET ./api/dummy-token...';
+      try {
+        const res = await fetch('./api/dummy-token');
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${await res.text() || 'Failed to call API'}`);
+        }
+        const data = await res.json();
+        pre.textContent = `Success!\n\nAccess Token:\n${data.token}\n\nDecoded Payload:\n${JSON.stringify(data.decoded, null, 2)}`;
+      } catch (err) {
+        pre.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    function triggerNotFoundError() {
+      window.open('../../route/non-existent-workspace-xyz', '_blank');
+    }
+
+    function triggerForbiddenError() {
+      window.open('../../permissions', '_blank');
     }
 
     // Check URL fragment (hash) on load for redirect callback token

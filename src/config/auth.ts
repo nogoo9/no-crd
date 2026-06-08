@@ -10,7 +10,7 @@ export const authSchema = {
 		description:
 			"Enables JWT token authentication on MCP tools and route proxy.",
 		get value(): boolean {
-			return getEnv(this.env) === "true";
+			return getEnv(this.env) === "true" && getEnv("TRANSPORT") !== "stdio";
 		},
 	} satisfies SchemaItem<boolean>,
 

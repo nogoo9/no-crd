@@ -40,6 +40,13 @@ async function main() {
 	// 3. Write final HTML to dist/ui/index.html
 	writeFileSync(distHtmlPath, finalHtml, "utf-8");
 	console.log(`==> Wrote final self-contained UI HTML to ${distHtmlPath}`);
+
+	// 4. Read error template HTML and write to dist/ui/error.html
+	const srcErrorHtmlPath = join(rootDir, "src", "ui", "error.template.html");
+	const distErrorHtmlPath = join(distDir, "error.html");
+	const errorHtml = readFileSync(srcErrorHtmlPath, "utf-8");
+	writeFileSync(distErrorHtmlPath, errorHtml, "utf-8");
+	console.log(`==> Wrote error UI HTML to ${distErrorHtmlPath}`);
 }
 
 main().catch((err) => {

@@ -43,6 +43,7 @@ export function loadUiHtml(distDir: string, basePrefix = ""): string {
 			authorizationUrl: config.ui.oauth.authorizationUrl,
 			tokenUrl: config.ui.oauth.tokenUrl,
 			endSessionUrl: config.ui.oauth.endSessionUrl,
+			subJsonPath: config.auth.subJsonPath,
 		};
 		const configScript = `<script>
 window.__NOCR_BASE_URL__ = ${JSON.stringify(basePrefix)};
@@ -53,6 +54,25 @@ window.__NOCR_OAUTH_CONFIG__ = ${JSON.stringify(oauthConfig)};
 	} catch (err) {
 		logger.warn("Could not load UI HTML asset: {error}", { error: err });
 		return `<!DOCTYPE html><html><body><p>UI not built. Run: bun run build</p></body></html>`;
+	}
+}
+
+/**
+ * Reads the Error HTML template, injects base URL configurations, and returns it.
+ */
+export function loadErrorHtml(distDir: string, basePrefix = ""): string {
+	const htmlPath = join(distDir, "ui", "error.html");
+	try {
+		logger.debug("Loading Error HTML page from {htmlPath}", { htmlPath });
+		let html = readFileSync(htmlPath, "utf-8");
+		const configScript = `<script>
+window.__NOCR_BASE_URL__ = ${JSON.stringify(basePrefix)};
+</script>`;
+		html = html.replace("<head>", `<head>${configScript}`);
+		return html;
+	} catch (err) {
+		logger.warn("Could not load Error HTML asset: {error}", { error: err });
+		return `<!DOCTYPE html><html><body><h1>Error</h1><p>An error occurred, and the error UI template could not be loaded.</p></body></html>`;
 	}
 }
 
