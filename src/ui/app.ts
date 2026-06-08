@@ -564,13 +564,6 @@ function renderWorkspaces() {
 		return;
 	}
 
-	const collapsedListStr =
-		localStorage.getItem("nocr_collapsed_workspaces") || "[]";
-	let collapsedIds: string[] = [];
-	try {
-		collapsedIds = JSON.parse(collapsedListStr);
-	} catch (_) {}
-
 	const collapsedTmplsStr =
 		localStorage.getItem("nocr_collapsed_templates") || "[]";
 	let collapsedTmplNames: string[] = [];
@@ -658,7 +651,6 @@ function renderWorkspaces() {
 
 		const workspacesCards = group.workspaces
 			.map((ws) => {
-				const isCollapsed = collapsedIds.includes(ws.id);
 				let statusClass = "status-unknown";
 				let pulseDot = "";
 				if (ws.status === "Running") {
@@ -807,15 +799,10 @@ function renderWorkspaces() {
 				}
 
 				return `
-      <div data-ws-id="${ws.id}" class="theme-card-row w-full p-6 flex flex-col justify-between transition workspace-card ${isCollapsed ? "is-collapsed" : ""}">
+      <div data-ws-id="${ws.id}" class="theme-card-row w-full p-6 flex flex-col justify-between transition workspace-card">
         <!-- Card Header -->
         <div class="flex items-center justify-between gap-4 w-full">
           <div class="flex items-center gap-3 min-w-0">
-            <button class="toggle-details-btn p-1 rounded hover:bg-[var(--panel-hover-bg)] transition cursor-pointer shrink-0" data-ws-id="${ws.id}" title="Toggle Details">
-              <svg class="w-4 h-4 transform transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
             <span class="theme-icon-box shrink-0">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -836,17 +823,16 @@ function renderWorkspaces() {
               ${pulseDot}
               ${ws.status}
             </span>
-            ${openLinkHtml}
           </div>
         </div>
 
-        <!-- Card Collapsible Details -->
+        <!-- Card Details (Always Visible) -->
         <div class="workspace-details mt-4 flex flex-col gap-4">
           ${infoHtml}
         </div>
 
         <!-- Card Actions (Always visible at the bottom) -->
-        <div class="flex items-center justify-between gap-3 mt-4 pt-3 border-t theme-border">
+        <div class="flex items-center justify-between gap-3 mt-4 pt-1">
           <div class="flex items-center gap-1.5 flex-wrap min-w-0">
             ${
 							ws.isOutdated
@@ -900,6 +886,7 @@ function renderWorkspaces() {
               </svg>
               Stop
             </button>
+            ${openLinkHtml}
           </div>
         </div>
       </div>
@@ -942,39 +929,6 @@ function renderWorkspaces() {
 	}
 
 	workspacesList.innerHTML = html;
-
-	// Attach collapse/expand toggle listener
-	document.querySelectorAll(".toggle-details-btn").forEach((btn: Element) => {
-		btn.addEventListener("click", (e: Event) => {
-			const target = e.currentTarget as HTMLButtonElement;
-			const wsId = target.getAttribute("data-ws-id");
-			if (!wsId) return;
-
-			const card = target.closest(".workspace-card");
-			if (!card) return;
-
-			const currentCollapsedStr =
-				localStorage.getItem("nocr_collapsed_workspaces") || "[]";
-			let currentCollapsedIds: string[] = [];
-			try {
-				currentCollapsedIds = JSON.parse(currentCollapsedStr);
-			} catch (_) {}
-
-			if (card.classList.contains("is-collapsed")) {
-				card.classList.remove("is-collapsed");
-				currentCollapsedIds = currentCollapsedIds.filter((id) => id !== wsId);
-			} else {
-				card.classList.add("is-collapsed");
-				if (!currentCollapsedIds.includes(wsId)) {
-					currentCollapsedIds.push(wsId);
-				}
-			}
-			localStorage.setItem(
-				"nocr_collapsed_workspaces",
-				JSON.stringify(currentCollapsedIds),
-			);
-		});
-	});
 
 	// Attach template group collapse toggle listener
 	document
