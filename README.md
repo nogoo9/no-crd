@@ -287,7 +287,7 @@ The server and command-line utility are configurable using CLI options or enviro
 | `--cors-methods` | `CORS_ALLOWED_METHODS`, `CORS_METHODS` | `GET, POST, OPTIONS` | String | CORS Allowed Methods header. |
 | `--cors-headers` | `CORS_ALLOWED_HEADERS`, `CORS_HEADERS` | `Content-Type, Authorization, mcp-protocol-version, mcp-session-id` | String | CORS Allowed Headers header. |
 | `--cors-allow-credentials` | `CORS_ALLOW_CREDENTIALS`, `CORS_CREDENTIALS` | `false` | `true`, `false` | Enable CORS Access-Control-Allow-Credentials header. |
-| `--cors-expose-headers` | `CORS_EXPOSED_HEADERS`, `CORS_EXPOSED` | `mcp-session-id` | String | Custom CORS Access-Control-Expose-Headers header. |
+| `--cors-expose-headers` | `CORS_EXPOSED_HEADERS`, `CORS_EXPOSED` | `mcp-session-id, x-refreshed-token` | String | Custom CORS Access-Control-Expose-Headers header. |
 | `--cors-max-age` | `CORS_MAX_AGE` | - | Number | Custom CORS Access-Control-Max-Age header in seconds. |
 
 ### ☸️ Kubernetes Configuration
@@ -371,6 +371,12 @@ Below is the mapping showing which Kubernetes API resources and verbs each MCP t
 | `get` | `create_pod_from_template` | Read template pod specifications stored in ConfigMaps. |
 | `update` | `update_template` | Modify metadata, annotations, or specifications of an existing template. |
 
+### Resource: `events`
+
+| Required Verb | Associated MCP Tools | Description / Purpose |
+|---|---|---|
+| `list` | `get_workspace_events` |  |
+
 ### Resource: `namespaces`
 
 | Required Verb | Associated MCP Tools | Description / Purpose |
@@ -381,10 +387,10 @@ Below is the mapping showing which Kubernetes API resources and verbs each MCP t
 
 | Required Verb | Associated MCP Tools | Description / Purpose |
 |---|---|---|
-| `create` | `create_pod`, `create_pod_from_template`, `spawn_workspace` | Provision and deploy new pods or workspace sandboxes. |
-| `delete` | `delete_pod`, `stop_workspace` | Terminate and clean up pods or workspace sandboxes. |
-| `get` | `get_pod`, `get_workspace` | Retrieve detailed JSON spec for a specific pod. |
-| `list` | `list_pods`, `list_workspaces` | Retrieve lists of pods or agent workspace pods. |
+| `create` | `create_pod`, `create_pod_from_template`, `spawn_workspace`, `upgrade_all_workspaces`, `upgrade_workspace` | Provision and deploy new pods or workspace sandboxes. |
+| `delete` | `delete_pod`, `stop_workspace`, `upgrade_all_workspaces`, `upgrade_workspace` | Terminate and clean up pods or workspace sandboxes. |
+| `get` | `get_pod`, `get_workspace`, `upgrade_workspace` | Retrieve detailed JSON spec for a specific pod. |
+| `list` | `list_pods`, `list_workspaces`, `upgrade_all_workspaces` | Retrieve lists of pods or agent workspace pods. |
 | `patch` | `patch_pod` | Strategic merge patch labels, annotations, or resource requests/limits. |
 
 ### Resource: `pods/log`
@@ -548,6 +554,11 @@ The spawner inspects `ConfigMap` metadata annotations (and custom inline annotat
 
 | Annotation / Label Key | Type | Description |
 |---|---|---|
+| `nogoo9/workspace-auth-mode` | Annotation (Comma-separated) | Configures authorization modes for the workspace proxy. Comma-separated list of: `token-api` (exposes token retrieval endpoints at `_auth/token` & `_auth/authorize` for SPAs), `inject-headers` (rewrites headers to forward user identity like `x-user-sub` and JWTs to container; enabled by default if `AUTH_ENABLED=true`), `no-auth` (bypasses all auth/owner checks for public workspaces). *(Available from v0.6.0, no-auth from v0.8.0)* |
+| `nogoo9/template-version` | Annotation (String) | Specifies the version of the pod template. Used to track if workspaces are outdated. *(Available from v0.8.0)* |
+| `nogoo9/workspace-name` | Annotation (String) | Stores the user-defined display name of the workspace. *(Available from v0.4.0)* |
+| `nogoo9/template-ref` | Annotation (String) | The reference to the pod template used to spawn the workspace (e.g. `default/workspace-terminal`). *(Available from v0.4.0)* |
+| `nogoo9/managed-by` | Label (String) | Used to label workspace pods created by this MCP server to restrict operational scope. *(Available from v0.5.0)* |
 | `nogoo9/pod-template` | Label (`"true"`) | Identifies a Kubernetes `ConfigMap` as a reusable pod template. |
 | `nogoo9/type` | Label (`"workspace"`) | Applied automatically by the spawner to identify running agent workspace pods. |
 | `nogoo9/workspace-id` | Label | Identifies the unique agent session / workspace ID associated with the running pod. |

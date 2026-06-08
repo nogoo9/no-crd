@@ -16,4 +16,4 @@ export {
 } from "./server/index.js";
 
 // Re-export Embedded UI registration utilities
-export { loadUiHtml, registerUiApp } from "./ui/index.js";
+export { loadErrorHtml, loadUiHtml, registerUiApp } from "./ui/index.js";

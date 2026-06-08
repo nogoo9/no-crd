@@ -14,6 +14,7 @@ export interface LocalTemplate {
 	annotations: Record<string, string>;
 	labels?: Record<string, string>;
 	spec: Record<string, unknown>;
+	version: string;
 }
 
 /** File extensions treated as YAML. */
@@ -83,8 +84,9 @@ export function parseTemplateContent(
 		[ANNOTATION_KEYS.POD_TEMPLATE]: "true",
 		...(metadata.labels as Record<string, string> | undefined),
 	};
+	const version = annotations[ANNOTATION_KEYS.TEMPLATE_VERSION] || "1.0.0";
 
-	return { name, annotations, labels, spec };
+	return { name, annotations, labels, spec, version };
 }
 
 /**

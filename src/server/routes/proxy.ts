@@ -22,7 +22,7 @@ export async function registerProxyRoutes(
 
 			// Verify if token-api mode is enabled
 			const annotations = (request as any).workspaceAnnotations || {};
-			const authMode = annotations["nogoo9/workspace-auth-mode"] || "";
+			const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
 			const modes = authMode
 				.split(",")
 				.map((m: string) => m.trim().toLowerCase());
@@ -49,7 +49,7 @@ export async function registerProxyRoutes(
 
 			// Verify if token-api mode is enabled
 			const annotations = (request as any).workspaceAnnotations || {};
-			const authMode = annotations["nogoo9/workspace-auth-mode"] || "";
+			const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
 			const modes = authMode
 				.split(",")
 				.map((m: string) => m.trim().toLowerCase());
@@ -175,7 +175,7 @@ export async function registerProxyRoutes(
 
 		// 2. Verify if token-api mode is enabled
 		const annotations = pod.metadata?.annotations || {};
-		const authMode = annotations["nogoo9/workspace-auth-mode"] || "";
+		const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
 		const modes = authMode
 			.split(",")
 			.map((m: string) => m.trim().toLowerCase());
@@ -302,12 +302,16 @@ export async function registerProxyRoutes(
 				rewriteRequestHeaders: (request: any, headers: any) => {
 					const newHeaders = { ...headers };
 					const annotations = request.workspaceAnnotations || {};
-					const authMode = annotations["nogoo9/workspace-auth-mode"] || "";
+					const authMode =
+						annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
 					const modes = authMode
 						.split(",")
 						.map((m: string) => m.trim().toLowerCase());
 
-					if (modes.includes("inject-headers")) {
+					const injectHeaders =
+						config.auth.enabled || modes.includes("inject-headers");
+
+					if (injectHeaders) {
 						// Inject user subject identity
 						const jwtPayload = request.jwtPayload;
 						if (jwtPayload) {

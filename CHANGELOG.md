@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-06-09
+
+### Added
+
+- **Consolidated Workspace Views & Template Upgrades** ([ADR-015](docs/decisions/ADR-015-workspace-view-consolidation-and-template-upgrades.md)): Grouped active workspaces on the dashboard by their respective pod templates and added a dynamic, dashed "Spawn Template" card button to launch new sandboxes. Supports templates without active workspaces, collapsing/expanding groups, and persisting collapsed state in `localStorage`. Relocated the template registration trigger to the main header toolbar.
+- **Workspace Upgrade Operations**: Added tool support for upgrading workspaces to the latest version of their respective template. Upgrades delete the current pod and start a new one, preserving the state in persistent volumes (PVs). Added an "Upgrade All Outdated" button that processes all outdated workspaces in parallel.
+- **Workspace Auth Modes**: Added `WORKSPACE_AUTH_MODE` configuration mapping supporting four modes: `inject-headers` (inject OIDC headers to downstream proxy), `same-origin` (redirect workspace to `/oauth/token` same-origin endpoint), `token-api` (expose token endpoint at `/_auth/token`), and `no-auth` (bypass authorization checks for routing proxy entirely).
+- **Default Auth Mode and Bypasses**: When `AUTH_ENABLED` is true, the `inject-headers` auth mode is enabled by default for all workspaces regardless of whether the annotation is provided. Added detailed annotations mapping documentation.
+
+### Fixed
+
+- **Collapsible Template Group Toggle Bubbling**: Resolved Caret toggles triggering collapse events twice due to bubbling up to the header click container.
+- **Card Button Layout & Styling**: Removed all button borders and shadows within cards, replacing them with flat styling and terracotta hover indicators. Segregated developer utility actions (Logs, Events, Spec, Preview) on the left and the Stop action on the right in a responsive split footer layout.
+
 ## [0.7.0] — 2026-06-07
 
 ### Added

@@ -31,19 +31,12 @@ let workspaces: Array<{
 	annotations?: Record<string, string>;
 	templateRef?: string;
 	apis?: WorkspaceApi[];
+	isOutdated?: boolean;
+	templateVersion?: string;
+	latestTemplateVersion?: string;
+	podName?: string;
 }> = [];
-let pods: Array<{
-	name: string;
-	namespace: string;
-	phase: string;
-	ready: number;
-	total: number;
-	restarts: number;
-	podIP: string;
-	node: string;
-	labels: Record<string, string>;
-	annotations: Record<string, string>;
-}> = [];
+
 let templates: Array<{
 	name: string;
 	namespace: string;
@@ -67,7 +60,7 @@ let capabilities: {
 	authEnabled: false,
 	isAdmin: false,
 };
-let unmanagedCount: number | undefined;
+let _unmanagedCount: number | undefined;
 
 // Authentication & token state
 let activeToken = "";
@@ -82,9 +75,15 @@ const errorBanner = document.getElementById("error-banner");
 const errorMessage = document.getElementById("error-message");
 const wsCount = document.getElementById("ws-count");
 const workspacesList = document.getElementById("workspaces-list");
-const podsCount = document.getElementById("pods-count");
-const podsTableBody = document.getElementById("pods-table-body");
 const templatesList = document.getElementById("templates-list");
+const eventsModal = document.getElementById("events-modal");
+const closeEventsBtn = document.getElementById("close-events-btn");
+const closeEventsFooterBtn = document.getElementById("close-events-footer-btn");
+const refreshEventsBtn = document.getElementById("refresh-events-btn");
+const eventsContent = document.getElementById("events-content");
+const eventsTitle = document.getElementById("events-title");
+const upgradeAllBtn = document.getElementById("upgrade-all-btn");
+let activeEventWsId: string | null = null;
 
 // Theme Toggle
 const themeBtn = document.getElementById("theme-btn");
@@ -270,6 +269,20 @@ function decodeJwt(t: string): any {
 	}
 }
 
+function getValueByJsonPath(obj: any, path: string): any {
+	if (!obj || !path) return undefined;
+	if (path.startsWith("$.")) {
+		const parts = path.substring(2).split(".");
+		let current = obj;
+		for (const part of parts) {
+			if (current === null || typeof current !== "object") return undefined;
+			current = current[part];
+		}
+		return current;
+	}
+	return undefined;
+}
+
 // Token State Management
 function initToken() {
 	const urlParams = new URLSearchParams(window.location.search);
@@ -307,7 +320,13 @@ function updateUserBadge(token: string) {
 		if (logoutBtn) logoutBtn.classList.remove("hidden");
 		const payload = decodeJwt(token);
 		if (payload) {
-			const sub = payload.sub || payload.identity || payload.name || "User";
+			const jsonPath = oauthConfig.subJsonPath || "$.sub";
+			const sub =
+				getValueByJsonPath(payload, jsonPath) ||
+				payload.sub ||
+				payload.identity ||
+				payload.name ||
+				"User";
 			userBadgeName.textContent = String(sub);
 			return;
 		}
@@ -425,20 +444,6 @@ async function refreshAll() {
 			console.warn("Failed to list workspaces", wsRes);
 		}
 
-		// 3. Fetch pods
-		const podsRes = await app.callServerTool({
-			name: "list_pods",
-			arguments: { namespace: currentNamespace, jwtPayload: getJwtPayload() },
-		});
-		if (podsRes && !podsRes.isError && podsRes.structuredContent) {
-			pods = (podsRes.structuredContent as any).pods || [];
-			unmanagedCount = (podsRes.structuredContent as any).unmanagedCount;
-		} else if (podsRes?.isError) {
-			showError(
-				`Pods error: ${(podsRes.content?.[0] as any)?.text || "Unknown"}`,
-			);
-		}
-
 		// 4. Fetch templates
 		const tmplRes = await app.callServerTool({
 			name: "list_templates",
@@ -465,18 +470,13 @@ async function refreshAll() {
 // Render dynamic elements
 function renderAll() {
 	renderWorkspaces();
-	renderPods();
 	renderTemplates();
 }
 
 function renderWorkspaces() {
 	if (!wsCount || !workspacesList) return;
 
-	if (currentLayout === "grid") {
-		workspacesList.className = "grid grid-cols-1 md:grid-cols-2 gap-6 py-4";
-	} else {
-		workspacesList.className = "flex flex-col gap-6 py-4";
-	}
+	workspacesList.className = "flex flex-col gap-10 py-4";
 
 	const filteredWorkspaces = workspaces.filter((ws) => {
 		if (!searchQuery) return true;
@@ -490,76 +490,219 @@ function renderWorkspaces() {
 
 	wsCount.textContent = String(filteredWorkspaces.length);
 
-	if (filteredWorkspaces.length === 0) {
+	const hasOutdated = filteredWorkspaces.some((ws) => ws.isOutdated);
+	if (upgradeAllBtn) {
+		if (
+			hasOutdated &&
+			capabilities.enabledTools.includes("upgrade_all_workspaces")
+		) {
+			upgradeAllBtn.classList.remove("hidden");
+		} else {
+			upgradeAllBtn.classList.add("hidden");
+		}
+	}
+
+	const groups: {
+		templateName: string;
+		templateTag?: string;
+		templateDesc?: string;
+		workspaces: typeof workspaces;
+		isRealTemplate: boolean;
+		apis?: (typeof templates)[0]["apis"];
+	}[] = [];
+
+	// Group workspaces by template name
+	for (const tmpl of templates) {
+		const wsForTmpl = filteredWorkspaces.filter(
+			(ws) => ws.templateRef?.toLowerCase() === tmpl.name.toLowerCase(),
+		);
+
+		const tmplMatchesQuery = searchQuery
+			? tmpl.name.toLowerCase().includes(searchQuery) ||
+				tmpl.description?.toLowerCase().includes(searchQuery) ||
+				tmpl.tag?.toLowerCase().includes(searchQuery)
+			: false;
+
+		if (!searchQuery || wsForTmpl.length > 0 || tmplMatchesQuery) {
+			groups.push({
+				templateName: tmpl.name,
+				templateTag: tmpl.tag,
+				templateDesc: tmpl.description,
+				workspaces: wsForTmpl,
+				isRealTemplate: true,
+				apis: tmpl.apis,
+			});
+		}
+	}
+
+	// Workspaces not associated with any registered template
+	const otherWorkspaces = filteredWorkspaces.filter((ws) => {
+		if (!ws.templateRef) return true;
+		return !templates.some(
+			(tmpl) => tmpl.name.toLowerCase() === ws.templateRef?.toLowerCase(),
+		);
+	});
+
+	if (
+		otherWorkspaces.length > 0 ||
+		(searchQuery && "other workspaces".includes(searchQuery))
+	) {
+		groups.push({
+			templateName: "Other Workspaces",
+			templateDesc: "Workspaces not associated with any registered template",
+			workspaces: otherWorkspaces,
+			isRealTemplate: false,
+		});
+	}
+
+	if (groups.length === 0) {
 		workspacesList.innerHTML = `
-      <div class="py-8 text-center theme-text-muted text-sm">
-        ${searchQuery ? "No matching workspaces found." : "No active workspaces. Click a template to spawn one."}
-      </div>
-    `;
+			<div class="py-8 text-center theme-text-muted text-sm">
+				${searchQuery ? "No matching workspaces or templates found." : "No workspaces or templates registered."}
+			</div>
+		`;
 		return;
 	}
 
-	const collapsedListStr =
-		localStorage.getItem("nocr_collapsed_workspaces") || "[]";
-	let collapsedIds: string[] = [];
+	const collapsedTmplsStr =
+		localStorage.getItem("nocr_collapsed_templates") || "[]";
+	let collapsedTmplNames: string[] = [];
 	try {
-		collapsedIds = JSON.parse(collapsedListStr);
+		collapsedTmplNames = JSON.parse(collapsedTmplsStr);
 	} catch (_) {}
 
-	workspacesList.innerHTML = filteredWorkspaces
-		.map((ws) => {
-			const isCollapsed = collapsedIds.includes(ws.id);
-			let statusClass = "status-unknown";
-			let pulseDot = "";
-			if (ws.status === "Running") {
-				statusClass = "status-running";
-				pulseDot = `
+	let html = "";
+
+	for (const group of groups) {
+		const isTmplCollapsed = collapsedTmplNames.includes(group.templateName);
+
+		// Render APIs compact badge layout
+		let apisHtml = "";
+		if (group.apis && group.apis.length > 0) {
+			apisHtml = group.apis
+				.map((api) => {
+					const tooltip = api.desc ? `title="${api.desc}"` : "";
+					const methodText = api.method
+						? api.method.split(",")[0].toUpperCase()
+						: "GET";
+					let methodClass =
+						"bg-neutral-500/10 text-neutral-600 dark:text-neutral-400 border border-neutral-500/20";
+					if (methodText === "GET") {
+						methodClass =
+							"bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20";
+					} else if (methodText === "POST") {
+						methodClass =
+							"bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
+					} else if (methodText === "WS" || methodText === "WEBSOCKET") {
+						methodClass =
+							"bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20";
+					}
+					return `<span ${tooltip} class="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono tracking-wider ${methodClass}">${methodText}:${api.name}</span>`;
+				})
+				.join(" ");
+		}
+
+		// Group Header (borderless)
+		const groupHeader = `
+			<div class="space-y-1 py-3">
+				<div class="flex flex-wrap items-center justify-between gap-3 group-header-clickable">
+					<div class="flex items-center gap-2 min-w-0">
+						<button class="toggle-group-btn p-1 rounded hover:bg-[var(--panel-hover-bg)] transition cursor-pointer shrink-0" title="Toggle Group">
+							<svg class="w-4 h-4 transform transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+							</svg>
+						</button>
+						<span class="theme-icon-box shrink-0 p-1.5 rounded-lg">
+							<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+							</svg>
+						</span>
+						<h3 class="text-sm font-extrabold theme-text-title font-mono truncate group-title-text" title="${group.templateName}">${group.templateName}</h3>
+						${group.templateTag ? `<span class="theme-badge-coral text-[9px] uppercase font-bold tracking-wider">${group.templateTag}</span>` : ""}
+						<span class="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-neutral-500/10 text-neutral-500 font-mono">${group.workspaces.length}</span>
+					</div>
+					
+					<div class="flex items-center gap-3 shrink-0 ml-auto" onclick="event.stopPropagation()">
+						${apisHtml ? `<div class="hidden sm:flex items-center gap-1">${apisHtml}</div>` : ""}
+						${
+							group.isRealTemplate
+								? `
+							<button data-tmpl-name="${group.templateName}" class="view-spec-btn theme-button-secondary px-2.5 py-1 text-[11px] flex items-center gap-1 cursor-pointer">
+								<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+								</svg>
+								Spec
+							</button>
+						`
+								: ""
+						}
+					</div>
+				</div>
+				${group.templateDesc ? `<p class="text-xs theme-text-muted leading-normal pl-14 mt-1">${group.templateDesc}</p>` : ""}
+			</div>
+		`;
+
+		// Cards list layout classes
+		const containerClass =
+			currentLayout === "grid"
+				? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 py-4"
+				: "flex flex-col gap-6 py-4";
+
+		const workspacesCards = group.workspaces
+			.map((ws) => {
+				let statusClass = "status-unknown";
+				let pulseDot = "";
+				if (ws.status === "Running") {
+					statusClass = "status-running";
+					pulseDot = `
 					<span class="relative flex h-1.5 w-1.5 shrink-0">
 						<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
 						<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
 					</span>`;
-			} else if (ws.status === "Pending") {
-				statusClass = "status-pending";
-				pulseDot = `
+				} else if (ws.status === "Pending") {
+					statusClass = "status-pending";
+					pulseDot = `
 					<span class="relative flex h-1.5 w-1.5 shrink-0">
 						<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
 						<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
 					</span>`;
-			} else if (ws.status === "Failed") {
-				statusClass = "status-failed";
-			}
+				} else if (ws.status === "Failed") {
+					statusClass = "status-failed";
+				}
 
-			let openLinkHtml = "";
-			let previewBtnHtml = "";
-			let viewSpecBtnHtml = "";
-			if (ws.status === "Running") {
-				const tokenQuery = activeToken
-					? `?token=${encodeURIComponent(activeToken)}`
-					: "";
-				const pathPart = ws.workspacePath || ws.previewPath || "/";
-				const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
-				const workspaceUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
-				openLinkHtml = `
-					<a href="${workspaceUrl}" target="_blank" class="theme-button-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer text-center">
+				let openLinkHtml = "";
+				let previewBtnHtml = "";
+				let viewSpecBtnHtml = "";
+				if (ws.status === "Running") {
+					const tokenQuery = activeToken
+						? `?token=${encodeURIComponent(activeToken)}`
+						: "";
+					const pathPart = ws.workspacePath || ws.previewPath || "/";
+					const cleanPath = pathPart.startsWith("/")
+						? pathPart
+						: `/${pathPart}`;
+					const workspaceUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
+					openLinkHtml = `
+					<a href="${workspaceUrl}" target="_blank" class="theme-button-primary inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] cursor-pointer text-center font-bold">
 						<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
 						</svg>
-						Open Workspace
+						Open
 					</a>
 				`;
-				viewSpecBtnHtml = `
-					<button data-ws-id="${ws.id}" class="view-ws-spec-btn theme-button-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer">
+					viewSpecBtnHtml = `
+					<button data-ws-id="${ws.id}" class="view-ws-spec-btn theme-button-secondary inline-flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer">
 						<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
 						</svg>
-						View Spec
+						Spec
 					</button>
 				`;
-				const previewTarget = ws.previewPath || ws.workspacePath;
-				if (previewTarget) {
-					previewBtnHtml = `
-						<button data-ws-id="${ws.id}" data-preview-path="${previewTarget}" data-preview-type="${ws.previewType || ws.workspaceType || "html"}" class="preview-ws-btn theme-button-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer">
+					const previewTarget = ws.previewPath || ws.workspacePath;
+					if (previewTarget) {
+						previewBtnHtml = `
+						<button data-ws-id="${ws.id}" data-preview-path="${previewTarget}" data-preview-type="${ws.previewType || ws.workspaceType || "html"}" class="preview-ws-btn theme-button-secondary inline-flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer">
 							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -567,44 +710,44 @@ function renderWorkspaces() {
 							Preview
 						</button>
 					`;
+					}
 				}
-			}
 
-			let infoHtml = "";
-			if (ws.podIP || ws.templateRef) {
-				let apisHtml = "";
-				if (ws.apis && ws.apis.length > 0) {
-					apisHtml = ws.apis
-						.map((api) => {
-							const apiPath = api.path.startsWith("/")
-								? api.path
-								: `/${api.path}`;
-							const methodText = api.method
-								? api.method.split(",")[0].toUpperCase()
-								: "GET";
-							let methodClass =
-								"bg-neutral-500/10 text-neutral-600 dark:text-neutral-400 border border-neutral-500/20";
-							if (methodText === "GET") {
-								methodClass =
-									"bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20";
-							} else if (methodText === "POST") {
-								methodClass =
-									"bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
-							} else if (methodText === "WS" || methodText === "WEBSOCKET") {
-								methodClass =
-									"bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20";
-							}
+				let infoHtml = "";
+				if (ws.podIP || ws.templateRef) {
+					let apisHtml = "";
+					if (ws.apis && ws.apis.length > 0) {
+						apisHtml = ws.apis
+							.map((api) => {
+								const apiPath = api.path.startsWith("/")
+									? api.path
+									: `/${api.path}`;
+								const methodText = api.method
+									? api.method.split(",")[0].toUpperCase()
+									: "GET";
+								let methodClass =
+									"bg-neutral-500/10 text-neutral-600 dark:text-neutral-400 border border-neutral-500/20";
+								if (methodText === "GET") {
+									methodClass =
+										"bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20";
+								} else if (methodText === "POST") {
+									methodClass =
+										"bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
+								} else if (methodText === "WS" || methodText === "WEBSOCKET") {
+									methodClass =
+										"bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20";
+								}
 
-							const tooltip = api.desc ? `title="${api.desc}"` : "";
-							const tokenQuery = activeToken
-								? `?token=${encodeURIComponent(activeToken)}`
-								: "";
-							const linkUrl = `${basePath}/route/${ws.id}${apiPath}${tokenQuery}`;
-							const isGet = methodText === "GET";
-							const pathHtml = isGet
-								? `<a href="${linkUrl}" target="_blank" ${tooltip} class="theme-text-link hover:underline break-all">${apiPath}</a>`
-								: `<span ${tooltip} class="theme-text-muted break-all">${apiPath}</span>`;
-							return `
+								const tooltip = api.desc ? `title="${api.desc}"` : "";
+								const tokenQuery = activeToken
+									? `?token=${encodeURIComponent(activeToken)}`
+									: "";
+								const linkUrl = `${basePath}/route/${ws.id}${apiPath}${tokenQuery}`;
+								const isGet = methodText === "GET";
+								const pathHtml = isGet
+									? `<a href="${linkUrl}" target="_blank" ${tooltip} class="theme-text-link hover:underline break-all">${apiPath}</a>`
+									: `<span ${tooltip} class="theme-text-muted break-all">${apiPath}</span>`;
+								return `
 								<tr class="hover:bg-[var(--panel-hover-bg)] transition-colors duration-150">
 									<td class="px-4 py-2.5 font-bold theme-text-title">${api.name}</td>
 									<td class="px-4 py-2.5 font-mono">
@@ -618,11 +761,11 @@ function renderWorkspaces() {
 									<td class="px-4 py-2.5 theme-text-muted leading-normal">${api.desc || "-"}</td>
 								</tr>
 							`;
-						})
-						.join("");
-				}
+							})
+							.join("");
+					}
 
-				infoHtml = `<div class="text-xs theme-text-muted mt-2 space-y-4">
+					infoHtml = `<div class="text-xs theme-text-muted mt-2 space-y-4">
 					<div class="flex flex-wrap gap-2.5">
 						${ws.templateRef ? `<span><strong>Template:</strong> <span class="px-1.5 py-0.5 theme-badge-pill text-[10px] font-bold rounded-md font-mono">${ws.templateRef}</span></span>` : ""}
 						${ws.podIP ? `<span><strong>IP:</strong> <span class="font-mono">${ws.podIP}</span></span>` : ""}
@@ -653,18 +796,13 @@ function renderWorkspaces() {
 							: ""
 					}
 				</div>`;
-			}
+				}
 
-			return `
-      <div data-ws-id="${ws.id}" class="theme-card-row w-full p-6 flex flex-col justify-between transition workspace-card ${isCollapsed ? "is-collapsed" : ""}">
+				return `
+      <div data-ws-id="${ws.id}" class="theme-card-row w-full p-6 flex flex-col justify-between transition workspace-card">
         <!-- Card Header -->
-        <div class="flex flex-wrap items-center justify-between gap-4 w-full">
+        <div class="flex items-center justify-between gap-4 w-full">
           <div class="flex items-center gap-3 min-w-0">
-            <button class="toggle-details-btn p-1 rounded hover:bg-[var(--panel-hover-bg)] transition cursor-pointer shrink-0" data-ws-id="${ws.id}" title="Toggle Details">
-              <svg class="w-4 h-4 transform transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
             <span class="theme-icon-box shrink-0">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -680,64 +818,175 @@ function renderWorkspaces() {
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2 shrink-0">
-            <span class="px-2.5 py-1 text-[11px] font-bold rounded-lg flex items-center gap-1.5 shrink-0 ${statusClass}">
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="px-2 py-0.5 text-[10px] font-bold rounded-md flex items-center gap-1.5 shrink-0 ${statusClass}">
               ${pulseDot}
               ${ws.status}
             </span>
-            ${openLinkHtml}
-            <button data-ws-id="${ws.id}" class="stop-ws-btn theme-button-danger inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer"${!capabilities.enabledTools.includes("stop_workspace") ? ' disabled title="Insufficient permissions"' : ""}>
+          </div>
+        </div>
+
+        <!-- Card Details (Always Visible) -->
+        <div class="workspace-details mt-4 flex flex-col gap-4">
+          ${infoHtml}
+        </div>
+
+        <!-- Card Actions (Always visible at the bottom) -->
+        <div class="flex items-center justify-between gap-3 mt-4 pt-1">
+          <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+            ${
+							ws.isOutdated
+								? `<span class="px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-1 shrink-0" title="A newer template version is available">
+                  <svg class="w-3.5 h-3.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  Outdated
+                </span>`
+								: ""
+						}
+            ${
+							ws.isOutdated &&
+							capabilities.enabledTools.includes("upgrade_workspace")
+								? `<button data-ws-id="${ws.id}" class="upgrade-ws-btn theme-button-primary inline-flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer bg-amber-600 border-amber-600 hover:bg-amber-700">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18" />
+                  </svg>
+                  Upgrade
+                </button>`
+								: ""
+						}
+            ${viewSpecBtnHtml}
+            ${previewBtnHtml}
+            ${
+							ws.podName && capabilities.enabledTools.includes("get_pod_logs")
+								? `<button data-pod-name="${ws.podName}" data-ws-id="${ws.id}" class="logs-ws-btn theme-button-secondary inline-flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Logs
+                </button>`
+								: ""
+						}
+            ${
+							capabilities.enabledTools.includes("get_workspace_events")
+								? `<button data-ws-id="${ws.id}" class="events-ws-btn theme-button-secondary inline-flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Events
+                </button>`
+								: ""
+						}
+          </div>
+
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button data-ws-id="${ws.id}" class="stop-ws-btn theme-button-danger inline-flex items-center gap-1 px-2 py-1 text-[11px] cursor-pointer"${!capabilities.enabledTools.includes("stop_workspace") ? ' disabled title="Insufficient permissions"' : ""}>
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
               Stop
             </button>
-          </div>
-        </div>
-
-        <!-- Card Collapsible Details -->
-        <div class="workspace-details mt-4 flex flex-col gap-4">
-          ${infoHtml}
-          <div class="flex items-center gap-2 mt-1">
-            ${viewSpecBtnHtml}
-            ${previewBtnHtml}
+            ${openLinkHtml}
           </div>
         </div>
       </div>
     `;
-		})
-		.join("");
+			})
+			.join("");
 
-	// Attach collapse/expand toggle listener
-	document.querySelectorAll(".toggle-details-btn").forEach((btn: Element) => {
-		btn.addEventListener("click", (e: Event) => {
-			const target = e.currentTarget as HTMLButtonElement;
-			const wsId = target.getAttribute("data-ws-id");
-			if (!wsId) return;
+		// Spawn template button using the new dotted outline styling
+		let dottedCardHtml = "";
+		if (
+			group.isRealTemplate &&
+			capabilities.enabledTools.includes("spawn_workspace")
+		) {
+			dottedCardHtml = `
+				<button data-tmpl-name="${group.templateName}" class="spawn-ws-dotted-btn create-ws-dotted-btn p-6">
+					<div class="plus-box">
+						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+						</svg>
+					</div>
+					<div>
+						<div class="font-bold text-xs theme-text-title font-mono">Spawn ${group.templateName}</div>
+						<div class="text-[11px] theme-text-muted mt-1">Create sandbox using this template</div>
+					</div>
+				</button>
+			`;
+		}
 
-			const card = target.closest(".workspace-card");
-			if (!card) return;
+		html += `
+			<div class="template-group ${isTmplCollapsed ? "is-collapsed" : ""}" data-tmpl-name="${group.templateName}">
+				${groupHeader}
+				<div class="group-content">
+					<div class="${containerClass}">
+						${workspacesCards}
+						${dottedCardHtml}
+					</div>
+				</div>
+			</div>
+		`;
+	}
 
-			const currentCollapsedStr =
-				localStorage.getItem("nocr_collapsed_workspaces") || "[]";
-			let currentCollapsedIds: string[] = [];
-			try {
-				currentCollapsedIds = JSON.parse(currentCollapsedStr);
-			} catch (_) {}
+	workspacesList.innerHTML = html;
 
-			if (card.classList.contains("is-collapsed")) {
-				card.classList.remove("is-collapsed");
-				currentCollapsedIds = currentCollapsedIds.filter((id) => id !== wsId);
-			} else {
-				card.classList.add("is-collapsed");
-				if (!currentCollapsedIds.includes(wsId)) {
-					currentCollapsedIds.push(wsId);
+	// Attach template group collapse toggle listener
+	document
+		.querySelectorAll(".group-header-clickable")
+		.forEach((el: Element) => {
+			el.addEventListener("click", (e: Event) => {
+				const target = e.target as HTMLElement;
+				// Ignore clicks inside the right-side actions area (apis badge or Spec button)
+				if (target.closest(".ml-auto")) return;
+
+				const groupContainer = el.closest(".template-group");
+				if (!groupContainer) return;
+				const tmplName = groupContainer.getAttribute("data-tmpl-name");
+				if (!tmplName) return;
+
+				const currentCollapsedStr =
+					localStorage.getItem("nocr_collapsed_templates") || "[]";
+				let currentCollapsed: string[] = [];
+				try {
+					currentCollapsed = JSON.parse(currentCollapsedStr);
+				} catch (_) {}
+
+				if (groupContainer.classList.contains("is-collapsed")) {
+					groupContainer.classList.remove("is-collapsed");
+					currentCollapsed = currentCollapsed.filter(
+						(name) => name !== tmplName,
+					);
+				} else {
+					groupContainer.classList.add("is-collapsed");
+					if (!currentCollapsed.includes(tmplName)) {
+						currentCollapsed.push(tmplName);
+					}
 				}
-			}
-			localStorage.setItem(
-				"nocr_collapsed_workspaces",
-				JSON.stringify(currentCollapsedIds),
+				localStorage.setItem(
+					"nocr_collapsed_templates",
+					JSON.stringify(currentCollapsed),
+				);
+			});
+		});
+
+	// Attach dotted card listeners
+	document.querySelectorAll(".spawn-ws-dotted-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", (e: Event) => {
+			const target = e.currentTarget as HTMLElement;
+			// Stop propagation so it doesn't trigger parent group toggle collapse
+			e.stopPropagation();
+			const name = target.getAttribute("data-tmpl-name");
+			if (name) openSpawnModal(name);
+		});
+	});
+
+	// Attach spec view modal listeners inside workspace card / template headers
+	document.querySelectorAll(".view-spec-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", async (e: Event) => {
+			const name = (e.currentTarget as HTMLButtonElement).getAttribute(
+				"data-tmpl-name",
 			);
+			if (name) await openTmplSpecModal(name);
 		});
 	});
 
@@ -751,6 +1000,40 @@ function renderWorkspaces() {
 				target.textContent = "Stopping...";
 				await stopWorkspace(wsId);
 			}
+		});
+	});
+
+	document.querySelectorAll(".upgrade-ws-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", async (e: Event) => {
+			const target = e.currentTarget as HTMLButtonElement;
+			const wsId = target.getAttribute("data-ws-id");
+			if (wsId) {
+				if (
+					confirm(
+						`Are you sure you want to upgrade workspace ${wsId}? This will delete the current pod and spawn a new one.`,
+					)
+				) {
+					target.setAttribute("disabled", "true");
+					target.textContent = "Upgrading...";
+					await upgradeWorkspace(wsId);
+				}
+			}
+		});
+	});
+
+	document.querySelectorAll(".logs-ws-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", (e: Event) => {
+			const target = e.currentTarget as HTMLButtonElement;
+			const podName = target.getAttribute("data-pod-name");
+			if (podName) openLogsModal(podName);
+		});
+	});
+
+	document.querySelectorAll(".events-ws-btn").forEach((btn: Element) => {
+		btn.addEventListener("click", (e: Event) => {
+			const target = e.currentTarget as HTMLButtonElement;
+			const wsId = target.getAttribute("data-ws-id");
+			if (wsId) openEventsModal(wsId);
 		});
 	});
 
@@ -777,99 +1060,123 @@ function renderWorkspaces() {
 	});
 }
 
-function renderPods() {
-	if (!podsCount || !podsTableBody) return;
-
-	const filteredPods = pods.filter((pod) => {
-		if (!searchQuery) return true;
-		return (
-			pod.name.toLowerCase().includes(searchQuery) ||
-			pod.phase.toLowerCase().includes(searchQuery) ||
-			pod.podIP?.toLowerCase().includes(searchQuery)
-		);
-	});
-
-	podsCount.textContent = String(filteredPods.length);
-
-	// Show unmanaged count info
-	const unmanagedInfo = document.getElementById("unmanaged-count-info");
-	if (unmanagedInfo) {
-		if (unmanagedCount !== undefined && unmanagedCount > 0) {
-			unmanagedInfo.textContent = `(${unmanagedCount} unmanaged pod${unmanagedCount === 1 ? "" : "s"} not shown)`;
-			unmanagedInfo.classList.remove("hidden");
+async function upgradeWorkspace(id: string) {
+	clearError();
+	try {
+		showToast(`Workspace "${id}" upgrade started...`, "success");
+		const res = await app.callServerTool({
+			name: "upgrade_workspace",
+			arguments: {
+				id,
+				namespace: currentNamespace,
+				jwtPayload: getJwtPayload(),
+			},
+		});
+		if (res.isError) {
+			showToast(
+				`Failed to upgrade workspace: ${(res.content?.[0] as any)?.text || "Unknown error"}`,
+				"error",
+			);
 		} else {
-			unmanagedInfo.classList.add("hidden");
+			showToast(`Workspace "${id}" upgraded successfully`, "success");
+		}
+	} catch (err) {
+		showError(`Error calling upgrade_workspace: ${err}`);
+	}
+	await refreshAll();
+}
+
+async function upgradeAllWorkspaces() {
+	clearError();
+	if (upgradeAllBtn) {
+		upgradeAllBtn.setAttribute("disabled", "true");
+		upgradeAllBtn.textContent = "Upgrading All...";
+	}
+	try {
+		showToast("Upgrading all outdated workspaces...", "success");
+		const res = await app.callServerTool({
+			name: "upgrade_all_workspaces",
+			arguments: {
+				namespace: currentNamespace,
+				jwtPayload: getJwtPayload(),
+			},
+		});
+		if (res.isError) {
+			showToast(
+				`Failed to upgrade workspaces: ${(res.content?.[0] as any)?.text || "Unknown error"}`,
+				"error",
+			);
+		} else {
+			const sc = res.structuredContent as any;
+			const upgradedCount = sc?.upgraded?.length || 0;
+			const failedCount = sc?.failed?.length || 0;
+			if (failedCount > 0) {
+				showToast(
+					`Upgraded ${upgradedCount} workspaces, ${failedCount} failed`,
+					"error",
+				);
+			} else {
+				showToast(
+					`Successfully upgraded ${upgradedCount} workspaces`,
+					"success",
+				);
+			}
+		}
+	} catch (err) {
+		showError(`Error calling upgrade_all_workspaces: ${err}`);
+	} finally {
+		if (upgradeAllBtn) {
+			upgradeAllBtn.removeAttribute("disabled");
+			upgradeAllBtn.textContent = "Upgrade All Outdated";
 		}
 	}
+	await refreshAll();
+}
 
-	if (filteredPods.length === 0) {
-		podsTableBody.innerHTML = `
-      <tr>
-        <td colspan="6" class="px-6 py-8 text-center theme-text-muted">
-          ${searchQuery ? "No matching pods found." : "No active pods in namespace."}
-        </td>
-      </tr>
-    `;
-		return;
+async function openEventsModal(wsId: string) {
+	if (!eventsModal || !eventsTitle || !eventsContent) return;
+	activeEventWsId = wsId;
+	eventsTitle.textContent = wsId;
+	eventsContent.textContent = "Fetching events...";
+	eventsModal.classList.remove("hidden");
+	await fetchEvents();
+}
+
+function closeEventsModal() {
+	if (!eventsModal) return;
+	eventsModal.classList.add("hidden");
+	activeEventWsId = null;
+}
+
+async function fetchEvents() {
+	if (!activeEventWsId || !eventsContent) return;
+	try {
+		const res = await app.callServerTool({
+			name: "get_workspace_events",
+			arguments: {
+				id: activeEventWsId,
+				namespace: currentNamespace,
+				jwtPayload: getJwtPayload(),
+			},
+		});
+		if (res.isError) {
+			eventsContent.textContent = `Error fetching events: ${(res.content?.[0] as any)?.text || "Unknown error"}`;
+		} else {
+			const sc = res.structuredContent as any;
+			if (sc?.events && sc.events.length > 0) {
+				eventsContent.textContent = sc.events
+					.map(
+						(e: any) =>
+							`[${e.timestamp}] [${e.type}] ${e.reason}: ${e.message}`,
+					)
+					.join("\n");
+			} else {
+				eventsContent.textContent = "No events found.";
+			}
+		}
+	} catch (err) {
+		eventsContent.textContent = `Error calling get_workspace_events: ${err}`;
 	}
-
-	podsTableBody.innerHTML = filteredPods
-		.map((pod) => {
-			let phaseClass = "status-unknown";
-			if (pod.phase === "Running") {
-				phaseClass = "status-running";
-			} else if (pod.phase === "Pending") {
-				phaseClass = "status-pending";
-			} else if (pod.phase === "Failed") {
-				phaseClass = "status-failed";
-			}
-
-			return `
-      <tr class="theme-card-row transition">
-        <td class="px-6 py-4">
-          <div class="font-bold theme-text-title max-w-[200px] sm:max-w-xs truncate">${pod.name}</div>
-          <div class="text-[10px] theme-text-muted font-mono mt-0.5">${pod.node || "Pending assignment"}</div>
-        </td>
-        <td class="px-6 py-4">
-          <span class="inline-flex px-2 py-0.5 text-xs font-bold rounded ${phaseClass}">${pod.phase}</span>
-        </td>
-        <td class="px-6 py-4 font-mono theme-text-body">${pod.ready}/${pod.total}</td>
-        <td class="px-6 py-4 font-mono theme-text-body">${pod.restarts}</td>
-        <td class="px-6 py-4 font-mono theme-text-body">${pod.podIP || "-"}</td>
-        <td class="px-6 py-4 text-right shrink-0">
-          <div class="inline-flex gap-2">
-            <button data-pod-name="${pod.name}" class="view-logs-btn theme-button-secondary px-2.5 py-1 text-xs cursor-pointer"${!capabilities.enabledTools.includes("get_pod_logs") ? ' disabled title="Insufficient permissions"' : ""}>Logs</button>
-            <button data-pod-name="${pod.name}" class="delete-pod-btn theme-button-danger px-2.5 py-1 text-xs cursor-pointer"${!capabilities.enabledTools.includes("delete_pod") ? ' disabled title="Insufficient permissions"' : ""}>Delete</button>
-          </div>
-        </td>
-      </tr>
-    `;
-		})
-		.join("");
-
-	// Attach event listeners
-	document.querySelectorAll(".view-logs-btn").forEach((btn: Element) => {
-		btn.addEventListener("click", (e: Event) => {
-			const podName = (e.currentTarget as HTMLButtonElement).getAttribute(
-				"data-pod-name",
-			);
-			if (podName) openLogsModal(podName);
-		});
-	});
-
-	document.querySelectorAll(".delete-pod-btn").forEach((btn: Element) => {
-		btn.addEventListener("click", async (e: Event) => {
-			const target = e.currentTarget as HTMLButtonElement;
-			const podName = target.getAttribute("data-pod-name");
-			if (podName) {
-				if (confirm(`Are you sure you want to delete pod ${podName}?`)) {
-					target.setAttribute("disabled", "true");
-					target.textContent = "Deleting...";
-					await deletePod(podName);
-				}
-			}
-		});
-	});
 }
 
 function renderTemplates() {
@@ -991,7 +1298,7 @@ async function stopWorkspace(id: string) {
 }
 
 // Tool invocation: delete_pod
-async function deletePod(name: string) {
+async function _deletePod(name: string) {
 	clearError();
 	try {
 		const res = await app.callServerTool({
@@ -1130,7 +1437,7 @@ async function openSpawnModal(tmplName: string) {
 							? "http://rustfs.nogoo9.svc.cluster.local:80"
 							: "http://localhost:9000";
 				} else if (key === "S3_BUCKET") {
-					input.value = "nogoo9-agent-workspace";
+					input.value = "nogoo9-test-bucket";
 				} else if (key === "S3_FOLDER") {
 					input.value = `folder-${Math.floor(Math.random() * 1000)}`;
 				} else if (key === "AWS_ACCESS_KEY_ID") {
@@ -1656,6 +1963,13 @@ if (closeLogsFooterBtn)
 	closeLogsFooterBtn.addEventListener("click", closeLogsModal);
 if (refreshLogsBtn) refreshLogsBtn.addEventListener("click", fetchLogs);
 
+if (closeEventsBtn) closeEventsBtn.addEventListener("click", closeEventsModal);
+if (closeEventsFooterBtn)
+	closeEventsFooterBtn.addEventListener("click", closeEventsModal);
+if (refreshEventsBtn) refreshEventsBtn.addEventListener("click", fetchEvents);
+if (upgradeAllBtn)
+	upgradeAllBtn.addEventListener("click", upgradeAllWorkspaces);
+
 if (closeSpawnBtn) closeSpawnBtn.addEventListener("click", closeSpawnModal);
 if (cancelSpawnBtn) cancelSpawnBtn.addEventListener("click", closeSpawnModal);
 
@@ -1747,6 +2061,12 @@ async function initHttpFallback(): Promise<boolean> {
 			return false;
 		}
 		if (resp.ok) {
+			const refreshedToken = resp.headers.get("x-refreshed-token");
+			if (refreshedToken) {
+				localStorage.setItem("nocr_token", refreshedToken);
+				activeToken = refreshedToken;
+				updateUserBadge(refreshedToken);
+			}
 			const sessId = resp.headers.get("mcp-session-id");
 			if (sessId) {
 				httpSessionId = sessId;
@@ -1826,6 +2146,13 @@ async function callServerToolFallback(name: string, args: any): Promise<any> {
 		const text = await resp.text().catch(() => "");
 		const detailedMsg = text ? `${resp.status} (${text})` : `${resp.status}`;
 		throw new Error(`HTTP error ${detailedMsg}`);
+	}
+
+	const refreshedToken = resp.headers.get("x-refreshed-token");
+	if (refreshedToken) {
+		localStorage.setItem("nocr_token", refreshedToken);
+		activeToken = refreshedToken;
+		updateUserBadge(refreshedToken);
 	}
 
 	const returnedSessionId = resp.headers.get("mcp-session-id");
@@ -1939,7 +2266,6 @@ function initSearch() {
 			searchQuery = target.value.trim().toLowerCase();
 			renderWorkspaces();
 			renderTemplates();
-			renderPods();
 		});
 	}
 }
@@ -2104,6 +2430,7 @@ interface OAuthConfig {
 	clientId?: string;
 	loginMethod?: "redirect";
 	scopes?: string[];
+	subJsonPath?: string;
 }
 
 const oauthConfig: OAuthConfig = (window as any).__NOCR_OAUTH_CONFIG__ || {};
@@ -2229,7 +2556,7 @@ async function initOidc() {
 						localStorage.setItem("nocr_id_token", tokenData.id_token);
 					}
 					if (tokenData.refresh_token) {
-						await fetch(`${basePath}/auth/set-refresh`, {
+						await fetch(`${basePath}/mcp/auth/set-refresh`, {
 							method: "POST",
 							headers: {
 								"Content-Type": "application/json",
@@ -2464,10 +2791,7 @@ app.ontoolresult = (params) => {
 	const toolName = app.getHostContext()?.toolInfo?.tool.name;
 	if (!toolName) return;
 
-	if (toolName === "list_pods" && params.structuredContent) {
-		pods = (params.structuredContent as any).pods || [];
-		renderPods();
-	} else if (toolName === "list_workspaces" && params.structuredContent) {
+	if (toolName === "list_workspaces" && params.structuredContent) {
 		workspaces = (params.structuredContent as any).workspaces || [];
 		renderWorkspaces();
 	} else if (toolName === "list_templates" && params.structuredContent) {
@@ -2477,6 +2801,21 @@ app.ontoolresult = (params) => {
 		openLogsModal(activeToolArgs.name);
 		const logs = (params.structuredContent as any)?.logs || "(no logs)";
 		if (logsContent) logsContent.textContent = logs;
+	} else if (toolName === "get_workspace_events" && activeToolArgs?.id) {
+		openEventsModal(activeToolArgs.id);
+		const sc = params.structuredContent as any;
+		if (eventsContent) {
+			if (sc?.events && sc.events.length > 0) {
+				eventsContent.textContent = sc.events
+					.map(
+						(e: any) =>
+							`[${e.timestamp}] [${e.type}] ${e.reason}: ${e.message}`,
+					)
+					.join("\n");
+			} else {
+				eventsContent.textContent = "No events found.";
+			}
+		}
 	} else if (toolName === "spawn_workspace") {
 		refreshAll();
 	}

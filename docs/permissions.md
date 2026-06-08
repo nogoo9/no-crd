@@ -16,6 +16,12 @@ The server dynamically checks these permissions at startup (unless disabled via 
 | `get` | `create_pod_from_template` | Read template pod specifications stored in ConfigMaps. |
 | `update` | `update_template` | Modify metadata, annotations, or specifications of an existing template. |
 
+### Resource: `events`
+
+| Required Verb | Associated MCP Tools | Description / Purpose |
+|---|---|---|
+| `list` | `get_workspace_events` |  |
+
 ### Resource: `namespaces`
 
 | Required Verb | Associated MCP Tools | Description / Purpose |
@@ -26,10 +32,10 @@ The server dynamically checks these permissions at startup (unless disabled via 
 
 | Required Verb | Associated MCP Tools | Description / Purpose |
 |---|---|---|
-| `create` | `create_pod`, `create_pod_from_template`, `spawn_workspace` | Provision and deploy new pods or workspace sandboxes. |
-| `delete` | `delete_pod`, `stop_workspace` | Terminate and clean up pods or workspace sandboxes. |
-| `get` | `get_pod`, `get_workspace` | Retrieve detailed JSON spec for a specific pod. |
-| `list` | `list_pods`, `list_workspaces` | Retrieve lists of pods or agent workspace pods. |
+| `create` | `create_pod`, `create_pod_from_template`, `spawn_workspace`, `upgrade_all_workspaces`, `upgrade_workspace` | Provision and deploy new pods or workspace sandboxes. |
+| `delete` | `delete_pod`, `stop_workspace`, `upgrade_all_workspaces`, `upgrade_workspace` | Terminate and clean up pods or workspace sandboxes. |
+| `get` | `get_pod`, `get_workspace`, `upgrade_workspace` | Retrieve detailed JSON spec for a specific pod. |
+| `list` | `list_pods`, `list_workspaces`, `upgrade_all_workspaces` | Retrieve lists of pods or agent workspace pods. |
 | `patch` | `patch_pod` | Strategic merge patch labels, annotations, or resource requests/limits. |
 
 ### Resource: `pods/log`

@@ -29,6 +29,11 @@ Pod templates and inline specifications can declare special annotations that dir
 
 | Annotation / Label Key | Type | Description |
 |---|---|---|
+| `nogoo9/workspace-auth-mode` | Annotation (Comma-separated) | Configures authorization modes for the workspace proxy. Comma-separated list of: `token-api` (exposes token retrieval endpoints at `_auth/token` & `_auth/authorize` for SPAs), `inject-headers` (rewrites headers to forward user identity like `x-user-sub` and JWTs to container; enabled by default if `AUTH_ENABLED=true`), `no-auth` (bypasses all auth/owner checks for public workspaces). *(Available from v0.6.0, no-auth from v0.8.0)* |
+| `nogoo9/template-version` | Annotation (String) | Specifies the version of the pod template. Used to track if workspaces are outdated. *(Available from v0.8.0)* |
+| `nogoo9/workspace-name` | Annotation (String) | Stores the user-defined display name of the workspace. *(Available from v0.4.0)* |
+| `nogoo9/template-ref` | Annotation (String) | The reference to the pod template used to spawn the workspace (e.g. `default/workspace-terminal`). *(Available from v0.4.0)* |
+| `nogoo9/managed-by` | Label (String) | Used to label workspace pods created by this MCP server to restrict operational scope. *(Available from v0.5.0)* |
 | `nogoo9/pod-template` | Label (`"true"`) | Identifies a Kubernetes `ConfigMap` as a reusable pod template. |
 | `nogoo9/type` | Label (`"workspace"`) | Applied automatically by the spawner to identify running agent workspace pods. |
 | `nogoo9/workspace-id` | Label | Identifies the unique agent session / workspace ID associated with the running pod. |

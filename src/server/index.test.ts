@@ -198,6 +198,9 @@ users:
 		mockCreateSelfSubjectAccessReview.mockResolvedValue({
 			status: { allowed: true },
 		});
+		mockListNamespacedPod.mockResolvedValue({
+			items: [],
+		});
 		k8sContext = initK8sContext(testKc);
 		await resetMcpServer(undefined, false, k8sContext);
 	});
@@ -674,6 +677,19 @@ users:
 		}
 	});
 
+	test("GET /.well-known/oauth-protected-resource/:suffix metadata endpoint", async () => {
+		const req = new Request(
+			"http://localhost/.well-known/oauth-protected-resource/mcp",
+			{ method: "GET" },
+		);
+		const resp = await handleWebRequest(req);
+		expect(resp.status).toBe(200);
+		expect(resp.headers.get("Access-Control-Allow-Origin")).toBe("*");
+		const body = await resp.json();
+		expect(body.resource).toBe("http://localhost/mcp");
+		expect(body.scopes_supported).toEqual(["nogoo9:read", "nogoo9:write"]);
+	});
+
 	test("Request returns 401 with Link and WWW-Authenticate headers when AUTH_ENABLED and token is missing", async () => {
 		process.env.AUTH_ENABLED = "true";
 		try {
@@ -816,7 +832,24 @@ users:
 			expect(resp.status).toBe(403);
 			const data = (await resp.json()) as any;
 			expect(data.error).toBe("Forbidden");
-			expect(data.message).toContain("Missing required scope: mcp:read");
+			expect(data.message).toContain('Missing required scope: "mcp:read"');
+		});
+
+		test("GET /permissions blocks and redirects to error.html if read scope is missing and Accept is text/html", async () => {
+			const token = createMockToken({ sub: "user-1", scope: "openid" });
+			const req = new Request("http://localhost/permissions", {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${token}`,
+					Accept: "text/html,application/xhtml+xml",
+				},
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			expect(resp.url).toContain("/error.html");
+			expect(resp.url).toContain("error=Forbidden");
+			expect(resp.url).toContain("message=");
+			expect(resp.url).toContain("Missing%20required%20scope");
 		});
 
 		test("GET /permissions allows if read scope is present", async () => {
@@ -839,7 +872,7 @@ users:
 			expect(resp.status).toBe(403);
 			const data = (await resp.json()) as any;
 			expect(data.error).toBe("Forbidden");
-			expect(data.message).toContain("Missing required scope: mcp:read");
+			expect(data.message).toContain('Missing required scope: "mcp:read"');
 		});
 
 		test("Proxy POST blocks if write scope is missing", async () => {
@@ -852,7 +885,7 @@ users:
 			expect(resp.status).toBe(403);
 			const data = (await resp.json()) as any;
 			expect(data.error).toBe("Forbidden");
-			expect(data.message).toContain("Missing required scope: mcp:write");
+			expect(data.message).toContain('Missing required scope: "mcp:write"');
 		});
 
 		test("Proxy POST allows if write scope is present", async () => {
@@ -1446,54 +1479,59 @@ users:
 		});
 
 		test("HTTP Proxy - does NOT inject headers when inject-headers mode is NOT enabled", async () => {
-			mockListNamespacedPod.mockResolvedValue({
-				items: [
-					{
-						metadata: {
-							name: "ws-user1-ws-1",
-							labels: {
-								"nogoo9/user-sub": "user-1",
-							},
-							annotations: {
-								"nogoo9/workspace-port": "8080",
-								"nogoo9/workspace-auth-mode": "token-api",
-							},
-						},
-						status: {
-							phase: "Running",
-							podIP: "10.0.0.5",
-						},
-					},
-				],
-			});
-
-			const token = createMockToken({
-				sub: "user-1",
-				roles: ["admin", "user"],
-			});
-			const originalFetch = globalThis.fetch;
-			const mockFetch = mock((_url: string, init?: any) => {
-				expect(init.headers.get("x-user-sub")).toBeNull();
-				expect(init.headers.get("x-user-roles")).toBeNull();
-				expect(init.headers.get("x-workspace-jwt")).toBeNull();
-				return Promise.resolve(
-					new Response("proxied-response", { status: 200 }),
-				);
-			});
-			globalThis.fetch = mockFetch as any;
-
+			process.env.AUTH_ENABLED = "false";
 			try {
-				const req = new Request("http://localhost/route/ws-1/subpath", {
-					method: "GET",
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
+				mockListNamespacedPod.mockResolvedValue({
+					items: [
+						{
+							metadata: {
+								name: "ws-user1-ws-1",
+								labels: {
+									"nogoo9/user-sub": "user-1",
+								},
+								annotations: {
+									"nogoo9/workspace-port": "8080",
+									"nogoo9/workspace-auth-mode": "token-api",
+								},
+							},
+							status: {
+								phase: "Running",
+								podIP: "10.0.0.5",
+							},
+						},
+					],
 				});
-				const resp = await handleWebRequest(req);
-				expect(resp.status).toBe(200);
-				expect(mockFetch).toHaveBeenCalled();
+
+				const token = createMockToken({
+					sub: "user-1",
+					roles: ["admin", "user"],
+				});
+				const originalFetch = globalThis.fetch;
+				const mockFetch = mock((_url: string, init?: any) => {
+					expect(init.headers.get("x-user-sub")).toBeNull();
+					expect(init.headers.get("x-user-roles")).toBeNull();
+					expect(init.headers.get("x-workspace-jwt")).toBeNull();
+					return Promise.resolve(
+						new Response("proxied-response", { status: 200 }),
+					);
+				});
+				globalThis.fetch = mockFetch as any;
+
+				try {
+					const req = new Request("http://localhost/route/ws-1/subpath", {
+						method: "GET",
+						headers: {
+							Authorization: `Bearer ${token}`,
+						},
+					});
+					const resp = await handleWebRequest(req);
+					expect(resp.status).toBe(200);
+					expect(mockFetch).toHaveBeenCalled();
+				} finally {
+					globalThis.fetch = originalFetch;
+				}
 			} finally {
-				globalThis.fetch = originalFetch;
+				process.env.AUTH_ENABLED = "true";
 			}
 		});
 
@@ -1992,6 +2030,101 @@ users:
 				const setCookieHeaders = resp.headers.get("set-cookie");
 				expect(setCookieHeaders).toContain("nocr_sess=");
 				expect(setCookieHeaders).toContain("nocr_refresh=");
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("HTTP Proxy - bypasses authentication check if no-auth mode is enabled", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/workspace-auth-mode": "no-auth",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock((_url: string, _init?: any) => {
+				return Promise.resolve(
+					new Response("proxied-response-no-auth", { status: 200 }),
+				);
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const req = new Request("http://localhost/route/ws-1/subpath", {
+					method: "GET",
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+				expect(await resp.text()).toBe("proxied-response-no-auth");
+				expect(mockFetch).toHaveBeenCalled();
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("HTTP Proxy - injects headers by default when AUTH_ENABLED is true regardless of annotations", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({
+				sub: "user-1",
+				roles: ["admin", "user"],
+			});
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock((_url: string, init?: any) => {
+				expect(init.headers.get("x-user-sub")).toBe("user-1");
+				expect(init.headers.get("x-user-roles")).toBe("admin,user");
+				expect(init.headers.get("x-workspace-jwt")).toBe(token);
+				return Promise.resolve(
+					new Response("proxied-response-with-headers", { status: 200 }),
+				);
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const req = new Request("http://localhost/route/ws-1/subpath", {
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+				expect(mockFetch).toHaveBeenCalled();
 			} finally {
 				globalThis.fetch = originalFetch;
 			}

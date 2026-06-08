@@ -51,7 +51,7 @@ export const corsSchema = {
 	exposedHeaders: {
 		cli: "--cors-expose-headers",
 		env: ["CORS_EXPOSED_HEADERS", "CORS_EXPOSED"],
-		defaultVal: "mcp-session-id",
+		defaultVal: "mcp-session-id, x-refreshed-token",
 		allowed: "String",
 		description: "Custom CORS Access-Control-Expose-Headers header.",
 		get value(): string {

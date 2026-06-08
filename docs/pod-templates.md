@@ -50,6 +50,11 @@ You can define spawner-specific annotations on the template `ConfigMap` to injec
 
 | Annotation / Label Key | Type | Description |
 |---|---|---|
+| `nogoo9/workspace-auth-mode` | Annotation (Comma-separated) | Configures authorization modes for the workspace proxy. Comma-separated list of: `token-api` (exposes token retrieval endpoints at `_auth/token` & `_auth/authorize` for SPAs), `inject-headers` (rewrites headers to forward user identity like `x-user-sub` and JWTs to container; enabled by default if `AUTH_ENABLED=true`), `no-auth` (bypasses all auth/owner checks for public workspaces). *(Available from v0.6.0, no-auth from v0.8.0)* |
+| `nogoo9/template-version` | Annotation (String) | Specifies the version of the pod template. Used to track if workspaces are outdated. *(Available from v0.8.0)* |
+| `nogoo9/workspace-name` | Annotation (String) | Stores the user-defined display name of the workspace. *(Available from v0.4.0)* |
+| `nogoo9/template-ref` | Annotation (String) | The reference to the pod template used to spawn the workspace (e.g. `default/workspace-terminal`). *(Available from v0.4.0)* |
+| `nogoo9/managed-by` | Label (String) | Used to label workspace pods created by this MCP server to restrict operational scope. *(Available from v0.5.0)* |
 | `nogoo9/pod-template` | Label (`"true"`) | Identifies a Kubernetes `ConfigMap` as a reusable pod template. |
 | `nogoo9/type` | Label (`"workspace"`) | Applied automatically by the spawner to identify running agent workspace pods. |
 | `nogoo9/workspace-id` | Label | Identifies the unique agent session / workspace ID associated with the running pod. |
@@ -247,6 +252,37 @@ Applications powered by KasmVNC (like `linuxserver/obsidian`) require being serv
 - If the routing proxy detects that the target workspace pod has a `SUBFOLDER` environment variable defined in its spec, **it preserves the `/route/:workspaceId` path prefix**.
 - It does this by rewriting the request path to `/route/:workspaceId/route/:workspaceId/...` before it reaches the proxy plugin, so that when the proxy strips the matched prefix once, the request forwarded to the pod remains prefixed with `/route/:workspaceId/...`.
 - This prevents hitting the default server block in the container's internal web server and avoids showing the default Nginx welcome page.
+
+---
+
+## 🔄 Template Versioning & Upgrades
+
+To support clean lifecycle updates of workspace pods as templates evolve (e.g. updating container images, adding environment variables, changing default resources), `@nogoo9/no-crd` introduces template versioning and a safe, state-preserving upgrade mechanism.
+
+### Versioning Annotations
+A pod template (ConfigMap or local template file) can declare its version using the annotation `nogoo9/template-version`:
+```yaml
+metadata:
+  name: basic-node-template
+  annotations:
+    nogoo9/template-version: "1.1.0"
+```
+If a template does not define a version annotation, it defaults to `"1.0.0"`.
+
+When a workspace pod is spawned, it is stamped with the template version in the `nogoo9/template-version` annotation.
+
+### Outdated Status Detection
+When listing workspaces via the `list_workspaces` tool, the system resolves the pod's template version and compares it against the latest version available in the template registry (ConfigMaps or local directory).
+* A workspace is considered **outdated** if its current version is not equal to the latest version (`currentVersion !== latestVersion`).
+* This supports both semantic versioning (e.g., `1.1.0` vs `1.0.0`) and simple revision strings (e.g., `v2` vs `v1`).
+* Outdated workspaces are returned with `isOutdated: true`, `templateVersion`, and `latestTemplateVersion` fields. The Frontend UI displays a warning badge next to outdated workspaces.
+
+### Safe Workspace Upgrade Process
+Upgrading a workspace uses a data-preserving restart flow via the `upgrade_workspace` (single workspace) or `upgrade_all_workspaces` (batch) MCP tools:
+1. **PVC & Volume Preservation**: The upgrade process preserves all `volumes` and `volumeMounts` connected to PersistentVolumeClaims (PVCs), ensuring user files and application states are not lost.
+2. **Environment Variable Merging**: Any custom environment variables passed during the initial workspace spawn are merged and preserved, while new template-level default environment variables are appended.
+3. **Collision Avoidance**: The old workspace pod is deleted first, and the upgrade process polls and awaits complete pod deletion before spawning the new pod to prevent volume attachment conflicts (e.g., PVC multi-attach locks or IP/name collisions).
+4. **Failure State Handling**: If the upgrade fails to re-spawn, the workspace transitions to a `Failed` state, and the error log is surfaced in the UI.
 
 ---
 

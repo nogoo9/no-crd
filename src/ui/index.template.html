@@ -460,23 +460,109 @@
       box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
     }
 
-    /* Collapsible card styling */
-    #workspaces-list .workspace-card.is-collapsed .workspace-details {
-      display: none !important;
+
+
+    /* Dotted Create Card style */
+    .create-ws-dotted-btn {
+      cursor: pointer;
+      min-height: 180px;
+      border-radius: 12px !important;
+      border: 1.5px dashed var(--panel-border) !important;
+      background-color: transparent !important;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: all 0.18s ease-in-out !important;
+      color: var(--text-color) !important;
+      text-align: center;
+      width: 100%;
+      outline: none;
     }
-    #workspaces-list .workspace-card.is-collapsed .toggle-details-btn svg {
-      transform: rotate(-90deg);
+    .create-ws-dotted-btn:hover {
+      border-color: var(--accent-color) !important;
+      background-color: var(--panel-hover-bg) !important;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
     }
-    #workspaces-list .toggle-details-btn svg {
+    .create-ws-dotted-btn .plus-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background-color: rgba(255, 255, 255, 0.03);
+      color: var(--accent-color);
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+      transition: all 0.18s ease-in-out;
+    }
+    .create-ws-dotted-btn:hover .plus-box {
+      background-color: var(--accent-color);
+      color: #ffffff;
+      transform: scale(1.06);
+    }
+
+    /* Collapsible template group styles */
+    .template-group .toggle-group-btn svg {
       transition: transform 0.2s ease;
     }
-    #workspaces-list .toggle-details-btn {
-      color: var(--text-muted);
-      transition: all 0.15s ease;
+    .template-group.is-collapsed .group-content {
+      display: none !important;
     }
-    #workspaces-list .toggle-details-btn:hover {
-      color: var(--text-title);
-      background-color: var(--panel-hover-bg);
+    .template-group.is-collapsed .toggle-group-btn svg {
+      transform: rotate(-90deg);
+    }
+    .group-header-clickable {
+      cursor: pointer;
+      user-select: none;
+    }
+    .group-header-clickable:hover .group-title-text {
+      color: var(--accent-color) !important;
+    }
+
+    /* Premium borderless flat button overrides inside cards */
+    #workspaces-list .theme-card-row button,
+    #workspaces-list .theme-card-row a.theme-button-primary,
+    #templates-list .theme-card-row button {
+      border: none !important;
+      box-shadow: none !important;
+      outline: none !important;
+    }
+
+    #workspaces-list .theme-card-row .theme-button-secondary,
+    #templates-list .theme-card-row .theme-button-secondary {
+      background-color: transparent !important;
+      color: var(--text-color) !important;
+      opacity: 0.85;
+      transition: all 0.12s ease-in-out !important;
+    }
+    #workspaces-list .theme-card-row .theme-button-secondary:hover,
+    #templates-list .theme-card-row .theme-button-secondary:hover {
+      background-color: rgba(204, 120, 92, 0.08) !important;
+      color: var(--accent-color) !important;
+      opacity: 1;
+    }
+
+    #workspaces-list .theme-card-row .theme-button-danger,
+    #templates-list .theme-card-row .theme-button-danger {
+      background-color: transparent !important;
+      color: var(--text-muted) !important;
+      transition: all 0.12s ease-in-out !important;
+    }
+    #workspaces-list .theme-card-row .theme-button-danger:hover,
+    #templates-list .theme-card-row .theme-button-danger:hover {
+      background-color: rgba(198, 69, 69, 0.08) !important;
+      color: var(--error-color) !important;
+    }
+
+    #workspaces-list .theme-card-row .upgrade-ws-btn {
+      background-color: var(--warning-color) !important;
+      color: #ffffff !important;
+    }
+    #workspaces-list .theme-card-row .upgrade-ws-btn:hover {
+      background-color: #c09012 !important;
     }
   </style>
   <style id="custom-theme-style"></style>
@@ -493,10 +579,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           </span>
-          <h1 id="app-title" class="text-3xl font-serif">nogoo9 Pod Manager</h1>
+          <div>
+            <h1 class="text-xl font-bold tracking-tight theme-text-title font-sans">nogoo9 / no-crd</h1>
+            <p class="text-xs theme-text-muted mt-0.5">Model Context Protocol Kubernetes Pod Manager</p>
+          </div>
         </div>
-        <p id="app-subtitle" class="mt-2 text-sm theme-text-muted">On-demand Kubernetes pod orchestration and agent-sandbox management without CRDs.</p>
-        <div class="mt-2 flex items-center gap-3">
+        <div class="flex items-center gap-4 mt-2.5 pl-14">
           <a href="https://github.com/nogoo9/no-crd" target="_blank" rel="noopener noreferrer" title="GitHub Repository" class="theme-text-muted hover:text-[var(--text-title)] transition-colors duration-150">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           </a>
@@ -601,93 +689,38 @@
       </div>
     </div>
  
-    <!-- Main Content Grid -->
-    <main class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Main Content -->
+    <main class="mt-8 space-y-8">
       
-      <!-- Left Column: Workspaces (occupies 2/3 wide on desktop) -->
-      <section class="lg:col-span-2 space-y-8">
-        
-        <!-- Active Workspaces -->
-        <section class="space-y-4">
-          <div class="flex items-center gap-2.5 py-2">
-            <span class="theme-text-muted flex shrink-0">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </span>
-            <h2 class="text-xs font-bold uppercase tracking-wider theme-text-title whitespace-nowrap">Active Workspaces</h2>
-            <span id="ws-count" class="font-mono text-xs theme-text-muted">0</span>
-            <div class="flex-grow h-[1px] bg-[var(--panel-border)]"></div>
-            <p class="text-[11px] theme-text-muted italic shrink-0 hidden sm:block">Agent sandboxes running inside the cluster.</p>
-          </div>
-          <div id="workspaces-list" class="flex flex-col gap-6">
-            <!-- Dynamic workspace items inserted here -->
-            <div class="py-8 text-center theme-text-muted text-sm">No active workspaces. Click a template to spawn one.</div>
-          </div>
-        </section>
- 
-        <!-- Pod List -->
-        <section class="space-y-4">
-          <div class="flex items-center gap-2.5 py-2">
-            <span class="theme-text-muted flex shrink-0">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </span>
-            <h2 class="text-xs font-bold uppercase tracking-wider theme-text-title whitespace-nowrap">Kubernetes Pods</h2>
-            <span id="pods-count" class="font-mono text-xs theme-text-muted">0</span>
-            <span id="unmanaged-count-info" class="text-[10px] theme-text-muted hidden"></span>
-            <div class="flex-grow h-[1px] bg-[var(--panel-border)]"></div>
-            <p class="text-[11px] theme-text-muted italic shrink-0 hidden sm:block">Managed pods in namespace.</p>
-          </div>
-          <div class="overflow-x-auto border theme-border rounded-xl bg-[var(--panel-bg)]">
-            <table class="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr class="theme-table-header text-xs uppercase font-semibold">
-                  <th class="px-6 py-4">Name</th>
-                  <th class="px-6 py-4">Phase</th>
-                  <th class="px-6 py-4">Ready</th>
-                  <th class="px-6 py-4">Restarts</th>
-                  <th class="px-6 py-4">Pod IP</th>
-                  <th class="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="pods-table-body" class="theme-divide-y">
-                <!-- Dynamic pod items inserted here -->
-                <tr>
-                  <td colspan="6" class="px-6 py-8 text-center theme-text-muted">No pods detected.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
- 
-      </section>
- 
-      <!-- Right Column: Templates -->
+      <!-- Active Workspaces Dashboard -->
       <section class="space-y-4">
-        
-        <!-- ConfigMap Templates -->
-        <div class="flex items-center justify-between gap-2.5 py-2">
-          <div class="flex items-center gap-2.5 min-w-0 flex-1">
-            <span class="theme-text-muted flex shrink-0">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-              </svg>
-            </span>
-            <h2 class="text-xs font-bold uppercase tracking-wider theme-text-title whitespace-nowrap">Pod Templates</h2>
-            <div class="flex-grow h-[1px] bg-[var(--panel-border)]"></div>
-          </div>
-          <button id="create-tmpl-btn" class="theme-button-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs cursor-pointer shrink-0">
+        <div class="flex items-center gap-2.5 py-2">
+          <span class="theme-text-muted flex shrink-0">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </span>
+          <h2 class="text-xs font-bold uppercase tracking-wider theme-text-title whitespace-nowrap">Active Workspaces</h2>
+          <span id="ws-count" class="font-mono text-xs theme-text-muted">0</span>
+          
+          <button id="upgrade-all-btn" class="hidden theme-button-primary inline-flex items-center gap-1.5 px-3 py-1 text-xs cursor-pointer shrink-0 ml-3 bg-amber-600 border-amber-600 hover:bg-amber-700">
+            Upgrade All Outdated
+          </button>
+          
+          <button id="create-tmpl-btn" class="theme-button-secondary inline-flex items-center gap-1.5 px-3 py-1 text-xs cursor-pointer shrink-0 ml-3">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            Create
+            Register Template
           </button>
+
+          <div class="flex-grow h-[1px] bg-[var(--panel-border)]"></div>
+          <p class="text-[11px] theme-text-muted italic shrink-0 hidden sm:block">Agent sandboxes running inside the cluster.</p>
         </div>
-        <div id="templates-list" class="theme-divide-y max-h-[600px] overflow-y-auto border theme-border rounded-xl bg-[var(--panel-bg)]">
-          <!-- Dynamic templates inserted here -->
-          <div class="p-6 text-center theme-text-muted text-sm">No templates registered.</div>
+        
+        <div id="workspaces-list" class="flex flex-col gap-10">
+          <!-- Dynamic workspace items grouped by template inserted here -->
+          <div class="py-8 text-center theme-text-muted text-sm">No active workspaces. Click a template to spawn one.</div>
         </div>
       </section>
     </main>
@@ -721,6 +754,35 @@
       <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
         <button id="refresh-logs-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Refresh Logs</button>
         <button id="close-logs-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Events Modal -->
+  <div id="events-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
+    <div class="theme-modal w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold theme-text-title flex items-center gap-2">
+            <svg class="w-5 h-5 text-[var(--accent-color)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Workspace Events
+          </h3>
+          <p id="events-title" class="text-xs theme-text-muted font-mono mt-0.5">ws-anonymous-session1</p>
+        </div>
+        <button id="close-events-btn" class="theme-btn-close">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="p-6 theme-code-window-card flex-1 overflow-y-auto font-mono text-xs leading-relaxed max-h-[60vh] scrollbar-thin select-text whitespace-pre-wrap" id="events-content">
+        Fetching events...
+      </div>
+      <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
+        <button id="refresh-events-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Refresh Events</button>
+        <button id="close-events-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
       </div>
     </div>
   </div>
