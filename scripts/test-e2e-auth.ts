@@ -1,7 +1,90 @@
+/**
+ * E2E Authentication and Authorization Verification Flow:
+ *
+ * 1. Unauthorized Challenges (RFC 9728):
+ *    - Makes an unauthenticated call to the MCP server.
+ *    - Verifies that the gateway returns 401 Unauthorized along with standard WWW-Authenticate
+ *      and Link headers indicating OIDC protected resource metadata.
+ *
+ * 2. Token Retrieval:
+ *    - Fetches OIDC access tokens from Keycloak for 'readuser', 'writeuser', and 'admin'.
+ *
+ * 3. Metadata and Permission Check:
+ *    - Calls the gateway /permissions endpoint using the 'readuser' token to verify
+ *      retrieval of allowed capabilities and tools.
+ *
+ * 4. User Isolation & Pod Provisioning:
+ *    - Verifies 'readuser' (missing write scope) is forbidden from calling 'create_pod'.
+ *    - Spawns 'writeuser-e2e-pod' using 'writeuser' credentials.
+ *    - Spawns 'admin-e2e-pod' using 'admin' credentials.
+ *
+ * 5. Tenant Resource Isolation:
+ *    - Verifies 'readuser' sees no pods in 'list_pods'.
+ *    - Verifies 'writeuser' sees only 'writeuser-e2e-pod' (and not 'admin-e2e-pod').
+ *    - Verifies 'admin' can view all pods across the cluster.
+ *
+ * 6. Escalation and Access Verification:
+ *    - Verifies 'writeuser' is forbidden from reading 'admin-e2e-pod' metadata.
+ *    - Verifies 'admin' can query and manage 'writeuser-e2e-pod' (admin escalation).
+ *    - Polls and waits until the target test pods transition into the 'Running' status.
+ *
+ * 7. Gateway Cookie and Session Verification:
+ *    - Calls the proxy route with 'writeuser' Bearer token to verify Set-Cookie headers:
+ *      - `nocr_sess`: The global root-scoped session cookie.
+ *      - `nocr_token`: The path-scoped workspace token cookie.
+ *    - Verifies `nocr_sess` alone successfully authenticates `/mcp` tool execution endpoint.
+ *    - Verifies `nocr_token` alone successfully authenticates workspace proxy sub-resource routes.
+ *
+ * 8. Cleanup:
+ *    - Deletes all spawned Kubernetes pods to prevent leftover test resources.
+ */
+
 export {};
 
 const BASE_URL = "http://localhost:8080";
 const TOKEN_URL = `${BASE_URL}/auth/realms/nogoo9/protocol/openid-connect/token`;
+
+interface TestContext {
+	readToken: string;
+	writeToken: string;
+	adminToken: string;
+}
+
+const writeuserPodSpec = {
+	labels: {
+		"nogoo9/type": "workspace",
+		"nogoo9/workspace-id": "writeuser-e2e-pod",
+	},
+	containers: [
+		{
+			name: "main",
+			image: "nogoo9-registry.localhost:5001/bun:latest",
+			command: [
+				"bun",
+				"-e",
+				"Bun.serve({ port: 3000, fetch(req) { return new Response('hello from workspace'); } }); console.log('Listening on 3000');",
+			],
+		},
+	],
+};
+
+const adminPodSpec = {
+	labels: {
+		"nogoo9/type": "workspace",
+		"nogoo9/workspace-id": "admin-e2e-pod",
+	},
+	containers: [
+		{
+			name: "main",
+			image: "nogoo9-registry.localhost:5001/bun:latest",
+			command: [
+				"bun",
+				"-e",
+				"Bun.serve({ port: 3000, fetch(req) { return new Response('hello from workspace'); } }); console.log('Listening on 3000');",
+			],
+		},
+	],
+};
 
 async function fetchToken(username: string): Promise<string> {
 	const body = new URLSearchParams({
@@ -85,10 +168,22 @@ async function makeMcpCall(token: string | null, method: string, params: any) {
 	};
 }
 
-async function main() {
-	console.log("==> Beginning E2E Authentication & Resource Isolation Tests...");
+function decodeJwt(token: string): any {
+	try {
+		const parts = token.split(".");
+		if (parts.length !== 3) return null;
+		const base64Url = parts[1];
+		const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+		return JSON.parse(Buffer.from(base64, "base64").toString("utf-8"));
+	} catch (_e) {
+		return null;
+	}
+}
 
-	// 1. Test Unauthorized challenge (RFC 9728)
+/**
+ * Step 1: RFC 9728 Unauthorized challenge headers check.
+ */
+async function runUnauthorizedChallenge() {
 	console.log("\n[1/7] Testing Unauthorized access challenges...");
 	const challengeRes = await makeMcpCall(null, "tools/list", {});
 	if (challengeRes.status !== 401) {
@@ -106,8 +201,12 @@ async function main() {
 		throw new Error("Missing correct RFC 9728 challenge headers");
 	}
 	console.log("    ✅ RFC 9728 Compliance challenge verified.");
+}
 
-	// 2. Obtain tokens
+/**
+ * Step 2: Obtain tokens from local Keycloak instance.
+ */
+async function fetchTokens(): Promise<TestContext> {
 	console.log("\n[2/7] Fetching access tokens from Keycloak...");
 	const readToken = await fetchToken("readuser");
 	const writeToken = await fetchToken("writeuser");
@@ -115,29 +214,22 @@ async function main() {
 	console.log(
 		"    ✅ Successfully retrieved readuser, writeuser, and admin tokens.",
 	);
-
-	function decodeJwt(token: string): any {
-		try {
-			const parts = token.split(".");
-			if (parts.length !== 3) return null;
-			const base64Url = parts[1];
-			const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-			return JSON.parse(Buffer.from(base64, "base64").toString("utf-8"));
-		} catch (_e) {
-			return null;
-		}
-	}
 	console.log(
 		"    DEBUG readuser token payload:",
 		JSON.stringify(decodeJwt(readToken), null, 2),
 	);
+	return { readToken, writeToken, adminToken };
+}
 
-	// 3. Test Authorized metadata read
+/**
+ * Step 3: Verify permission listing and scopes check.
+ */
+async function runPermissionVerification(ctx: TestContext) {
 	console.log(
 		"\n[3/7] Verifying permissions and tool retrieval with tokens...",
 	);
 	const permissionsRes = await fetch(`${BASE_URL}/permissions`, {
-		headers: { Authorization: `Bearer ${readToken}` },
+		headers: { Authorization: `Bearer ${ctx.readToken}` },
 	});
 	if (!permissionsRes.ok) {
 		throw new Error(
@@ -149,13 +241,18 @@ async function main() {
 		"    Active tools enabled for readuser:",
 		permReport.enabledTools.join(", "),
 	);
+	console.log("    ✅ Permissions verification passed.");
+}
 
-	// 4. Create pods for user isolation test
+/**
+ * Step 4: Spawning workspace pods.
+ */
+async function provisionPods(ctx: TestContext) {
 	console.log("\n[4/7] Provisioning user-scoped test pods...");
 
 	// Test that readuser cannot create a pod
 	console.log("    Verifying that readuser is blocked from creating a pod...");
-	const blockedCreate = await makeMcpCall(readToken, "tools/call", {
+	const blockedCreate = await makeMcpCall(ctx.readToken, "tools/call", {
 		name: "create_pod",
 		arguments: {
 			name: "readuser-e2e-pod",
@@ -179,43 +276,8 @@ async function main() {
 	}
 	console.log("    ✅ readuser successfully blocked.");
 
-	const writeuserPodSpec = {
-		labels: {
-			"nogoo9/type": "workspace",
-			"nogoo9/workspace-id": "writeuser-e2e-pod",
-		},
-		containers: [
-			{
-				name: "main",
-				image: "nogoo9-registry.localhost:5001/bun:latest",
-				command: [
-					"bun",
-					"-e",
-					"Bun.serve({ port: 3000, fetch(req) { return new Response('hello from workspace'); } }); console.log('Listening on 3000');",
-				],
-			},
-		],
-	};
-	const adminPodSpec = {
-		labels: {
-			"nogoo9/type": "workspace",
-			"nogoo9/workspace-id": "admin-e2e-pod",
-		},
-		containers: [
-			{
-				name: "main",
-				image: "nogoo9-registry.localhost:5001/bun:latest",
-				command: [
-					"bun",
-					"-e",
-					"Bun.serve({ port: 3000, fetch(req) { return new Response('hello from workspace'); } }); console.log('Listening on 3000');",
-				],
-			},
-		],
-	};
-
 	console.log("    Creating pod 'writeuser-e2e-pod' owned by writeuser...");
-	const createWriteuserPod = await makeMcpCall(writeToken, "tools/call", {
+	const createWriteuserPod = await makeMcpCall(ctx.writeToken, "tools/call", {
 		name: "create_pod",
 		arguments: { name: "writeuser-e2e-pod", ...writeuserPodSpec },
 	});
@@ -230,7 +292,7 @@ async function main() {
 	}
 
 	console.log("    Creating pod 'admin-e2e-pod' owned by admin...");
-	const createAdminPod = await makeMcpCall(adminToken, "tools/call", {
+	const createAdminPod = await makeMcpCall(ctx.adminToken, "tools/call", {
 		name: "create_pod",
 		arguments: { name: "admin-e2e-pod", ...adminPodSpec },
 	});
@@ -241,182 +303,248 @@ async function main() {
 		);
 	}
 	console.log("    ✅ Both test pods provisioned successfully.");
+}
 
-	try {
-		// 5. Test raw pod tools isolation (per-user filtering)
-		console.log(
-			"\n[5/7] Testing raw pod tool user isolation (per-user filtering)...",
-		);
+/**
+ * Step 5: Test isolation where users can only see their own resources.
+ */
+async function runPodIsolationTest(ctx: TestContext) {
+	console.log(
+		"\n[5/7] Testing raw pod tool user isolation (per-user filtering)...",
+	);
 
-		console.log("    Listing pods as 'readuser'...");
-		const listAsRead = await makeMcpCall(readToken, "tools/call", {
-			name: "list_pods",
-			arguments: {},
-		});
-		const readPods = (listAsRead.data.result.content[0].text as string).split(
-			"\n",
-		);
-		console.log(
-			"      Pods seen by readuser:\n",
-			listAsRead.data.result.content[0].text,
-		);
-		const readHasAdminPod = readPods.some((p) => p.includes("admin-e2e-pod"));
-		const readHasWritePod = readPods.some((p) =>
-			p.includes("writeuser-e2e-pod"),
-		);
-		if (readHasAdminPod || readHasWritePod) {
-			throw new Error(
-				"Isolation failure: readuser can list other user's pods!",
-			);
-		}
-		console.log("      -> readuser sees only owned pods (none). Correct.");
+	console.log("    Listing pods as 'readuser'...");
+	const listAsRead = await makeMcpCall(ctx.readToken, "tools/call", {
+		name: "list_pods",
+		arguments: {},
+	});
+	const readPods = (listAsRead.data.result.content[0].text as string).split(
+		"\n",
+	);
+	console.log(
+		"      Pods seen by readuser:\n",
+		listAsRead.data.result.content[0].text,
+	);
+	const readHasAdminPod = readPods.some((p) => p.includes("admin-e2e-pod"));
+	const readHasWritePod = readPods.some((p) => p.includes("writeuser-e2e-pod"));
+	if (readHasAdminPod || readHasWritePod) {
+		throw new Error("Isolation failure: readuser can list other user's pods!");
+	}
+	console.log("      -> readuser sees only owned pods (none). Correct.");
 
-		console.log("    Listing pods as 'writeuser'...");
-		const listAsWrite = await makeMcpCall(writeToken, "tools/call", {
-			name: "list_pods",
-			arguments: {},
-		});
-		const writePods = (listAsWrite.data.result.content[0].text as string).split(
-			"\n",
-		);
-		console.log(
-			"      Pods seen by writeuser:\n",
-			listAsWrite.data.result.content[0].text,
-		);
-		const writeHasAdminPod = writePods.some((p) => p.includes("admin-e2e-pod"));
-		const writeHasWritePod = writePods.some((p) =>
-			p.includes("writeuser-e2e-pod"),
-		);
-		if (writeHasAdminPod) {
-			throw new Error("Isolation failure: writeuser can list admin's pod!");
-		}
-		if (!writeHasWritePod) {
-			throw new Error("Expected writeuser to see 'writeuser-e2e-pod'");
-		}
-		console.log("      -> writeuser sees only owned pods. Correct.");
+	console.log("    Listing pods as 'writeuser'...");
+	const listAsWrite = await makeMcpCall(ctx.writeToken, "tools/call", {
+		name: "list_pods",
+		arguments: {},
+	});
+	const writePods = (listAsWrite.data.result.content[0].text as string).split(
+		"\n",
+	);
+	console.log(
+		"      Pods seen by writeuser:\n",
+		listAsWrite.data.result.content[0].text,
+	);
+	const writeHasAdminPod = writePods.some((p) => p.includes("admin-e2e-pod"));
+	const writeHasWritePod = writePods.some((p) =>
+		p.includes("writeuser-e2e-pod"),
+	);
+	if (writeHasAdminPod) {
+		throw new Error("Isolation failure: writeuser can list admin's pod!");
+	}
+	if (!writeHasWritePod) {
+		throw new Error("Expected writeuser to see 'writeuser-e2e-pod'");
+	}
+	console.log("      -> writeuser sees only owned pods. Correct.");
 
-		console.log("    Listing pods as 'admin' (admin role enabled)...");
-		const listAsAdmin = await makeMcpCall(adminToken, "tools/call", {
-			name: "list_pods",
-			arguments: {},
-		});
-		const adminPods = (listAsAdmin.data.result.content[0].text as string).split(
-			"\n",
-		);
-		console.log(
-			"      Pods seen by admin:\n",
-			listAsAdmin.data.result.content[0].text,
-		);
-		const adminHasAdminPod = adminPods.some((p) => p.includes("admin-e2e-pod"));
-		const adminHasWritePod = adminPods.some((p) =>
-			p.includes("writeuser-e2e-pod"),
-		);
-		if (!adminHasAdminPod || !adminHasWritePod) {
-			throw new Error("Admin escalation failure: admin cannot see all pods!");
-		}
-		console.log("      -> admin can see all pods. Correct.");
+	console.log("    Listing pods as 'admin' (admin role enabled)...");
+	const listAsAdmin = await makeMcpCall(ctx.adminToken, "tools/call", {
+		name: "list_pods",
+		arguments: {},
+	});
+	const adminPods = (listAsAdmin.data.result.content[0].text as string).split(
+		"\n",
+	);
+	console.log(
+		"      Pods seen by admin:\n",
+		listAsAdmin.data.result.content[0].text,
+	);
+	const adminHasAdminPod = adminPods.some((p) => p.includes("admin-e2e-pod"));
+	const adminHasWritePod = adminPods.some((p) =>
+		p.includes("writeuser-e2e-pod"),
+	);
+	if (!adminHasAdminPod || !adminHasWritePod) {
+		throw new Error("Admin escalation failure: admin cannot see all pods!");
+	}
+	console.log("      -> admin can see all pods. Correct.");
+}
 
-		// 6. Test specific resource access block
-		console.log(
-			"\n[6/7] Testing direct resource access checks & admin escalation...",
+/**
+ * Step 6: Test direct metadata read authorization and escalation rules.
+ */
+async function runResourceAccessEscalationTest(ctx: TestContext) {
+	console.log(
+		"\n[6/7] Testing direct resource access checks & admin escalation...",
+	);
+
+	console.log("    Querying admin pod as 'writeuser'...");
+	const getAdminPodAsWrite = await makeMcpCall(ctx.writeToken, "tools/call", {
+		name: "get_pod",
+		arguments: { name: "admin-e2e-pod" },
+	});
+	if (getAdminPodAsWrite.data.result?.isError !== true) {
+		throw new Error(
+			"Isolation failure: writeuser allowed to read admin's pod!",
 		);
+	}
+	console.log("      -> Access successfully denied to writeuser.");
 
-		console.log("    Querying admin pod as 'writeuser'...");
-		const getAdminPodAsWrite = await makeMcpCall(writeToken, "tools/call", {
-			name: "get_pod",
-			arguments: { name: "admin-e2e-pod" },
-		});
-		if (getAdminPodAsWrite.data.result?.isError !== true) {
-			throw new Error(
-				"Isolation failure: writeuser allowed to read admin's pod!",
-			);
-		}
-		console.log("      -> Access successfully denied to writeuser.");
+	console.log("    Querying write pod as 'admin' (admin escalation)...");
+	const getTestPodAsAdmin = await makeMcpCall(ctx.adminToken, "tools/call", {
+		name: "get_pod",
+		arguments: { name: "writeuser-e2e-pod" },
+	});
+	if (getTestPodAsAdmin.data.result?.isError === true) {
+		throw new Error(
+			"Admin escalation failure: admin blocked from reading user's pod!",
+		);
+	}
+	console.log("      -> Admin successfully allowed to read user's pod.");
+	console.log("    ✅ Identity-based authorization rules verified.");
 
-		console.log("    Querying write pod as 'admin' (admin escalation)...");
-		const getTestPodAsAdmin = await makeMcpCall(adminToken, "tools/call", {
+	// Wait for writeuser-e2e-pod to be Running
+	console.log("    Waiting for 'writeuser-e2e-pod' to be in Running phase...");
+	let isRunning = false;
+	for (let i = 0; i < 45; i++) {
+		const getPodRes = await makeMcpCall(ctx.writeToken, "tools/call", {
 			name: "get_pod",
 			arguments: { name: "writeuser-e2e-pod" },
 		});
-		if (getTestPodAsAdmin.data.result?.isError === true) {
-			throw new Error(
-				"Admin escalation failure: admin blocked from reading user's pod!",
-			);
+		const podData = getPodRes.data.result?.structuredContent?.pod;
+		const phase = podData?.status?.phase;
+		console.log(`      Current phase: ${phase || "Unknown"}`);
+		if (phase === "Running") {
+			isRunning = true;
+			break;
 		}
-		console.log("      -> Admin successfully allowed to read user's pod.");
-		console.log("    ✅ Identity-based authorization rules verified.");
-
-		// Wait for writeuser-e2e-pod to be Running
-		console.log(
-			"    Waiting for 'writeuser-e2e-pod' to be in Running phase...",
+		await new Promise((resolve) => setTimeout(resolve, 1000));
+	}
+	if (!isRunning) {
+		throw new Error(
+			"Pod 'writeuser-e2e-pod' did not reach Running status within timeout",
 		);
-		let isRunning = false;
-		for (let i = 0; i < 45; i++) {
-			const getPodRes = await makeMcpCall(writeToken, "tools/call", {
-				name: "get_pod",
-				arguments: { name: "writeuser-e2e-pod" },
-			});
-			const podData = getPodRes.data.result?.structuredContent?.pod;
-			const phase = podData?.status?.phase;
-			console.log(`      Current phase: ${phase || "Unknown"}`);
-			if (phase === "Running") {
-				isRunning = true;
-				break;
-			}
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-		}
-		if (!isRunning) {
-			throw new Error(
-				"Pod 'writeuser-e2e-pod' did not reach Running status within timeout",
-			);
-		}
+	}
+}
 
-		// 7. Test Routing Proxy cookie authentication
-		console.log("\n[7/7] Testing routing proxy cookie-based authentication...");
-		const proxyUrl = `${BASE_URL}/route/writeuser-e2e-pod/`;
+/**
+ * Step 7: Gateway cookie & stateless session validation.
+ */
+async function runCookieAuthenticationTest(ctx: TestContext) {
+	console.log("\n[7/7] Testing routing proxy cookie-based authentication...");
+	const proxyUrl = `${BASE_URL}/route/writeuser-e2e-pod/`;
 
-		console.log("    Connecting to routing proxy with Bearer token...");
-		const proxyResToken = await fetch(proxyUrl, {
-			headers: { Authorization: `Bearer ${writeToken}` },
-		});
+	console.log("    Connecting to routing proxy with Bearer token...");
+	const proxyResToken = await fetch(proxyUrl, {
+		headers: { Authorization: `Bearer ${ctx.writeToken}` },
+	});
 
-		const setCookie = proxyResToken.headers.get("Set-Cookie");
-		console.log(`      Set-Cookie header returned: ${setCookie}`);
-		if (
-			!setCookie?.includes("nocr_token=") ||
-			!setCookie.includes("Path=/route/writeuser-e2e-pod/")
-		) {
-			throw new Error(
-				"Missing path-scoped nocr_token session cookie in response",
-			);
-		}
+	const setCookies = proxyResToken.headers.getSetCookie
+		? proxyResToken.headers.getSetCookie()
+		: [proxyResToken.headers.get("Set-Cookie") || ""];
+	console.log("      Set-Cookie headers returned:", setCookies);
 
-		// Extract the cookie value
-		const cookieVal = setCookie.split(";")[0];
+	const sessCookieStr = setCookies.find((c) => c.includes("nocr_sess="));
+	const tokenCookieStr = setCookies.find((c) => c.includes("nocr_token="));
 
-		console.log(
-			"    Connecting to routing proxy sub-resource with cookie header...",
+	if (!sessCookieStr) {
+		throw new Error("Missing nocr_sess session cookie in response");
+	}
+	if (!tokenCookieStr?.includes("Path=/route/writeuser-e2e-pod/")) {
+		throw new Error(
+			"Missing path-scoped nocr_token session cookie in response",
 		);
-		const proxyResCookie = await fetch(`${proxyUrl}index.html`, {
-			headers: { Cookie: cookieVal },
-		});
-		console.log(`      Proxy sub-resource status: ${proxyResCookie.status}`);
-		if (proxyResCookie.status === 401 || proxyResCookie.status === 403) {
-			throw new Error(
-				`Proxy cookie auth failed with status: ${proxyResCookie.status}`,
-			);
-		}
-		console.log("    ✅ Cookie-based session authentication verified.");
+	}
+
+	const sessCookieVal = sessCookieStr.split(";")[0];
+	const tokenCookieVal = tokenCookieStr.split(";")[0];
+
+	console.log(
+		"    Testing session cookie authentication on MCP tools (/mcp) using only nocr_sess...",
+	);
+	const mcpResSess = await fetch(`${BASE_URL}/mcp`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Accept: "application/json, text/event-stream",
+			Cookie: sessCookieVal,
+		},
+		body: JSON.stringify({
+			jsonrpc: "2.0",
+			method: "initialize",
+			params: {
+				protocolVersion: "2024-11-05",
+				capabilities: {},
+				clientInfo: { name: "e2e-test-sess", version: "1.0" },
+			},
+			id: 1,
+		}),
+	});
+	console.log(
+		`      MCP initialization status via session cookie: ${mcpResSess.status}`,
+	);
+	if (mcpResSess.status !== 200) {
+		const errText = await mcpResSess.text().catch(() => "");
+		throw new Error(
+			`Expected 200 OK for session cookie authenticated initialize call, got: ${mcpResSess.status}: ${errText}`,
+		);
+	}
+	console.log(
+		"    ✅ nocr_sess session cookie authentication verified on /mcp.",
+	);
+
+	console.log(
+		"    Connecting to routing proxy sub-resource with token cookie header...",
+	);
+	const proxyResCookie = await fetch(`${proxyUrl}index.html`, {
+		headers: { Cookie: tokenCookieVal },
+	});
+	console.log(`      Proxy sub-resource status: ${proxyResCookie.status}`);
+	if (proxyResCookie.status === 401 || proxyResCookie.status === 403) {
+		throw new Error(
+			`Proxy cookie auth failed with status: ${proxyResCookie.status}`,
+		);
+	}
+	console.log("    ✅ Cookie-based path authentication verified on proxy.");
+}
+
+/**
+ * Step 8: Cleanup Kubernetes pods.
+ */
+async function cleanupPods(ctx: TestContext) {
+	console.log("\nCleaning up test resources...");
+	await makeMcpCall(ctx.adminToken, "tools/call", {
+		name: "delete_pod",
+		arguments: { name: "writeuser-e2e-pod", gracePeriodSeconds: 0 },
+	});
+	await makeMcpCall(ctx.adminToken, "tools/call", {
+		name: "delete_pod",
+		arguments: { name: "admin-e2e-pod", gracePeriodSeconds: 0 },
+	});
+}
+
+async function main() {
+	console.log("==> Beginning E2E Authentication & Resource Isolation Tests...");
+
+	await runUnauthorizedChallenge();
+	const ctx = await fetchTokens();
+	await runPermissionVerification(ctx);
+	await provisionPods(ctx);
+
+	try {
+		await runPodIsolationTest(ctx);
+		await runResourceAccessEscalationTest(ctx);
+		await runCookieAuthenticationTest(ctx);
 	} finally {
-		console.log("\nCleaning up test resources...");
-		await makeMcpCall(adminToken, "tools/call", {
-			name: "delete_pod",
-			arguments: { name: "writeuser-e2e-pod", gracePeriodSeconds: 0 },
-		});
-		await makeMcpCall(adminToken, "tools/call", {
-			name: "delete_pod",
-			arguments: { name: "admin-e2e-pod", gracePeriodSeconds: 0 },
-		});
+		await cleanupPods(ctx);
 	}
 
 	console.log(

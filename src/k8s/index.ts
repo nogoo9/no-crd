@@ -77,6 +77,7 @@ export {
 	encryptRefreshToken,
 	extractSessionCookieUserSub,
 	getSessionKey,
+	reconstructSessionPayload,
 	resolveSessionSecret,
 	type SessionPayload,
 	verifySessionCookie,

@@ -102,7 +102,7 @@ Authentication behavior on the MCP server is governed by the following environme
 - `AUTH_ENABLED="true"`: Toggles authentication checks.
 - `JWKS_URI`: Cluster-internal URL to retrieve Keycloak public keys to verify signature integrity.
 - `AUTH_ISSUER`: Expected token issuer (`http://localhost:8080/auth/realms/nogoo9`).
-- `AUTH_SUB_JSONPATH`: JSONPath expression to extract the unique user identifier (default: `$.sub`).
+- `AUTH_SUB_JSONPATH`: JSONPath expression to extract the unique user identifier (configured as `$.custom_user_id` in sandbox; default: `$.sub`).
 - `AUTH_ADMIN_JSONPATH`: JSONPath to locate role array claims (default: `$.realm_access.roles`).
 - `AUTH_ADMIN_ROLE`: Role name granting admin escalation capabilities (default: `nogoo9-admin`).
 - `AUTH_REQUIRED_READ_SCOPE`: Scope required for read operations (e.g. `mcp:read`).
@@ -110,7 +110,7 @@ Authentication behavior on the MCP server is governed by the following environme
 - `AUTH_SCOPE_JSONPATH`: JSONPath to locate scope claims in the token (default: `$.scope`).
 - `AUTH_REQUIRED_READ_ROLE`: User role required for read operations (e.g. `mcp-reader`).
 - `AUTH_REQUIRED_WRITE_ROLE`: User role required for write/mutation operations (e.g. `mcp-writer`).
-- `AUTH_ROLES_JSONPATH`: JSONPath to locate user role claims in the token (default: `$.realm_access.roles`).
+- `AUTH_ROLES_JSONPATH`: JSONPath to locate user role claims in the token (configured as `$.custom_roles` in sandbox; default: `$.realm_access.roles`).
 
 ### 5.2 Token Acceptance
 The MCP server accepts JWTs via three mechanisms:

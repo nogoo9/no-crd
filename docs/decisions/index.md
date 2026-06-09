@@ -21,9 +21,10 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-010](./ADR-010-graceful-configmap-template-fallback.md) | Graceful ConfigMap Template Fallback | Accepted |
 | [ADR-011](./ADR-011-ui-base-url-and-cookie-path-consistency.md) | UI BASE_URL Contract and Cookie Path Consistency | Accepted |
 | [ADR-012](./ADR-012-per-session-mcp-server-factory.md) | Per-Session McpServer Factory Pattern | Accepted |
-| [ADR-013](./ADR-013-workspace-app-authorization.md) | Workspace App Authorization Support | Proposed |
+| [ADR-013](./ADR-013-workspace-app-authorization.md) | Workspace App Authorization Support | Accepted |
 | [ADR-014](./ADR-014-admin-access-hardening-and-role-mapping.md) | Hardened Administrator Access with Scope and Role Mapping | Accepted |
 | [ADR-015](./ADR-015-workspace-view-consolidation-and-template-upgrades.md) | Workspace View Consolidation, Safe Template Upgrades, and STDIO Auth Bypass | Accepted |
+| [ADR-016](./ADR-016-session-cookie-custom-jsonpath-compatibility.md) | Session Cookie Reconstitution Compatibility with Custom JSONPaths | Accepted |
 
 ## How to Read ADRs
 
@@ -55,6 +56,7 @@ graph LR
     ADR008 --> ADR014["ADR-014: Admin Hardening"]
     ADR011 --> ADR015["ADR-015: Workspace Consolidation & Upgrades"]
     ADR014 --> ADR015
+    ADR013 --> ADR016["ADR-016: Session Cookie Custom JSONPaths"]
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -70,6 +72,7 @@ graph LR
     style ADR013 fill:#4a9eff,color:#fff
     style ADR014 fill:#f59e0b,color:#fff
     style ADR015 fill:#f59e0b,color:#fff
+    style ADR016 fill:#4a9eff,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain

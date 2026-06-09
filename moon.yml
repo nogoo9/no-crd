@@ -44,7 +44,8 @@ tasks:
       AUTH_SCOPE_JSONPATH: "$.scope"
       AUTH_REQUIRED_READ_ROLE: "mcp-reader"
       AUTH_REQUIRED_WRITE_ROLE: "mcp-writer"
-      AUTH_ROLES_JSONPATH: "$.realm_access.roles"
+      AUTH_ROLES_JSONPATH: "$.custom_roles"
+      AUTH_SUB_JSONPATH: "$.custom_user_id"
     deps:
       - "build"
     options:

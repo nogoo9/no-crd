@@ -58,7 +58,9 @@ spec:
             - name: AUTH_REQUIRED_WRITE_ROLE
               value: "mcp-writer"
             - name: AUTH_ROLES_JSONPATH
-              value: "$.realm_access.roles"
+              value: "$.custom_roles"
+            - name: AUTH_SUB_JSONPATH
+              value: "$.custom_user_id"
           ports:
             - containerPort: 3000
           readinessProbe:

@@ -13,6 +13,7 @@ import {
 	hasRequiredScope,
 	MODE,
 	parseWorkspaceApis,
+	reconstructSessionPayload,
 	requestContextStore,
 	resolveNamespace,
 	verifySessionCookie,
@@ -206,10 +207,10 @@ export function registerAuthHooks(
 			if (sessCookie) {
 				const sessPayload = verifySessionCookie(sessCookie, sessKey);
 				if (sessPayload) {
-					jwtPayload = {
-						sub: sessPayload.sub,
-						realm_access: { roles: sessPayload.roles },
-					};
+					jwtPayload = reconstructSessionPayload(
+						sessPayload.sub,
+						sessPayload.roles,
+					);
 					(request as any).sessionAuthenticated = true;
 					logger.debug("Authenticated via session cookie for user {sub}", {
 						sub: sessPayload.sub,

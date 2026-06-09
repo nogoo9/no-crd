@@ -182,7 +182,7 @@ data:
                 "userinfo.token.claim": "true",
                 "id.token.claim": "true",
                 "access.token.claim": "true",
-                "claim.name": "realm_access.roles",
+                "claim.name": "custom_roles",
                 "jsonType.label": "String"
               }
             },
@@ -193,7 +193,7 @@ data:
               "consentRequired": false,
               "config": {
                 "user.attribute": "username",
-                "claim.name": "sub",
+                "claim.name": "custom_user_id",
                 "jsonType.label": "String",
                 "id.token.claim": "true",
                 "access.token.claim": "true",
