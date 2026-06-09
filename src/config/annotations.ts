@@ -197,4 +197,10 @@ export const ANNOTATION_METADATA: AnnotationParam[] = [
 		description:
 			"Comma-separated list of supported HTTP methods (e.g. `GET,POST`, `*`, defaults to any method).",
 	},
+	{
+		key: "nogoo9/api.<api-name>.refresh",
+		type: "Annotation (Duration)",
+		description:
+			"Sets the refresh frequency for custom stats/activity or other mini API views in the dashboard cards (e.g. `10s`, `1m`, or `init` to query only once on startup).",
+	},
 ];

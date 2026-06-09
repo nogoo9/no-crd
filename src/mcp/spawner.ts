@@ -47,6 +47,11 @@ export const ListWorkspacesOutputSchema = z.object({
 			templateVersion: z.string().optional(),
 			latestTemplateVersion: z.string().optional(),
 			isOutdated: z.boolean().optional(),
+			owner: z.string().optional(),
+			userSub: z.string().optional(),
+			creationTime: z.string().optional(),
+			description: z.string().optional(),
+			annotations: z.record(z.string(), z.string()).optional(),
 		}),
 	),
 });
@@ -77,10 +82,14 @@ export const GetWorkspaceOutputSchema = z.object({
 	templateRef: z.string().optional(),
 	apis: z.array(WorkspaceApiSchema).optional(),
 	spec: z.record(z.string(), z.unknown()).optional(),
+	pod: z.record(z.string(), z.unknown()).optional(),
 	podName: z.string().optional(),
 	templateVersion: z.string().optional(),
 	latestTemplateVersion: z.string().optional(),
 	isOutdated: z.boolean().optional(),
+	owner: z.string().optional(),
+	creationTime: z.string().optional(),
+	description: z.string().optional(),
 });
 
 export const GetWorkspaceEventsOutputSchema = z.object({
@@ -536,6 +545,22 @@ export function registerSpawnerTools(
 								templateVersion,
 								latestTemplateVersion,
 								isOutdated,
+								owner:
+									pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB] ??
+									ann[ANNOTATION_KEYS.USER_SUB] ??
+									"",
+								userSub:
+									pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB] ??
+									ann[ANNOTATION_KEYS.USER_SUB] ??
+									"",
+								creationTime: pod.metadata?.creationTimestamp
+									? new Date(pod.metadata.creationTimestamp).toISOString()
+									: undefined,
+								description:
+									ann[ANNOTATION_KEYS.DESCRIPTION] ??
+									ann["nogoo9/template-description"] ??
+									"",
+								annotations: ann,
 							};
 						}),
 					);
@@ -736,10 +761,19 @@ export function registerSpawnerTools(
 						templateRef,
 						apis,
 						spec: pod.spec ? JSON.parse(JSON.stringify(pod.spec)) : undefined,
+						pod: JSON.parse(JSON.stringify(pod)),
 						podName: pod.metadata?.name,
 						templateVersion,
 						latestTemplateVersion,
 						isOutdated,
+						owner: userSub,
+						creationTime: pod.metadata?.creationTimestamp
+							? new Date(pod.metadata.creationTimestamp).toISOString()
+							: undefined,
+						description:
+							annotations[ANNOTATION_KEYS.DESCRIPTION] ??
+							annotations["nogoo9/template-description"] ??
+							"",
 					};
 					const fullWorkspaceObj = {
 						metadata: {

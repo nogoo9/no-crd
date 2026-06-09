@@ -3,6 +3,14 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.8.1
+
+- **NPM and GitHub Links & Dynamic Version Reporting**: Integrated direct navigation links to the [GitHub Repository](https://github.com/nogoo9/no-crd) and the [npm Package](https://www.npmjs.com/package/@nogoo9/no-crd) inside the gateway dashboard footer. Added a styled mono-badge displaying the dynamic server capabilities version returned by the backend (e.g. `no-crd v0.8.1`).
+- **SystemMetadata Backend Info**: Added a **no-crd Backend** card inside the `SystemInfo` metadata modal showing `@nogoo9/no-crd` and its current active version, aligning with the new capabilities version payload field.
+- **Workspace Owner Validation & Spawn Schema Mismatch**: Fixed a schema validation mapping error by changing the frontend parameter from `targetUserSub` to `userSub` during workspace spawning. This ensures that dynamic workspaces inherit the proper owner context instantly on creation.
+- **Admin Layout Separation & Duplication Prevention**: Partitioned the workspaces grid for admin sessions so that admin-owned sandboxes appear in "My Workspace Sandboxes" and all other users' sandboxes appear in "Shared/Other Sandboxes" without visual duplication or layout overlapping.
+- **Refresh Interval Annotation Registration**: Registered the `nogoo9/api.<api-name>.refresh` annotation in `src/config/annotations.ts`, which automatically updates the permissions and annotations tables in user guides and developer docs.
+
 ## What's New in v0.8.0
 
 - **Consolidated Workspace UI & Event Logs** ([ADR-015](/decisions/ADR-015-workspace-view-consolidation-and-template-upgrades)): Streamlined the frontend dashboard by removing the separate "Pods" list and merging log streaming, pod lifecycle events, and upgrade status directly into the single Workspace card view. Added a new `get_workspace_events` MCP tool to pull real-time Kubernetes pod events into the UI.

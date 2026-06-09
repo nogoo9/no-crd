@@ -102,3 +102,4 @@ Slash-command workflows and always-on rules live in `.agents/`. **Always use the
 | `.agents/rules/publishing.md` | `model_decision` | When modifying package configuration, build scripts, or preparing a release/publishing step. |
 | `.agents/rules/gha-security.md` | `model_decision` | When modifying `.github/workflows/` files, run `/gha-security` to verify SHA pins and zizmor. |
 | `.agents/rules/security.md` | `always_on` | Security scan and bypass regulations. Bypasses require human review. |
+| `.agents/rules/mcp-client.md` | `always_on` | Enforce handshake and auth sequencing in UI and MCP clients. |

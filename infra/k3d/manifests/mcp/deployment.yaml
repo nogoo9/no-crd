@@ -21,6 +21,12 @@ spec:
             allowPrivilegeEscalation: false
           imagePullPolicy: Always
           env:
+            - name: BASE_URL
+              value: "/nocr"
+            - name: UI_TITLE
+              value: "nogoo9 Pod Gateway"
+            - name: UI_SUBTITLE
+              value: "Model Context Protocol Orchestration Sandbox (k3s)"
             - name: TRANSPORT
               value: http
             - name: PORT
@@ -35,6 +41,8 @@ spec:
               value: "true"
             - name: AUTH_ENABLED
               value: "true"
+            - name: JWT_AUDIENCE
+              value: "http://localhost:8080"
             - name: JWKS_URI
               value: "http://keycloak.nogoo9.svc.cluster.local:8080/auth/realms/nogoo9/protocol/openid-connect/certs"
             - name: AUTH_ISSUER
@@ -65,13 +73,13 @@ spec:
             - containerPort: 3000
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /nocr/healthz
               port: 3000
             initialDelaySeconds: 3
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /nocr/healthz
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 15

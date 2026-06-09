@@ -10,6 +10,7 @@ import {
 	requestContextStore,
 	verifyAccessOrThrow,
 } from "~/k8s/index.js";
+import { APP_VERSION } from "~/version.js";
 
 const logger = getLogger(["nogoo9", "mcp-namespace"]);
 
@@ -33,6 +34,7 @@ export const GetCapabilitiesOutputSchema = z.object({
 	managedOnly: z.boolean(),
 	authEnabled: z.boolean(),
 	isAdmin: z.boolean(),
+	version: z.string().optional(),
 });
 
 /**
@@ -250,6 +252,7 @@ export function registerNamespaceTools(
 					managedOnly: config.k8s.managedOnly,
 					authEnabled,
 					isAdmin,
+					version: APP_VERSION,
 				};
 
 				return {
@@ -271,6 +274,7 @@ export function registerNamespaceTools(
 					managedOnly: config.k8s.managedOnly,
 					authEnabled,
 					isAdmin,
+					version: APP_VERSION,
 				});
 			}
 		},

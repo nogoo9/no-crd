@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-density="comfortable">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,53 +11,58 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,300..900;1,8..60,300..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+      --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+      /* default terracotta accent */
+      --accent: #c96442;
+      --accent-press: #b1543a;
+      --accent-soft: #f3e7e0;
+      --accent-ink: #ffffff;
+
+      --r-sm: 7px;
+      --r-md: 11px;
+      --r-lg: 16px;
+      --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+
+    /* ---------- LIGHT (default) ---------- */
     :root,
     html[data-theme="light"] {
-      --font-serif: "Source Serif 4", Georgia, serif;
-      --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: "JetBrains Mono", monospace;
-
-      --bg-color: #faf9f5; /* --paper */
-      --text-color: #65625b; /* --ink-2 */
-      --text-title: #29261b; /* --ink */
-      --text-muted: #9a968c; /* --ink-3 */
-      --panel-bg: #ffffff; /* --card */
-      --panel-hover-bg: #f1eee5; /* --surface */
-      --panel-border: #e7e2d6; /* --line */
-      --item-border: #d9d3c5; /* --line-2 */
-      --modal-bg: #ffffff; /* --card */
-      --input-bg: #faf9f5;
-      --input-border: #d9d3c5;
-      --input-text: #29261b;
-      --badge-bg: #f1eee5;
-      --badge-text: #65625b;
-      --accent-color: #D97757; /* terracotta */
-      --accent-active: #b1543a;
-      --success-color: #5db872;
-      --error-color: #c64545;
-      --warning-color: #d4a017;
-      --panel-hover-bg: #f5f0e8; /* surface-soft */
-      --accent-amber: #e8a55a;
+      --paper: #faf9f5;
+      --surface: #f1eee5;
+      --sunken: #eae6da;
+      --card: #ffffff;
+      --ink: #1f1e1c;
+      --ink-2: #65625b;
+      --ink-3: #9a968c;
+      --line: #e7e2d6;
+      --line-2: #d9d3c5;
+      --shadow-card: 0 1px 2px rgba(40, 34, 24, 0.04), 0 6px 16px -10px rgba(40, 34, 24, 0.14);
+      --shadow-pop: 0 12px 40px -8px rgba(35, 28, 18, 0.22), 0 2px 6px rgba(35, 28, 18, 0.08);
+      color-scheme: light;
     }
-    html.dark,
+
+    /* ---------- DARK (premium) ---------- */
     html[data-theme="dark"] {
-      --bg-color: #1b1a17; /* --paper */
-      --text-color: #a6a199; /* --ink-2 */
-      --text-title: #f3f0e9; /* --ink */
-      --text-muted: #726e66; /* --ink-3 */
-      --panel-bg: #2a2825; /* --card */
-      --panel-hover-bg: #232220; /* --surface */
-      --panel-border: #34322d; /* --line */
-      --item-border: #423f39; /* --line-2 */
-      --modal-bg: #2a2825;
-      --input-bg: #1b1a17;
-      --input-border: #423f39;
-      --input-text: #f3f0e9;
-      --badge-bg: #232220;
-      --badge-text: #a6a199;
+      --paper: #1b1a17;
+      --surface: #232220;
+      --sunken: #181714;
+      --card: #2a2825;
+      --ink: #f3f0e9;
+      --ink-2: #a6a199;
+      --ink-3: #726e66;
+      --line: #34322d;
+      --line-2: #423f39;
+      --accent-soft: #3a2a22;
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px -12px rgba(0, 0, 0, 0.6);
+      --shadow-pop: 0 18px 50px -10px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.4);
+      color-scheme: dark;
     }
 
-    /* Density comfortable */
+    /* ---------- DENSITY ---------- */
     :root,
     html[data-density="comfortable"] {
       --fs-base: 15px;
@@ -66,7 +71,6 @@
       --row-pad: 13px;
       --section-gap: 44px;
     }
-    /* Density compact */
     html[data-density="compact"] {
       --fs-base: 13px;
       --card-pad: 14px;
@@ -75,1022 +79,119 @@
       --section-gap: 30px;
     }
 
-    body {
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
       font-family: var(--font-sans);
-      background-color: var(--bg-color) !important;
-      color: var(--text-color) !important;
-      font-size: var(--fs-base) !important;
-      transition: background-color 0.3s, color 0.3s;
+      font-size: var(--fs-base);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      transition: background-color 0.25s var(--ease), color 0.25s var(--ease);
     }
 
-    /* Density overrides for container layouts */
-    html[data-density="compact"] .p-6,
-    html[data-density="compact"] .px-6 {
-      padding-left: var(--card-pad) !important;
-      padding-right: var(--card-pad) !important;
-      padding-top: var(--card-pad) !important;
-      padding-bottom: var(--card-pad) !important;
+    ::selection { background: var(--accent-soft); color: var(--ink); }
+
+    /* custom scrollbars */
+    *::-webkit-scrollbar { width: 8px; height: 8px; }
+    *::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 99px; border: 2px solid transparent; background-clip: padding-box; }
+    *::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: padding-box; }
+
+    /* type helpers */
+    .serif { font-family: var(--font-serif) !important; font-weight: 500 !important; }
+    .mono { font-family: var(--font-mono) !important; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      font-weight: 600;
     }
-    html[data-density="compact"] .py-5 {
-      padding-top: calc(var(--card-pad) * 0.8) !important;
-      padding-bottom: calc(var(--card-pad) * 0.8) !important;
+
+    h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+
+    /* buttons matching editorial design */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-family: var(--font-sans); font-size: 0.93em; font-weight: 600;
+      padding: 8px 14px; border-radius: var(--r-sm);
+      border: 1px solid transparent; cursor: pointer;
+      transition: all 0.16s var(--ease); white-space: nowrap;
+      line-height: 1.2; user-select: none;
     }
-    html[data-density="compact"] .gap-6,
-    html[data-density="compact"] .gap-8 {
-      gap: var(--grid-gap) !important;
-    }
-    html[data-density="compact"] .space-y-8 > * + * {
-      margin-top: var(--section-gap) !important;
-    }
-    h1, h2, h3, h4, .font-serif {
-      font-family: var(--font-serif) !important;
-      font-weight: 500 !important;
-      letter-spacing: -0.02em !important;
-      background: none !important;
-      -webkit-background-clip: initial !important;
-      background-clip: initial !important;
-      -webkit-text-fill-color: initial !important;
-      color: var(--text-title) !important;
-    }
-    .font-mono {
-      font-family: 'JetBrains Mono', monospace;
+    .btn svg { width: 1.1em; height: 1.1em; }
+    .btn-primary { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
+    .btn-primary:hover { background: var(--accent-press); border-color: var(--accent-press); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+    .btn-ghost:hover { background: var(--surface); border-color: var(--ink-3); }
+    .btn-quiet { background: transparent; color: var(--ink-2); border: none; }
+    .btn-quiet:hover { background: var(--surface); color: var(--ink); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+    /* card layout */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      box-shadow: var(--shadow-card);
+      transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.2s var(--ease);
     }
     
-    /* Semantic theme-agnostic components */
-    .app-body {
-      background-color: var(--bg-color);
-      color: var(--text-color);
+    /* interactive cards list animation */
+    .card-ws-hover:hover {
+      border-color: var(--accent) !important;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px -8px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
     }
-    .app-header {
-      border-bottom: 1px solid var(--panel-border);
-    }
-    .theme-text-title {
-      color: var(--text-title) !important;
-    }
-    .theme-text-muted {
-      color: var(--text-muted) !important;
-    }
-    .theme-text-body {
-      color: var(--text-color) !important;
-    }
-    .theme-text-success {
-      color: var(--success-color) !important;
-    }
-    .theme-text-error {
-      color: var(--error-color) !important;
-    }
-    .theme-border {
-      border: 1px solid var(--panel-border) !important;
-    }
-    .theme-feature-card {
-      background-color: var(--panel-bg) !important;
-      border: 1px solid var(--panel-border) !important;
-    }
-    .theme-card-header {
-      border-bottom: 1px solid var(--panel-border);
-      background-color: rgba(0, 0, 0, 0.02);
-    }
-    .theme-modal-header {
-      border-bottom: 1px solid var(--panel-border);
-      background-color: rgba(0, 0, 0, 0.04);
-    }
-    .theme-card-row {
-      transition: background-color 0.15s ease-in-out;
-    }
-    .theme-card-row:hover {
-      background-color: var(--panel-hover-bg) !important;
-    }
-    .theme-divide-y > * + * {
-      border-top: 1px solid var(--panel-border) !important;
-    }
-    .theme-badge {
-      background-color: var(--badge-bg) !important;
-      color: var(--badge-text) !important;
-      border: 1px solid var(--panel-border) !important;
-    }
-    .theme-badge-pill {
-      background-color: var(--badge-bg) !important;
-      color: var(--badge-text) !important;
-      border: 1px solid var(--panel-border) !important;
-    }
-    .theme-badge-coral {
-      background-color: rgba(204, 120, 92, 0.1) !important;
-      border: 1px solid rgba(204, 120, 92, 0.2) !important;
-      color: var(--accent-color) !important;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 0.125rem 0.375rem;
-      border-radius: 0.25rem;
-    }
-    .theme-icon-box {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.625rem;
-      background-color: var(--badge-bg) !important;
-      border-radius: 0.75rem;
-      border: 1px solid var(--item-border) !important;
-      color: var(--accent-color) !important;
-    }
-    .theme-table-header {
-      background-color: rgba(0, 0, 0, 0.04) !important;
-      color: var(--text-muted) !important;
-      border-bottom: 1px solid var(--panel-border) !important;
-    }
-    .theme-modal-overlay {
-      background-color: rgba(24, 23, 21, 0.8) !important;
-      backdrop-filter: blur(4px) !important;
-    }
-    .theme-modal {
-      background-color: var(--modal-bg) !important;
-      border: 1px solid var(--panel-border) !important;
-    }
-    .theme-code-window-card {
-      background-color: var(--input-bg) !important;
-      color: var(--input-text) !important;
-      border: 1px solid var(--panel-border) !important;
-    }
+
+    /* text input controls */
     .theme-text-input {
-      background-color: var(--input-bg) !important;
-      border: 1px solid var(--input-border) !important;
-      color: var(--input-text) !important;
-      border-radius: 8px !important;
-      transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+      background-color: var(--card);
+      border: 1px solid var(--line-2);
+      color: var(--ink);
+      border-radius: var(--r-sm);
+      transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
     }
     .theme-text-input:focus {
-      outline: none !important;
-      border-color: var(--accent-color) !important;
-      box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.15) !important;
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
     }
-    .theme-btn-close {
-      color: var(--text-muted) !important;
-      padding: 0.25rem;
-      border-radius: 0.5rem;
-      transition: background-color 0.15s, color 0.15s;
-      cursor: pointer;
+
+    /* badge styling */
+    .badge-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+      text-transform: uppercase; font-weight: 600;
+      padding: 3px 8px; border-radius: 999px;
+      border: 1px solid var(--line-2); color: var(--ink-2); background: var(--paper);
     }
-    .theme-btn-close:hover {
-      background-color: var(--panel-hover-bg) !important;
-      color: var(--text-title) !important;
+
+    /* modal layout overlays */
+    .modal-overlay {
+      background-color: rgba(24, 23, 21, 0.6);
+      backdrop-filter: blur(4px);
+      transition: opacity 0.25s var(--ease);
     }
-    .theme-banner-error {
-      background-color: rgba(198, 69, 69, 0.1) !important;
-      border: 1px solid rgba(198, 69, 69, 0.2) !important;
-    }
-    .theme-status-success-dot {
-      background-color: var(--success-color) !important;
-      width: 0.625rem;
-      height: 0.625rem;
-      border-radius: 9999px;
-      display: inline-block;
-    }
-    .theme-text-link {
-      color: var(--accent-color) !important;
-      background: transparent;
-      transition: color 0.15s;
-    }
-    .theme-text-link:hover {
-      color: var(--accent-active) !important;
-      text-decoration: underline;
-    }
-    .theme-code-inline {
-      background-color: var(--badge-bg) !important;
-      color: var(--accent-color) !important;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      padding: 0.125rem 0.375rem;
-      border-radius: 0.25rem;
-    }
-    
-    /* Status classes mapping */
-    .status-running {
-      background-color: rgba(93, 184, 114, 0.1) !important;
-      color: var(--success-color) !important;
-      border: 1px solid rgba(93, 184, 114, 0.2) !important;
-    }
-    .status-pending {
-      background-color: rgba(232, 165, 90, 0.1) !important;
-      color: var(--accent-amber) !important;
-      border: 1px solid rgba(232, 165, 90, 0.2) !important;
-    }
-    .status-failed {
-      background-color: rgba(198, 69, 69, 0.1) !important;
-      color: var(--error-color) !important;
-      border: 1px solid rgba(198, 69, 69, 0.2) !important;
-    }
-    .status-unknown {
-      background-color: var(--badge-bg) !important;
-      color: var(--text-color) !important;
-      border: 1px solid var(--panel-border) !important;
-    }
-    .status-pulse-running {
-      background-color: var(--success-color) !important;
-    }
-    .status-pulse-pending {
-      background-color: var(--accent-amber) !important;
-    }
-    
-    /* Toast styles mapping */
-    .toast-success {
-      background-color: var(--modal-bg) !important;
-      border-color: rgba(93, 184, 114, 0.3) !important;
-      color: var(--text-color) !important;
-    }
-    .toast-error {
-      background-color: var(--modal-bg) !important;
-      border-color: rgba(198, 69, 69, 0.3) !important;
-      color: var(--text-color) !important;
-    }
-    .toast-icon-success {
-      padding: 0.25rem;
-      background-color: rgba(93, 184, 114, 0.1) !important;
-      color: var(--success-color) !important;
-      border-radius: 0.5rem;
-      flex-shrink: 0;
-    }
-    .toast-icon-error {
-      padding: 0.25rem;
-      background-color: rgba(198, 69, 69, 0.1) !important;
-      color: var(--error-color) !important;
-      border-radius: 0.5rem;
-      flex-shrink: 0;
-    }
+
+    /* toast custom layout animations */
     .toast-item {
       animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      pointer-events: auto;
-    }
-    .toast-item.toast-out {
-      animation: slideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     @keyframes slideIn {
-      from {
-        transform: translateY(1.5rem) scale(0.95);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-      }
-    }
-    @keyframes slideOut {
-      from {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-      }
-      to {
-        transform: translateY(1rem) scale(0.95);
-        opacity: 0;
-      }
-    }
-    
-    /* Custom scrollbars */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(204, 120, 92, 0.2);
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(204, 120, 92, 0.4);
-    }
-
-    ::selection {
-      background-color: var(--accent-color) !important;
-      color: #ffffff !important;
-    }
-    ::-moz-selection {
-      background-color: var(--accent-color) !important;
-      color: #ffffff !important;
-    }
-
-    /* Button styles matching Claude/DESIGN.md */
-    .theme-button-primary {
-      background-color: var(--accent-color) !important;
-      border: 1px solid var(--accent-color) !important;
-      color: #ffffff !important;
-      border-radius: 8px !important;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-      font-weight: 500 !important;
-      transition: all 0.15s ease-in-out !important;
-      cursor: pointer !important;
-      box-shadow: 0 4px 6px -1px rgba(204, 120, 92, 0.15), 0 2px 4px -1px rgba(204, 120, 92, 0.1) !important;
-    }
-    .theme-button-primary:hover {
-      background-color: var(--accent-active) !important;
-      border-color: var(--accent-active) !important;
-    }
-    .theme-button-primary:active {
-      transform: scale(0.98) !important;
-    }
-
-    .theme-button-secondary {
-      background-color: var(--panel-bg) !important;
-      border: 1px solid var(--panel-border) !important;
-      color: var(--text-color) !important;
-      border-radius: 8px !important;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-      font-weight: 500 !important;
-      transition: all 0.15s ease-in-out !important;
-      cursor: pointer !important;
-    }
-    .theme-button-secondary:hover {
-      background-color: var(--input-bg) !important;
-      border-color: var(--accent-color) !important;
-      color: var(--text-title) !important;
-    }
-    .theme-button-secondary:active {
-      transform: scale(0.98) !important;
-    }
-
-    .theme-button-danger {
-      background-color: var(--panel-bg) !important;
-      border: 1px solid var(--panel-border) !important;
-      color: var(--text-color) !important;
-      border-radius: 8px !important;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-      font-weight: 500 !important;
-      transition: all 0.15s ease-in-out !important;
-      cursor: pointer !important;
-    }
-    .theme-button-danger:hover {
-      background-color: rgba(198, 69, 69, 0.1) !important;
-      border-color: var(--error-color) !important;
-      color: var(--error-color) !important;
-    }
-    .theme-button-danger:active {
-      transform: scale(0.98) !important;
-    }
-
-    /* Disabled button state */
-    .theme-button-primary:disabled,
-    .theme-button-secondary:disabled,
-    .theme-button-danger:disabled {
-      opacity: 0.4 !important;
-      cursor: not-allowed !important;
-      pointer-events: none !important;
-      transform: none !important;
-      box-shadow: none !important;
-    }
-
-    /* Logo badge matching theme */
-    .logo-badge {
-      background-color: var(--accent-color) !important;
-      background-image: none !important;
-      color: #ffffff !important;
-      box-shadow: 0 10px 15px -3px rgba(204, 120, 92, 0.2) !important;
-    }
-
-    /* Workspace Premium Card Layout */
-    #workspaces-list .theme-card-row {
-      border: 1px solid var(--panel-border) !important;
-      border-radius: 12px !important;
-      background-color: rgba(255, 255, 255, 0.01);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    }
-    #workspaces-list .theme-card-row:hover {
-      background-color: var(--panel-hover-bg) !important;
-      border-color: var(--accent-color) !important;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
-    }
-
-
-
-    /* Dotted Create Card style */
-    .create-ws-dotted-btn {
-      cursor: pointer;
-      min-height: 180px;
-      border-radius: 12px !important;
-      border: 1.5px dashed var(--panel-border) !important;
-      background-color: transparent !important;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      transition: all 0.18s ease-in-out !important;
-      color: var(--text-color) !important;
-      text-align: center;
-      width: 100%;
-      outline: none;
-    }
-    .create-ws-dotted-btn:hover {
-      border-color: var(--accent-color) !important;
-      background-color: var(--panel-hover-bg) !important;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04) !important;
-    }
-    .create-ws-dotted-btn .plus-box {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      background-color: rgba(255, 255, 255, 0.03);
-      color: var(--accent-color);
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--panel-border);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-      transition: all 0.18s ease-in-out;
-    }
-    .create-ws-dotted-btn:hover .plus-box {
-      background-color: var(--accent-color);
-      color: #ffffff;
-      transform: scale(1.06);
-    }
-
-    /* Collapsible template group styles */
-    .template-group .toggle-group-btn svg {
-      transition: transform 0.2s ease;
-    }
-    .template-group.is-collapsed .group-content {
-      display: none !important;
-    }
-    .template-group.is-collapsed .toggle-group-btn svg {
-      transform: rotate(-90deg);
-    }
-    .group-header-clickable {
-      cursor: pointer;
-      user-select: none;
-    }
-    .group-header-clickable:hover .group-title-text {
-      color: var(--accent-color) !important;
-    }
-
-    /* Premium borderless flat button overrides inside cards */
-    #workspaces-list .theme-card-row button,
-    #workspaces-list .theme-card-row a.theme-button-primary,
-    #templates-list .theme-card-row button {
-      border: none !important;
-      box-shadow: none !important;
-      outline: none !important;
-    }
-
-    #workspaces-list .theme-card-row .theme-button-secondary,
-    #templates-list .theme-card-row .theme-button-secondary {
-      background-color: transparent !important;
-      color: var(--text-color) !important;
-      opacity: 0.85;
-      transition: all 0.12s ease-in-out !important;
-    }
-    #workspaces-list .theme-card-row .theme-button-secondary:hover,
-    #templates-list .theme-card-row .theme-button-secondary:hover {
-      background-color: rgba(204, 120, 92, 0.08) !important;
-      color: var(--accent-color) !important;
-      opacity: 1;
-    }
-
-    #workspaces-list .theme-card-row .theme-button-danger,
-    #templates-list .theme-card-row .theme-button-danger {
-      background-color: transparent !important;
-      color: var(--text-muted) !important;
-      transition: all 0.12s ease-in-out !important;
-    }
-    #workspaces-list .theme-card-row .theme-button-danger:hover,
-    #templates-list .theme-card-row .theme-button-danger:hover {
-      background-color: rgba(198, 69, 69, 0.08) !important;
-      color: var(--error-color) !important;
-    }
-
-    #workspaces-list .theme-card-row .upgrade-ws-btn {
-      background-color: var(--warning-color) !important;
-      color: #ffffff !important;
-    }
-    #workspaces-list .theme-card-row .upgrade-ws-btn:hover {
-      background-color: #c09012 !important;
+      from { transform: translateY(1.5rem) scale(0.95); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
     }
   </style>
-  <style id="custom-theme-style"></style>
 </head>
 <body class="app-body min-h-screen">
-  <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    
-    <!-- Header -->
-    <header class="flex flex-col md:flex-row md:items-center md:justify-between pb-8 app-header gap-4">
-      <div>
-        <div class="flex items-center gap-3">
-          <span class="logo-badge inline-flex items-center justify-center p-2 rounded-xl">
-            <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          </span>
-          <div>
-            <h1 class="text-xl font-bold tracking-tight theme-text-title font-sans">nogoo9 / no-crd</h1>
-            <p class="text-xs theme-text-muted mt-0.5">Model Context Protocol Kubernetes Pod Manager</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-4 mt-2.5 pl-14">
-          <a href="https://github.com/nogoo9/no-crd" target="_blank" rel="noopener noreferrer" title="GitHub Repository" class="theme-text-muted hover:text-[var(--text-title)] transition-colors duration-150">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          </a>
-          <a href="https://www.npmjs.com/package/@nogoo9/no-crd" target="_blank" rel="noopener noreferrer" title="npm Package" class="theme-text-muted hover:text-[var(--text-title)] transition-colors duration-150">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.998v4H1.332V8.666h5.334v5.332zm4 0v1.336H8V8.666h5.334v5.332h-2.668zm12 0h-1.332v-4h-1.334v4h-1.334v-4h-1.334v4h-2.666V8.666h8v5.332zM10.666 10v2.668h1.334V10h-1.334z"/></svg>
-          </a>
-          <span id="app-version" class="text-[10px] font-mono theme-badge-coral hidden"></span>
-        </div>
-      </div>
-      <!-- Quick Action Stats -->
-      <div class="flex items-center gap-4 flex-wrap">
-        <!-- Theme Select Dropdown -->
-        <div class="relative inline-block">
-          <select id="theme-select" class="theme-button-secondary text-xs px-3 py-2 pr-8 appearance-none cursor-pointer outline-none rounded-lg font-medium">
-            <option value="default">Default Theme</option>
-          </select>
-          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 theme-text-muted">
-            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-            </svg>
-          </div>
-        </div>
-
-        <button id="theme-btn" title="Toggle Theme" class="theme-button-secondary px-3 py-2 flex items-center justify-center cursor-pointer">
-          <svg id="theme-icon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-        </button>
-        <button id="user-badge-btn" class="theme-button-secondary px-4 py-2 flex items-center gap-2 cursor-pointer text-left">
-          <span class="theme-status-success-dot"></span>
-          <span class="text-xs theme-text-muted font-medium">User:</span>
-          <span id="user-badge-name" class="text-xs font-bold font-mono theme-text-title">Anonymous</span>
-          <span id="user-admin-badge" class="hidden text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">Admin</span>
-        </button>
-        <button id="logout-btn" title="Sign Out" class="theme-button-secondary px-3 py-2 flex items-center justify-center cursor-pointer hidden theme-text-error">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-        </button>
-        <div class="px-4 py-2 theme-badge rounded-xl flex items-center gap-2">
-          <span class="theme-status-success-dot animate-pulse"></span>
-          <span class="text-xs theme-text-muted font-medium">Namespace:</span>
-          <span id="ns-badge" class="text-xs font-bold font-mono theme-text-success">nogoo9</span>
-        </div>
-        <button id="refresh-btn" class="theme-button-primary inline-flex items-center gap-2 px-4 py-2 text-sm cursor-pointer">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18" />
-          </svg>
-          Refresh
-        </button>
-      </div>
-    </header>
- 
-    <!-- Error Banner -->
-    <div id="error-banner" class="hidden mt-6 p-4 theme-banner-error rounded-xl flex items-center gap-3">
-      <svg class="w-6 h-6 theme-text-error shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-      <div class="text-sm font-medium theme-text-error" id="error-message">Failed to connect to Kubernetes cluster.</div>
-    </div>
-
-    <!-- Toolbar -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 mt-2">
-      <!-- Search Input -->
-      <div class="relative flex-1 max-w-md">
-        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <svg class="h-4 w-4 theme-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        <input type="text" id="local-search-input" class="theme-text-input w-full pl-9 pr-4 py-2 text-sm outline-none transition" placeholder="Search workspaces, templates, or pods..." />
-      </div>
-
-      <!-- Controls Group -->
-      <div class="flex items-center gap-3">
-        <!-- Layout Toggle -->
-        <div class="flex items-center border theme-border rounded-lg overflow-hidden bg-[var(--panel-bg)]">
-          <button id="view-grid-btn" type="button" title="Grid View" class="px-3 py-2 text-xs font-medium theme-text-muted hover:bg-[var(--panel-hover-bg)] transition-colors cursor-pointer">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-          </button>
-          <button id="view-list-btn" type="button" title="List View" class="px-3 py-2 text-xs font-medium theme-text-muted hover:bg-[var(--panel-hover-bg)] transition-colors border-l theme-border cursor-pointer">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Density Dropdown -->
-        <div class="relative inline-block">
-          <select id="density-select" class="theme-button-secondary text-xs px-3 py-2 pr-8 appearance-none cursor-pointer outline-none rounded-lg font-medium bg-transparent">
-            <option value="comfortable" class="theme-text-title bg-neutral-900">Comfortable Density</option>
-            <option value="compact" class="theme-text-title bg-neutral-900">Compact Density</option>
-          </select>
-          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 theme-text-muted">
-            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-    </div>
- 
-    <!-- Main Content -->
-    <main class="mt-8 space-y-8">
-      
-      <!-- Active Workspaces Dashboard -->
-      <section class="space-y-4">
-        <div class="flex items-center gap-2.5 py-2">
-          <span class="theme-text-muted flex shrink-0">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </span>
-          <h2 class="text-xs font-bold uppercase tracking-wider theme-text-title whitespace-nowrap">Active Workspaces</h2>
-          <span id="ws-count" class="font-mono text-xs theme-text-muted">0</span>
-          
-          <button id="upgrade-all-btn" class="hidden theme-button-primary inline-flex items-center gap-1.5 px-3 py-1 text-xs cursor-pointer shrink-0 ml-3 bg-amber-600 border-amber-600 hover:bg-amber-700">
-            Upgrade All Outdated
-          </button>
-          
-          <button id="create-tmpl-btn" class="theme-button-secondary inline-flex items-center gap-1.5 px-3 py-1 text-xs cursor-pointer shrink-0 ml-3">
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Register Template
-          </button>
-
-          <div class="flex-grow h-[1px] bg-[var(--panel-border)]"></div>
-          <p class="text-[11px] theme-text-muted italic shrink-0 hidden sm:block">Agent sandboxes running inside the cluster.</p>
-        </div>
-        
-        <div id="workspaces-list" class="flex flex-col gap-10">
-          <!-- Dynamic workspace items grouped by template inserted here -->
-          <div class="py-8 text-center theme-text-muted text-sm">No active workspaces. Click a template to spawn one.</div>
-        </div>
-      </section>
-    </main>
-
-    <!-- Footer -->
-    <footer class="mt-12 pb-4 text-center">
-      <span class="text-[11px] theme-text-muted">Powered by <a href="https://github.com/nogoo9/no-crd" target="_blank" rel="noopener noreferrer" class="theme-text-link font-medium">nogoo9</a></span>
-    </footer>
-  </div>
- 
-  <!-- Logs Modal -->
-  <div id="logs-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-bold theme-text-title flex items-center gap-2">
-            <span class="w-2 h-2 status-pulse-running rounded-full animate-ping"></span>
-            Container Logs
-          </h3>
-          <p id="logs-title" class="text-xs theme-text-muted font-mono mt-0.5">ws-anonymous-session1</p>
-        </div>
-        <button id="close-logs-btn" class="theme-btn-close">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <div class="p-6 theme-code-window-card flex-1 overflow-y-auto font-mono text-xs leading-relaxed max-h-[60vh] scrollbar-thin select-text whitespace-pre-wrap" id="logs-content">
-        Fetching logs...
-      </div>
-      <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
-        <button id="refresh-logs-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Refresh Logs</button>
-        <button id="close-logs-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Events Modal -->
-  <div id="events-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-bold theme-text-title flex items-center gap-2">
-            <svg class="w-5 h-5 text-[var(--accent-color)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Workspace Events
-          </h3>
-          <p id="events-title" class="text-xs theme-text-muted font-mono mt-0.5">ws-anonymous-session1</p>
-        </div>
-        <button id="close-events-btn" class="theme-btn-close">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <div class="p-6 theme-code-window-card flex-1 overflow-y-auto font-mono text-xs leading-relaxed max-h-[60vh] scrollbar-thin select-text whitespace-pre-wrap" id="events-content">
-        Fetching events...
-      </div>
-      <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
-        <button id="refresh-events-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Refresh Events</button>
-        <button id="close-events-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
-      </div>
-    </div>
-  </div>
- 
-  <!-- Spawn Workspace Modal -->
-  <div id="spawn-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-bold theme-text-title">Spawn Workspace</h3>
-          <p id="spawn-template-title" class="text-xs theme-text-muted mt-0.5">Template: dev-node-template</p>
-        </div>
-        <button id="close-spawn-btn" class="theme-btn-close">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <form id="spawn-form" class="p-6 space-y-4">
-        <input type="hidden" id="spawn-template-ref" />
-        
-        <div>
-          <label for="workspace-id" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Workspace ID (Unique URL identifier)</label>
-          <input type="text" id="workspace-id" required class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm font-mono outline-none transition" placeholder="e.g. workspace-alpha" />
-        </div>
- 
-        <div>
-          <label for="workspace-name" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Workspace Name (Optional display name)</label>
-          <input type="text" id="workspace-name" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm outline-none transition" placeholder="e.g. My Dev Sandbox" />
-        </div>
-
-        <div id="target-user-container" class="hidden">
-          <label for="target-user-sub" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Target User ID (Admin Only)</label>
-          <input type="text" id="target-user-sub" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm font-mono outline-none transition" placeholder="e.g. user-abc" />
-        </div>
-
-        <div id="context-variables-container" class="hidden space-y-3">
-          <label class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Required Context Variables</label>
-          <div id="context-inputs" class="space-y-3">
-            <!-- Dynamic context key inputs -->
-          </div>
-        </div>
-
-        <div class="pt-4 border-t theme-border flex justify-end gap-3">
-          <button type="button" id="cancel-spawn-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Cancel</button>
-          <button type="submit" id="submit-spawn-btn" class="theme-button-primary px-4 py-2 text-xs cursor-pointer flex items-center gap-1.5">
-            <span id="spawn-btn-text">Spawn Sandbox</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  </div>
-
-  <!-- Token Modal -->
-  <div id="token-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-bold theme-text-title">Authentication Settings</h3>
-          <p class="text-xs theme-text-muted mt-0.5">Configure your JWT token for authorized endpoints.</p>
-        </div>
-        <button id="close-token-btn" class="theme-btn-close">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <form id="token-form" class="p-6 space-y-4">
-        <div>
-          <label for="jwt-token-input" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">JWT Token</label>
-          <textarea id="jwt-token-input" rows="4" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs font-mono outline-none transition resize-none" placeholder="Paste your JWT token here..."></textarea>
-        </div>
-        <div class="pt-4 border-t theme-border flex justify-end gap-3">
-          <button type="button" id="clear-token-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Clear Token</button>
-          <button type="submit" class="theme-button-primary px-4 py-2 text-xs cursor-pointer">Save Token</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Template Spec Modal -->
-  <div id="tmpl-spec-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-bold theme-text-title" id="tmpl-spec-title">Template Specification</h3>
-          <p id="tmpl-spec-subtitle" class="text-xs theme-text-muted mt-0.5">ConfigMap: dev-node-template</p>
-        </div>
-        <button id="close-tmpl-spec-btn" class="theme-btn-close">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <div class="p-6 flex-1 overflow-y-auto max-h-[60vh] space-y-6" id="tmpl-spec-body">
-        <div id="tmpl-spec-loading" class="theme-text-muted text-sm font-mono">Loading specification...</div>
-
-        <!-- Annotations Grid -->
-        <div id="tmpl-spec-annotations-container" class="space-y-2 hidden">
-          <h4 class="text-xs font-bold theme-text-title uppercase tracking-wider">Template Annotations & Hooks</h4>
-          <div id="tmpl-spec-annotations-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/5 dark:bg-white/5 p-4 rounded-xl border theme-border">
-            <!-- Dynamic Key-Values will go here -->
-          </div>
-        </div>
-
-        <!-- Labels Badge List -->
-        <div id="tmpl-spec-labels-container" class="space-y-2 hidden">
-          <h4 class="text-xs font-bold theme-text-title uppercase tracking-wider">Labels</h4>
-          <div id="tmpl-spec-labels-list" class="flex flex-wrap gap-1.5">
-            <!-- Dynamic Label Badges will go here -->
-          </div>
-        </div>
-        
-        <!-- Pod Spec JSON -->
-        <div id="tmpl-spec-code-container" class="space-y-2 hidden">
-          <h4 class="text-xs font-bold theme-text-title uppercase tracking-wider">Pod Spec (JSON)</h4>
-          <pre class="p-4 theme-code-window-card rounded-xl font-mono text-xs overflow-x-auto select-text" id="tmpl-spec-code"></pre>
-        </div>
-      </div>
-      <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
-        <button id="close-tmpl-spec-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Create Template Modal -->
-  <div id="create-tmpl-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-bold theme-text-title">Create Pod Template</h3>
-          <p class="text-xs theme-text-muted mt-0.5">Define a reusable pod specification template ConfigMap.</p>
-        </div>
-        <button id="close-create-tmpl-btn" class="theme-btn-close">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <form id="create-tmpl-form" class="p-6 space-y-4 overflow-y-auto flex-1 max-h-[70vh]">
-        <div>
-          <label for="create-tmpl-name" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Template Name</label>
-          <input type="text" id="create-tmpl-name" required class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm font-mono outline-none transition" placeholder="e.g. custom-python-env" />
-        </div>
-        <div>
-          <label for="create-tmpl-desc" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Description</label>
-          <input type="text" id="create-tmpl-desc" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm outline-none transition" placeholder="Brief explanation of this sandbox environment" />
-        </div>
-        <div>
-          <label for="create-tmpl-tag" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Tag</label>
-          <input type="text" id="create-tmpl-tag" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-sm outline-none transition" placeholder="e.g. dev, testing, backup" />
-        </div>
-        <div>
-          <label for="create-tmpl-spec" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Pod Spec (JSON)</label>
-          <textarea id="create-tmpl-spec" rows="8" required class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs font-mono outline-none transition resize-y" placeholder='{
-  "containers": [
-    {
-      "name": "workspace",
-      "image": "node:20-alpine",
-      "command": ["sleep", "infinity"]
-    }
-  ]
-}'></textarea>
-        </div>
-        <details class="border theme-border rounded-xl overflow-hidden transition-all duration-300">
-          <summary class="list-none flex items-center justify-between p-4 cursor-pointer select-none font-bold text-xs theme-text-title uppercase tracking-wider bg-linear-to-b from-transparent to-black/5 dark:to-white/5">
-            <span>Advanced Annotations & Hooks</span>
-            <span>
-              <svg class="w-4 h-4 transform transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </span>
-          </summary>
-          <div class="p-4 border-t theme-border space-y-4 bg-black/5 dark:bg-white/5">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label for="create-tmpl-req-context" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Required Context</label>
-                <input type="text" id="create-tmpl-req-context" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. AWS_ACCESS_KEY_ID,S3_BUCKET" />
-              </div>
-              <div>
-                <label for="create-tmpl-port" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Workspace Port</label>
-                <input type="number" id="create-tmpl-port" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. 3000" />
-              </div>
-              <div>
-                <label for="create-tmpl-preview-path" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Preview Path</label>
-                <input type="text" id="create-tmpl-preview-path" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. /" />
-              </div>
-              <div>
-                <label for="create-tmpl-preview-type" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Preview Type</label>
-                <select id="create-tmpl-preview-type" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition cursor-pointer bg-transparent">
-                  <option value="html" class="theme-text-title bg-neutral-900">HTML</option>
-                  <option value="markdown" class="theme-text-title bg-neutral-900">Markdown</option>
-                </select>
-              </div>
-              <div>
-                <label for="create-tmpl-grace-period" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Grace Period (Seconds)</label>
-                <input type="number" id="create-tmpl-grace-period" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. 60" />
-              </div>
-            </div>
-
-            <div class="border-t theme-border pt-4">
-              <h5 class="text-xs font-bold theme-text-title uppercase tracking-wider mb-3">Init Container Hook</h5>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label for="create-tmpl-init-image" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Init Image</label>
-                  <input type="text" id="create-tmpl-init-image" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. alpine:latest" />
-                </div>
-                <div>
-                  <label for="create-tmpl-init-cmd" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Init Command</label>
-                  <input type="text" id="create-tmpl-init-cmd" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. echo 'initializing...'" />
-                </div>
-              </div>
-            </div>
-
-            <div class="border-t theme-border pt-4">
-              <h5 class="text-xs font-bold theme-text-title uppercase tracking-wider mb-3">Pre-Stop Lifecycle Hook</h5>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label for="create-tmpl-prestop-cmd" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Pre-Stop Command</label>
-                  <input type="text" id="create-tmpl-prestop-cmd" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. sync script" />
-                </div>
-                <div>
-                  <label for="create-tmpl-prestop-sidecar" class="block text-xs font-bold theme-text-muted uppercase tracking-wider mb-1.5">Pre-Stop Sidecar Image</label>
-                  <input type="text" id="create-tmpl-prestop-sidecar" class="theme-text-input w-full rounded-xl px-4 py-2.5 text-xs outline-none transition" placeholder="e.g. amazon/aws-cli:latest" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
-        <div class="pt-4 border-t theme-border flex justify-end gap-3">
-          <button type="button" id="cancel-create-tmpl-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Cancel</button>
-          <button type="submit" class="theme-button-primary px-4 py-2 text-xs cursor-pointer">Create Template</button>
-        </div>
-      </form>
-    </div>
-  </div>
-  <!-- OIDC Login Overlay -->
-  <div id="login-overlay" class="fixed inset-0 z-[100] hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-md rounded-2xl shadow-2xl p-8 text-center space-y-6">
-      <div class="logo-badge inline-flex items-center justify-center p-4 rounded-2xl">
-        <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
-      </div>
-      <div>
-        <h2 class="text-2xl font-bold theme-text-title">Authentication Required</h2>
-        <p class="text-sm theme-text-muted mt-2">Access to the Pod Manager is protected. Please sign in with your identity provider.</p>
-      </div>
-      <button id="login-btn" class="theme-button-primary w-full py-3 text-sm cursor-pointer">
-        Sign In with OIDC
-      </button>
-      <div id="login-fallback-option" class="text-xs theme-text-muted pt-2 border-t theme-border">
-        Or use an <a href="#" id="use-manual-token-link" class="theme-text-link hover:underline">access token manually</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- 403 Forbidden Overlay -->
-  <div id="forbidden-overlay" class="fixed inset-0 z-[100] hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-md rounded-2xl shadow-2xl p-8 text-center space-y-6">
-      <div class="theme-banner-error inline-flex items-center justify-center p-4 rounded-2xl">
-        <svg class="w-10 h-10 theme-text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-      </div>
-      <div>
-        <h2 class="text-2xl font-bold theme-text-error">Access Forbidden (403)</h2>
-        <p id="forbidden-message" class="text-sm theme-text-muted mt-2">You do not have the required scopes or roles to access this resource.</p>
-      </div>
-      <div class="flex flex-col gap-3">
-        <button id="forbidden-retry-btn" class="theme-button-primary w-full py-3 text-sm cursor-pointer">
-          Sign In with Different Account
-        </button>
-        <button id="forbidden-back-btn" class="theme-button-secondary w-full py-3 text-sm cursor-pointer font-medium">
-          Use a Manual Token
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Preview Modal -->
-  <div id="preview-modal" class="fixed inset-0 z-50 hidden theme-modal-overlay flex items-center justify-center p-4">
-    <div class="theme-modal w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-      <div class="px-6 py-4 theme-modal-header flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-bold theme-text-title" id="preview-modal-title">Workspace Preview</h3>
-          <p id="preview-modal-subtitle" class="text-xs theme-text-muted mt-0.5">Previewing running workspace</p>
-        </div>
-        <button id="close-preview-btn" class="theme-btn-close">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <div class="flex-1 overflow-auto theme-feature-card p-6 min-h-[50vh] max-h-[70vh]" id="preview-content-area">
-        <!-- Preview Content (iframe or markdown HTML) will be inserted here -->
-      </div>
-      <div class="px-6 py-4 theme-modal-header flex justify-end gap-3">
-        <button id="refresh-preview-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Refresh</button>
-        <button id="close-preview-footer-btn" class="theme-button-secondary px-4 py-2 text-xs cursor-pointer">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast Container -->
-  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none max-w-sm w-full"></div>
+  <div id="root"></div>
 
   <!-- Injected App Logic Bundle -->
   <script>

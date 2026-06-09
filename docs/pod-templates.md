@@ -78,6 +78,7 @@ You can define spawner-specific annotations on the template `ConfigMap` to injec
 | `nogoo9/api.<api-name>.path` | Annotation (String) | Defines the subpath routing prefix for this specific API (e.g. `/terminal`). |
 | `nogoo9/api.<api-name>.desc` | Annotation (String) | A short description of this additional API, shown in the UI interface. |
 | `nogoo9/api.<api-name>.method` | Annotation (String) | Comma-separated list of supported HTTP methods (e.g. `GET,POST`, `*`, defaults to any method). |
+| `nogoo9/api.<api-name>.refresh` | Annotation (Duration) | Sets the refresh frequency for custom stats/activity or other mini API views in the dashboard cards (e.g. `10s`, `1m`, or `init` to query only once on startup). |
 
 <!-- TEMPLATE_ANNOTATIONS_TABLE_END -->
 

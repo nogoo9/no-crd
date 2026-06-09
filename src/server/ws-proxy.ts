@@ -240,8 +240,16 @@ export function registerUpgradeHandler(
 						subpath.startsWith(`${apiPathNoTrailingSlash}/`);
 					if (pathMatches) {
 						port = String(api.port);
-						upstreamPath =
-							subpath.substring(apiPathNoTrailingSlash.length) || "/";
+						// Only rewrite upstreamPath to strip the API path prefix if the API target port
+						// is different from the main workspace port. If it is the same port,
+						// we assume it is a sub-route on the same application web server.
+						const workspacePort = String(
+							targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000",
+						);
+						if (port !== workspacePort) {
+							upstreamPath =
+								subpath.substring(apiPathNoTrailingSlash.length) || "/";
+						}
 						break;
 					}
 				}

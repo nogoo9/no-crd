@@ -624,17 +624,36 @@ export function registerAuthHooks(
 
 						if (pathMatches && methodMatches) {
 							port = api.port;
-							// Rewrite URL to strip the API path prefix
-							const cleanRest =
-								pathOnly.substring(apiPathNoTrailingSlash.length) || "/";
-							const newUrl = routePrefix + cleanRest + queryOnly;
-							if (request.raw) {
-								request.raw.url = newUrl;
-							}
-							logger.debug(
-								"Matched API {apiName} (port {apiPort}) for workspace {workspaceId}. Rewrote request URL to {newUrl}",
-								{ apiName: api.name, apiPort: port, workspaceId, newUrl },
+							// Only rewrite URL to strip the API path prefix if the API target port
+							// is different from the main workspace port. If it is the same port,
+							// we assume it is a sub-route on the same application web server.
+							const workspacePort = String(
+								targetPortAnnotation ||
+									config.k8s.defaultWorkspacePort ||
+									"3000",
 							);
+							if (String(port) !== workspacePort) {
+								const cleanRest =
+									pathOnly.substring(apiPathNoTrailingSlash.length) || "/";
+								const newUrl = routePrefix + cleanRest + queryOnly;
+								if (request.raw) {
+									request.raw.url = newUrl;
+								}
+								logger.debug(
+									"Matched API {apiName} (port {apiPort}) for workspace {workspaceId}. Rewrote request URL to {newUrl}",
+									{ apiName: api.name, apiPort: port, workspaceId, newUrl },
+								);
+							} else {
+								logger.debug(
+									"Matched API {apiName} (port {apiPort}) for workspace {workspaceId}. Port matches workspace port; preserving path prefix: {url}",
+									{
+										apiName: api.name,
+										apiPort: port,
+										workspaceId,
+										url: request.url,
+									},
+								);
+							}
 							break;
 						}
 					}

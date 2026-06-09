@@ -11,6 +11,16 @@ metadata:
     nogoo9/workspace-port: "3000"
     nogoo9/workspace-path: "/"
     nogoo9/workspace-auth-mode: "inject-headers,token-api"
+    nogoo9/api.stats.port: "3000"
+    nogoo9/api.stats.path: "/api/stats"
+    nogoo9/api.stats.method: "GET"
+    nogoo9/api.stats.desc: "Return server stats"
+    nogoo9/api.stats.refresh: "10s"
+    nogoo9/api.last_activity.port: "3000"
+    nogoo9/api.last_activity.path: "/api/last-activity"
+    nogoo9/api.last_activity.method: "GET"
+    nogoo9/api.last_activity.desc: "Return last activity time"
+    nogoo9/api.last_activity.refresh: "30s"
 data:
   spec: |
     {

@@ -338,6 +338,24 @@ export async function registerProxyRoutes(
 				},
 				onResponse: (request: any, reply: any, res: any) => {
 					setCorsHeaders(reply);
+
+					// Strip frame blocking headers from downstream containers to allow iframe previews
+					reply.removeHeader("x-frame-options");
+					reply.removeHeader("X-Frame-Options");
+
+					const csp =
+						reply.getHeader("content-security-policy") ||
+						reply.getHeader("Content-Security-Policy");
+					if (typeof csp === "string") {
+						const cleanedCsp = csp.replace(
+							/frame-ancestors\s+[^;]+(;?)/gi,
+							"frame-ancestors 'self'$1",
+						);
+						reply.header("content-security-policy", cleanedCsp);
+					} else {
+						reply.header("content-security-policy", "frame-ancestors 'self'");
+					}
+
 					const token = (request as any).token;
 					const workspaceId = (request as any).workspaceId;
 					if (token && workspaceId) {

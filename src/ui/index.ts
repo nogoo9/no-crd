@@ -45,11 +45,20 @@ export function loadUiHtml(distDir: string, basePrefix = ""): string {
 			endSessionUrl: config.ui.oauth.endSessionUrl,
 			subJsonPath: config.auth.subJsonPath,
 		};
+		const uiConfig = {
+			title: config.ui.title,
+			subtitle: config.ui.subtitle,
+		};
 		const configScript = `<script>
 window.__NOCR_BASE_URL__ = ${JSON.stringify(basePrefix)};
 window.__NOCR_OAUTH_CONFIG__ = ${JSON.stringify(oauthConfig)};
+window.__NOCR_UI_CONFIG__ = ${JSON.stringify(uiConfig)};
 </script>`;
 		html = html.replace("<head>", `<head>${configScript}`);
+		html = html.replace(
+			/<title>[^<]*<\/title>/i,
+			`<title>${config.ui.title}</title>`,
+		);
 		return html;
 	} catch (err) {
 		logger.warn("Could not load UI HTML asset: {error}", { error: err });
