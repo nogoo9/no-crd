@@ -86,6 +86,91 @@ You can define spawner-specific annotations on the template `ConfigMap` to injec
 
 ---
 
+## 🔄 Reserved API Annotations: `stats` & `last_activity` *(Available from v0.8.1)*
+
+To support rich dynamic feedback directly in the workspace sandboxes list, the dashboard includes a **Metrics & Activity Mini-View** rendered on each workspace card when the workspace is running.
+
+This view is driven by two reserved API names: `stats` and `last_activity`. By defining these APIs in your template's annotations, the dashboard will automatically query the workspace container's endpoints at the configured frequency, parsing and presenting the response payload.
+
+### 1. Stats Metrics Annotation (`stats`)
+Exposes custom container metrics as key-value pairs in a grid.
+- **Port Annotation**: `nogoo9/api.stats.port` (must point to the port of the container exposing metrics, e.g. `"8080"`).
+- **Path Annotation**: `nogoo9/api.stats.path` (the HTTP subpath, e.g. `"/api/stats"`).
+- **Refresh Annotation**: `nogoo9/api.stats.refresh` (frequency like `"10s"`, `"30s"`, `"1m"`, or `"init"` to query only once on load. Defaults to `"30s"`).
+
+#### Expected Output Format
+The `/api/stats` endpoint in the workspace container must return a JSON response containing a `stats` dictionary object:
+```json
+{
+  "stats": {
+    "CPU Usage": "4.2%",
+    "Memory": "128MB / 512MB",
+    "Active Connections": 14,
+    "Status": "Healthy"
+  }
+}
+```
+
+### 2. Last Activity Tracker Annotation (`last_activity`)
+Exposes the elapsed time since the user's last action in the workspace.
+- **Port Annotation**: `nogoo9/api.last_activity.port` (usually the same port as stats, e.g. `"8080"`).
+- **Path Annotation**: `nogoo9/api.last_activity.path` (the subpath, e.g. `"/api/stats"` or `"/api/activity"`).
+- **Refresh Annotation**: `nogoo9/api.last_activity.refresh` (frequency like `"30s"`, `"1m"`, or `"init"`. Defaults to `"30s"`).
+
+#### Expected Output Format
+The endpoint must return a JSON response containing a `last_activity` key with a numeric Unix epoch timestamp (supports both seconds or milliseconds):
+```json
+{
+  "last_activity": 1718040000000
+}
+```
+*Note: A single endpoint can serve both `stats` and `last_activity` payloads together, with the annotations referencing different paths or targeting the same path.*
+
+### 🎴 How it renders in the Dashboard Card
+When the workspace is running, the dashboard overlays a sunken "Metrics" pane displaying:
+1. **Activity status indicator** at the top right (e.g., `Active: Just now`, `Active: 5m ago`).
+2. **Metrics grid** listing the custom key-value pairs:
+   ```
+   METRICS                                      ACTIVE: 2m ago
+   -----------------------------------------------------------
+   CPU Usage: 4.2%         Active Connections: 14
+   Memory: 128MB / 512MB   Status: Healthy
+   ```
+
+### Full Pod Template Example
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workspace-with-metrics
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/description: "Developer workspace with system resource stats tracking"
+    # Port & Path for stats API
+    nogoo9/api.stats.port: "3000"
+    nogoo9/api.stats.path: "/api/stats"
+    nogoo9/api.stats.refresh: "10s"
+    # Port & Path for activity API (pointing to the same route)
+    nogoo9/api.last_activity.port: "3000"
+    nogoo9/api.last_activity.path: "/api/stats"
+    nogoo9/api.last_activity.refresh: "30s"
+data:
+  spec: |
+    {
+      "containers": [
+        {
+          "name": "workspace",
+          "image": "node:22-alpine",
+          "command": ["sleep", "infinity"]
+        }
+      ]
+    }
+```
+
+---
+
 ## 📂 Local & Built-In Templates *(Available from v0.4.0)*
 
 In addition to cluster-level Kubernetes `ConfigMap` templates, `@nogoo9/no-crd` supports loading templates from local file filesystems. This enables simple template management alongside the codebase or mounting templates dynamically via volumes:
