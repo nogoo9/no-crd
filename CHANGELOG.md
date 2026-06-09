@@ -5,18 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.1] — 2026-06-09
+## [0.8.1] — 2026-06-10
 
 ### Added
 
-- **NPM and GitHub Links & Dynamic Version Reporting**: Replaced the basic dashboard footer with a premium-designed responsive footer featuring hover-animated SVG links to the npm package and GitHub repository. Added a version badge (`no-crd v0.8.1`) that displays the server capabilities version dynamically.
-- **SystemInfoModal Backend Metadata**: Included the `@nogoo9/no-crd` backend version card inside the System Metadata info modal, dynamically fetched from the new `version` capability field.
+- **NPM and GitHub Links & Dynamic Version Reporting** ([ADR-018](docs/decisions/ADR-018-workspace-ownership-and-version-metadata.md)): Replaced the basic dashboard footer with a premium-designed responsive footer featuring hover-animated SVG links to the npm package and GitHub repository. Added a version badge (`no-crd v0.8.1`) that displays the server capabilities version dynamically.
+- **SystemInfoModal Backend Metadata** ([ADR-018](docs/decisions/ADR-018-workspace-ownership-and-version-metadata.md)): Included the `@nogoo9/no-crd` backend version card inside the System Metadata info modal, dynamically fetched from the new `version` capability field.
+- **Unauthenticated Workspace Redirection Recovery** ([ADR-017](docs/decisions/ADR-017-unauthenticated-workspace-redirection-recovery.md)): Preserved the post-login destination URL securely in `sessionStorage` to recover deep link navigation states when returning from OIDC PKCE redirect challenges.
 - **`nogoo9/api.<api-name>.refresh` Annotation**: Registered and documented the API refresh frequency annotation pattern in `src/config/annotations.ts` to support configurable stats and activity refresh rates, automatically synchronizing documentation tables.
 
 ### Fixed
 
-- **Workspace Owner Association & Spawn Schema Mismatch**: Aligned the spawner frontend parameter mapping from `targetUserSub` to `userSub` to resolve spawner validation errors and guarantee that spawned pods are labeled with the correct user subject on creation.
-- **Admin Layout Duplication**: Partitioned workspace lists for administrator sessions so that admin-owned sandboxes appear in "My Workspace Sandboxes" while other users' sandboxes appear in "Shared/Other Sandboxes", preventing duplication on the dashboard page.
+- **Workspace Owner Association & Spawn Schema Mismatch** ([ADR-018](docs/decisions/ADR-018-workspace-ownership-and-version-metadata.md)): Aligned the spawner frontend parameter mapping from `targetUserSub` to `userSub` to resolve spawner validation errors and guarantee that spawned pods are labeled with the correct user subject on creation.
+- **Admin Layout Duplication** ([ADR-018](docs/decisions/ADR-018-workspace-ownership-and-version-metadata.md)): Partitioned workspace lists for administrator sessions so that admin-owned sandboxes appear in "My Workspace Sandboxes" while other users' sandboxes appear in "Shared/Other Sandboxes", preventing duplication on the dashboard page.
+- **Session Cookie Custom JSONPaths** ([ADR-016](docs/decisions/ADR-016-session-cookie-custom-jsonpath-compatibility.md)): Fixed custom OIDC role mapping issues by properly reconstituting session cookies when using custom `subJsonPath` and `rolesJsonPath` claims.
+
 
 ## [0.8.0] — 2026-06-09
 

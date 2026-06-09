@@ -79,6 +79,8 @@ You can define spawner-specific annotations on the template `ConfigMap` to injec
 | `nogoo9/api.<api-name>.desc` | Annotation (String) | A short description of this additional API, shown in the UI interface. |
 | `nogoo9/api.<api-name>.method` | Annotation (String) | Comma-separated list of supported HTTP methods (e.g. `GET,POST`, `*`, defaults to any method). |
 | `nogoo9/api.<api-name>.refresh` | Annotation (Duration) | Sets the refresh frequency for custom stats/activity or other mini API views in the dashboard cards (e.g. `10s`, `1m`, or `init` to query only once on startup). |
+| `nogoo9/api.stats.refresh` | Annotation (Duration) | Explicitly configures the reload frequency for the reserved `stats` API metrics on the workspace dashboard card (e.g., `10s`, `30s`, `init`). |
+| `nogoo9/api.last_activity.refresh` | Annotation (Duration) | Explicitly configures the reload frequency for the reserved `last_activity` epoch timestamp API on the workspace dashboard card (e.g., `30s`, `1m`, `init`). |
 
 <!-- TEMPLATE_ANNOTATIONS_TABLE_END -->
 
