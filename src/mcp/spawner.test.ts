@@ -128,6 +128,9 @@ describe("Spawner MCP Tools - get_workspace", () => {
 			templateVersion: "1.0.0",
 			latestTemplateVersion: undefined,
 			isOutdated: false,
+			owner: "anonymous",
+			creationTime: undefined,
+			description: "",
 			annotations: {
 				"nogoo9/workspace-port": "8081",
 				"nogoo9/preview-path": "/preview",
@@ -145,6 +148,33 @@ describe("Spawner MCP Tools - get_workspace", () => {
 						image: "node:latest",
 					},
 				],
+			},
+			pod: {
+				metadata: {
+					name: "ws-pod-123",
+					annotations: {
+						"nogoo9/workspace-port": "8081",
+						"nogoo9/preview-path": "/preview",
+						"nogoo9/preview-type": "markdown",
+						custom: "val",
+					},
+					labels: {
+						"nogoo9/workspace-id": "ws-123",
+						"nogoo9/user-sub": "anonymous",
+					},
+				},
+				spec: {
+					containers: [
+						{
+							name: "agent",
+							image: "node:latest",
+						},
+					],
+				},
+				status: {
+					phase: "Running",
+					podIP: "10.244.0.5",
+				},
 			},
 		});
 	});

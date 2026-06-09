@@ -91,6 +91,31 @@ data:
           });
         }
 
+        // Expose stats API
+        if (url.pathname.endsWith("/api/stats")) {
+          const files = Math.floor(Math.random() * 80) + 10;
+          const tasks = Math.floor(Math.random() * 10) + 2;
+          return new Response(JSON.stringify({ stats: { files, tasks } }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+            },
+          });
+        }
+
+        // Expose last activity API
+        if (url.pathname.endsWith("/api/last-activity")) {
+          const lastActivity = Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 60);
+          return new Response(JSON.stringify({ last_activity: lastActivity }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+            },
+          });
+        }
+
         // Serve index.html
         const htmlPath = join(__dirname, "index.html");
         if (existsSync(htmlPath)) {

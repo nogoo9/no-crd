@@ -14,20 +14,24 @@ async function main() {
 		mkdirSync(distDir, { recursive: true });
 	}
 
-	// 1. Bundle src/ui/app.ts for the browser
+	// 1. Bundle src/ui/app.tsx for the browser
 	const result = await build({
-		entrypoints: [join(rootDir, "src", "ui", "app.ts")],
+		entrypoints: [join(rootDir, "src", "ui", "app.tsx")],
 		target: "browser",
 		minify: true,
 	});
 
 	if (!result.success) {
-		console.error("Failed to build app.ts bundle:", result.logs);
+		console.error("Failed to build app.tsx bundle:", result.logs);
 		process.exit(1);
 	}
 
 	// Get compiled JS as string
-	const bundledJs = await result.outputs[0].text();
+	let bundledJs = await result.outputs[0].text();
+
+	// Escape </script> tags inside the JS to prevent HTML parser breakage in the browser
+	bundledJs = bundledJs.replace(/<\/script>/gi, "<\\/script>");
+
 	console.log(`==> Bundled app.ts successfully (${bundledJs.length} bytes).`);
 
 	// 2. Read template HTML and inject compiled script

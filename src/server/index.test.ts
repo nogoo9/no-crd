@@ -2129,5 +2129,77 @@ users:
 				globalThis.fetch = originalFetch;
 			}
 		});
+
+		test("Session cookie parsing works with custom subJsonPath and rolesJsonPath", async () => {
+			process.env.AUTH_SUB_JSONPATH = "$.user.id";
+			process.env.AUTH_ROLES_JSONPATH = "$.user.roles";
+
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/workspace-auth-mode": "inject-headers",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock((_url: string, init?: any) => {
+				expect(init.headers.get("x-user-sub")).toBe("user-1");
+				expect(init.headers.get("x-user-roles")).toBe("admin,user");
+				return Promise.resolve(
+					new Response("proxied-response-with-custom-paths", { status: 200 }),
+				);
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const { createSessionCookie, resolveSessionSecret } = await import(
+					"~/k8s/index.js"
+				);
+				const key = await resolveSessionSecret(null, "default");
+
+				const jwt = {
+					user: {
+						id: "user-1",
+						roles: ["admin", "user"],
+					},
+				};
+				const sessCookie = createSessionCookie(
+					jwt,
+					key,
+					1800,
+					"$.user.id",
+					"$.user.roles",
+				);
+
+				const req = new Request("http://localhost/route/ws-1/subpath", {
+					method: "GET",
+					headers: {
+						Cookie: `nocr_sess=${sessCookie}`,
+					},
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+				expect(await resp.text()).toBe("proxied-response-with-custom-paths");
+				expect(mockFetch).toHaveBeenCalled();
+			} finally {
+				globalThis.fetch = originalFetch;
+				delete process.env.AUTH_SUB_JSONPATH;
+				delete process.env.AUTH_ROLES_JSONPATH;
+			}
+		});
 	});
 });

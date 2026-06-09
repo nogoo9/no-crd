@@ -26,6 +26,8 @@ export const ANNOTATION_KEYS = {
 	INIT_SHARE_VOLUMES: "nogoo9/init-share-volumes",
 	TEMPLATE_VERSION: "nogoo9/template-version",
 	WORKSPACE_AUTH_MODE: "nogoo9/workspace-auth-mode",
+	API_STATS_REFRESH: "nogoo9/api.stats.refresh",
+	API_LAST_ACTIVITY_REFRESH: "nogoo9/api.last_activity.refresh",
 } as const;
 
 export const ANNOTATION_METADATA: AnnotationParam[] = [
@@ -196,5 +198,23 @@ export const ANNOTATION_METADATA: AnnotationParam[] = [
 		type: "Annotation (String)",
 		description:
 			"Comma-separated list of supported HTTP methods (e.g. `GET,POST`, `*`, defaults to any method).",
+	},
+	{
+		key: "nogoo9/api.<api-name>.refresh",
+		type: "Annotation (Duration)",
+		description:
+			"Sets the refresh frequency for custom stats/activity or other mini API views in the dashboard cards (e.g. `10s`, `1m`, or `init` to query only once on startup).",
+	},
+	{
+		key: ANNOTATION_KEYS.API_STATS_REFRESH,
+		type: "Annotation (Duration)",
+		description:
+			"Explicitly configures the reload frequency for the reserved `stats` API metrics on the workspace dashboard card (e.g., `10s`, `30s`, `init`).",
+	},
+	{
+		key: ANNOTATION_KEYS.API_LAST_ACTIVITY_REFRESH,
+		type: "Annotation (Duration)",
+		description:
+			"Explicitly configures the reload frequency for the reserved `last_activity` epoch timestamp API on the workspace dashboard card (e.g., `30s`, `1m`, `init`).",
 	},
 ];

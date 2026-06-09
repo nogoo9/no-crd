@@ -322,6 +322,54 @@ function extractJsonPathValue(
 }
 
 /**
+ * Sets a value at a dot-separated JSONPath on an object.
+ */
+export function setJsonPathValue(
+	obj: Record<string, any>,
+	path: string,
+	value: any,
+): void {
+	const cleaned = path.replace(/^\$\.?/, "");
+	if (!cleaned) return;
+
+	const parts = cleaned.split(".");
+	let current = obj;
+	for (let i = 0; i < parts.length; i++) {
+		const part = parts[i];
+		if (i === parts.length - 1) {
+			current[part] = value;
+		} else {
+			if (current[part] == null || typeof current[part] !== "object") {
+				current[part] = {};
+			}
+			current = current[part];
+		}
+	}
+}
+
+/**
+ * Reconstructs a dummy JWT payload from session cookie fields, populating
+ * both standard paths and custom configured JSONPaths.
+ */
+export function reconstructSessionPayload(sub: string, roles: string[]): any {
+	const payload: any = {};
+	setJsonPathValue(payload, "$.sub", sub);
+	setJsonPathValue(payload, "$.realm_access.roles", roles);
+
+	const subPath = config.auth.subJsonPath;
+	const rolesPath = config.auth.rolesJsonPath;
+
+	if (subPath !== "$.sub") {
+		setJsonPathValue(payload, subPath, sub);
+	}
+	if (rolesPath !== "$.realm_access.roles") {
+		setJsonPathValue(payload, rolesPath, roles);
+	}
+
+	return payload;
+}
+
+/**
  * AES-256-GCM encrypts a refresh token using a key derived from the session secret.
  * Returns a dot-separated string: `base64url(iv).base64url(ciphertext).base64url(authTag)`.
  */

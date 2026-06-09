@@ -1,7 +1,7 @@
 {
 	"compilerOptions": {
 		"target": "ES2022",
-		"lib": ["ES2022"],
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"module": "ESNext",
 		"moduleResolution": "bundler",
 		"resolveJsonModule": true,
@@ -12,6 +12,7 @@
 		"sourceMap": true,
 		"composite": true,
 		"esModuleInterop": true,
-		"allowSyntheticDefaultImports": true
+		"allowSyntheticDefaultImports": true,
+		"jsx": "react-jsx"
 	}
 }

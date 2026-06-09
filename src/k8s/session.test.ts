@@ -5,8 +5,10 @@ import {
 	decryptRefreshToken,
 	encryptRefreshToken,
 	extractSessionCookieUserSub,
+	reconstructSessionPayload,
 	resolveSessionSecret,
 	type SessionPayload,
+	setJsonPathValue,
 	verifySessionCookie,
 } from "./session.js";
 
@@ -227,5 +229,61 @@ describe("encryptRefreshToken & decryptRefreshToken", () => {
 			decryptRefreshToken("too.many.dots.here.abc", TEST_SECRET),
 		).toBeNull();
 		expect(decryptRefreshToken("", TEST_SECRET)).toBeNull();
+	});
+});
+
+describe("setJsonPathValue", () => {
+	test("sets a value at flat path", () => {
+		const obj: any = {};
+		setJsonPathValue(obj, "$.sub", "user-123");
+		expect(obj.sub).toBe("user-123");
+	});
+
+	test("sets a value at nested path", () => {
+		const obj: any = {};
+		setJsonPathValue(obj, "$.user.profile.id", "profile-456");
+		expect(obj.user?.profile?.id).toBe("profile-456");
+	});
+
+	test("sets value on existing object paths", () => {
+		const obj: any = { user: { name: "Alice" } };
+		setJsonPathValue(obj, "$.user.id", "user-789");
+		expect(obj.user.name).toBe("Alice");
+		expect(obj.user.id).toBe("user-789");
+	});
+});
+
+describe("reconstructSessionPayload", () => {
+	test("reconstructs standard paths", () => {
+		const payload = reconstructSessionPayload("user-1", ["admin"]);
+		expect(payload.sub).toBe("user-1");
+		expect(payload.realm_access?.roles).toEqual(["admin"]);
+	});
+
+	test("reconstructs custom paths based on config", () => {
+		const origSub = process.env.AUTH_SUB_JSONPATH;
+		const origRoles = process.env.AUTH_ROLES_JSONPATH;
+
+		try {
+			process.env.AUTH_SUB_JSONPATH = "$.user.id";
+			process.env.AUTH_ROLES_JSONPATH = "$.user.roles";
+
+			const payload = reconstructSessionPayload("user-custom", ["custom-role"]);
+			expect(payload.sub).toBe("user-custom");
+			expect(payload.realm_access?.roles).toEqual(["custom-role"]);
+			expect(payload.user?.id).toBe("user-custom");
+			expect(payload.user?.roles).toEqual(["custom-role"]);
+		} finally {
+			if (origSub !== undefined) {
+				process.env.AUTH_SUB_JSONPATH = origSub;
+			} else {
+				delete process.env.AUTH_SUB_JSONPATH;
+			}
+			if (origRoles !== undefined) {
+				process.env.AUTH_ROLES_JSONPATH = origRoles;
+			} else {
+				delete process.env.AUTH_ROLES_JSONPATH;
+			}
+		}
 	});
 });
