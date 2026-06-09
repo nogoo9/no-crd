@@ -324,6 +324,7 @@ interface WorkspaceApi {
 	path: string;
 	desc?: string;
 	method?: string;
+	refresh?: string;
 }
 
 interface Workspace {
@@ -1532,8 +1533,8 @@ function WorkspaceCard({
 		};
 
 		// Independent refresh intervals from annotations
-		const statsRefreshStr = ws.annotations?.["nogoo9/api.stats.refresh"] || "30s";
-		const activityRefreshStr = ws.annotations?.["nogoo9/api.last_activity.refresh"] || "30s";
+		const statsRefreshStr = statsApi?.refresh || ws.annotations?.["nogoo9/api.stats.refresh"] || "30s";
+		const activityRefreshStr = activityApi?.refresh || ws.annotations?.["nogoo9/api.last_activity.refresh"] || "30s";
 
 		if (statsApi) {
 			void fetchStats();

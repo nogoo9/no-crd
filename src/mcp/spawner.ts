@@ -33,6 +33,7 @@ export const WorkspaceApiSchema = z.object({
 	path: z.string(),
 	desc: z.string().optional(),
 	method: z.string().optional(),
+	refresh: z.string().optional(),
 });
 
 export const ListWorkspacesOutputSchema = z.object({

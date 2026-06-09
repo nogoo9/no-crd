@@ -193,11 +193,12 @@ export interface WorkspaceApi {
 	path: string;
 	desc?: string;
 	method?: string;
+	refresh?: string;
 }
 
 /**
  * Parses additional workspace APIs exposed via kubernetes metadata annotations.
- * Pattern: `nogoo9/api.<api-name>.(port|path|desc|method)`
+ * Pattern: `nogoo9/api.<api-name>.(port|path|desc|method|refresh)`
  *
  * @param annotations Pod metadata annotations.
  * @returns Parsed list of WorkspaceApi instances.
@@ -212,7 +213,7 @@ export function parseWorkspaceApis(
 		if (key === "__proto__" || key === "constructor") continue;
 		if (key.startsWith(ANNOTATION_KEYS.PORT_PREFIX)) {
 			const rest = key.substring(ANNOTATION_KEYS.PORT_PREFIX.length);
-			const match = rest.match(/^([^.]+)\.(port|path|desc|method)$/);
+			const match = rest.match(/^([^.]+)\.(port|path|desc|method|refresh)$/);
 			if (match) {
 				const [_, apiName, field] = match;
 				if (!apisMap.has(apiName)) {
@@ -227,6 +228,8 @@ export function parseWorkspaceApis(
 					api.desc = value;
 				} else if (field === "method") {
 					api.method = value;
+				} else if (field === "refresh") {
+					api.refresh = value;
 				}
 			}
 		}
@@ -241,6 +244,7 @@ export function parseWorkspaceApis(
 				path: api.path ?? "/",
 				desc: api.desc,
 				method: api.method,
+				refresh: api.refresh,
 			});
 		}
 	}
