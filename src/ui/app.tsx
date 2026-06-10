@@ -3229,7 +3229,11 @@ interface WorkspacePreviewModalProps {
 }
 
 function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, onClose }: WorkspacePreviewModalProps) {
-	const [isMaximized, setIsMaximized] = useState(false);
+	const [isMaximized, setIsMaximized] = useState(() => {
+		const stored = localStorage.getItem("nocr_inline_maximized");
+		return stored !== "false"; // Defaults to true if not set
+	});
+	const [isHeaderOpen, setIsHeaderOpen] = useState(true);
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	const tokenQuery = activeToken ? `?token=${encodeURIComponent(activeToken)}` : "";
@@ -3240,45 +3244,90 @@ function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, o
 		setRefreshKey(prev => prev + 1);
 	};
 
+	const toggleMaximize = () => {
+		const next = !isMaximized;
+		setIsMaximized(next);
+		localStorage.setItem("nocr_inline_maximized", String(next));
+	};
+
 	return (
-		<div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-4">
-			<div className={`theme-modal bg-[var(--card)] border border-[var(--line)] shadow-2xl overflow-hidden flex flex-col animate-pop transition-all ${isMaximized ? "w-[98vw] h-[96vh] rounded-xl" : "w-full max-w-5xl rounded-2xl h-[90vh]"}`}>
-				<div className="px-6 py-4 border-b border-[var(--line)] flex items-center justify-between shrink-0">
-					<div>
-						<h3 className="text-base font-extrabold text-[var(--ink)]">Inline App Preview</h3>
-						<p className="text-xs text-[var(--ink-3)] mt-0.5 font-medium">Workspace Sandbox: <span className="font-mono text-[var(--accent)]">{workspace.id}</span></p>
-					</div>
-					<div className="flex gap-2 items-center">
-						<button onClick={handleRefresh} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1" title="Refresh Application">
-							<I.refresh className="w-3.5 h-3.5" />
-							Refresh
-						</button>
-						<button onClick={() => setIsMaximized(!isMaximized)} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1" title={isMaximized ? "Restore Size" : "Maximize"}>
-							{isMaximized ? (
-								<>
+		<div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-0 md:p-4">
+			<div className={`theme-modal bg-[var(--sunken)] overflow-hidden flex flex-col animate-pop transition-all relative ${isMaximized ? "fixed inset-0 w-screen h-screen rounded-none border-0" : "w-full max-w-6xl rounded-2xl h-[92vh] border border-[var(--line)] shadow-2xl"}`}>
+				
+				{/* Top-Sliding Floating Control Drawer */}
+				<div className={`absolute top-0 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 transform ${isHeaderOpen ? "translate-y-0" : "-translate-y-full"}`}>
+					<div className="bg-[var(--card)] border border-t-0 border-[var(--line)] px-6 py-2.5 rounded-b-2xl shadow-2xl flex flex-col items-center gap-1.5 shrink-0">
+						<div className="flex items-center gap-5">
+							<div className="flex flex-col pr-4 border-r border-[var(--line)] text-left">
+								<span className="text-[11px] font-extrabold text-[var(--ink)] whitespace-nowrap">Inline App Preview</span>
+								<span className="text-[9px] font-mono text-[var(--accent)] whitespace-nowrap">{workspace.id}</span>
+							</div>
+							
+							<div className="flex items-center gap-1.5">
+								<button onClick={handleRefresh} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Refresh Application">
+									<I.refresh className="w-3.5 h-3.5" />
+									Refresh
+								</button>
+								
+								<button onClick={toggleMaximize} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title={isMaximized ? "Restore Size" : "Maximize"}>
+									{isMaximized ? (
+										<>
+											<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9h-4V5m0 4l5-5M5 15h4v4m0-4l-5 5m14 0h4v-4m-4 4l5 5M9 5v4H5m4-4L4 4" />
+											</svg>
+											Restore
+										</>
+									) : (
+										<>
+											<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 14h6v6m0-6l-6 6m16-6h-6V8m0 6l6-6M4 4h6v6m0-6L4 10m16-6h-6v6m0-6l6 6" />
+											</svg>
+											Maximize
+										</>
+									)}
+								</button>
+								
+								<a href={targetUrl} target="_blank" className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Open in New Tab">
 									<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9h-4V5m0 4l5-5M5 15h4v4m0-4l-5 5m14 0h4v-4m-4 4l5 5M9 5v4H5m4-4L4 4" />
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
 									</svg>
-									Restore
-								</>
-							) : (
-								<>
-									<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 14h6v6m0-6l-6 6m16-6h-6V8m0 6l6-6M4 4h6v6m0-6L4 10m16-6h-6v6m0-6l6 6" />
-									</svg>
-									Maximize
-								</>
-							)}
-						</button>
-						<a href={targetUrl} target="_blank" className="btn btn-ghost px-2.5 py-1 text-[11px]">
-							Open Tab
-						</a>
-						<button className="btn btn-quiet p-1 rounded-lg text-[var(--ink-3)]" onClick={onClose}>
-							<I.cross className="w-5 h-5" />
+									Open Tab
+								</a>
+								
+								<button className="btn btn-quiet p-1 rounded-lg text-[var(--ink-3)] hover:text-red-500 flex items-center justify-center" onClick={onClose} title="Close Preview">
+									<I.cross className="w-4 h-4" />
+								</button>
+							</div>
+						</div>
+						
+						{/* Collapse Drawer Tab/Button */}
+						<button 
+							onClick={() => setIsHeaderOpen(false)}
+							className="text-[9px] text-[var(--ink-3)] hover:text-[var(--accent)] flex items-center gap-0.5 select-none cursor-pointer border-none bg-transparent font-semibold mt-0.5 transition-colors"
+						>
+							<span>Collapse Panel</span>
+							<svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" />
+							</svg>
 						</button>
 					</div>
 				</div>
-				<div className="flex-1 bg-[var(--sunken)] relative min-h-[300px]">
+
+				{/* Floating Expand Tab when Collapsed */}
+				<div className="absolute top-0 left-1/2 -translate-x-1/2 z-50">
+					<button 
+						onClick={() => setIsHeaderOpen(true)}
+						className={`bg-[var(--card)] border border-[var(--line)] border-t-0 px-4 py-1.5 rounded-b-xl shadow-md hover:bg-[var(--sunken)] flex items-center gap-1 text-[10px] text-[var(--ink-2)] transition-all cursor-pointer select-none font-extrabold ${isHeaderOpen ? "opacity-0 pointer-events-none -translate-y-full" : "opacity-100 translate-y-0"}`}
+					>
+						<span>Show Control Panel</span>
+						<svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+						</svg>
+					</button>
+				</div>
+
+				{/* Immersive Full-Screen Iframe Viewport */}
+				<div className="flex-1 bg-white relative w-full h-full">
 					<iframe
 						key={refreshKey}
 						src={targetUrl}
@@ -3286,9 +3335,6 @@ function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, o
 						sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
 						title={`Preview frame of ${workspace.id}`}
 					/>
-				</div>
-				<div className="px-6 py-4 border-t border-[var(--line)] flex justify-end shrink-0">
-					<button className="btn btn-ghost text-xs" onClick={onClose}>Close</button>
 				</div>
 			</div>
 		</div>
