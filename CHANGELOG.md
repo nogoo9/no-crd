@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-06-10
+
+### Added
+
+- **Interactive Popup SSO Renewal & Session Expiry Warnings** ([ADR-019](docs/decisions/ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md)): Added a session expiration banner warning standard users when their token is about to expire, launching a user-initiated SSO renewal flow in a popup window.
+- **Auto/Manual Refresh Dashboard Control**: Added a segmented control in the dashboard toolbar to switch between automated 5-second data polling and manual refresh, persisting the setting in `localStorage`.
+- **Maximize & Reload Control for Inline Workspaces**: Added toolbar controls to maximize/restore the size of the inline preview workspace modal and reload the iframe target.
+
+### Fixed
+
+- **Keycloak Hostname and Path Mismatch** ([ADR-019](docs/decisions/ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md)): Configured `KC_HOSTNAME` to `http://localhost:8080/auth` in `keycloak.yaml` to ensure Keycloak generates and validates the same token issuer URL (`http://localhost:8080/auth/realms/nogoo9`) for both external frontend login flows and internal backend-to-backend token refresh requests.
+- **Dynamic Path-Scoped Cookie Routing** ([ADR-019](docs/decisions/ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md)): Scoped OIDC session and authorization cookies to dynamic base URLs (`Path=/nocr/`) under dynamic subpath routers, preventing token resolution and refresh routing conflicts.
+
+
 ## [0.8.1] — 2026-06-10
 
 ### Added

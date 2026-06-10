@@ -27,6 +27,7 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-016](./ADR-016-session-cookie-custom-jsonpath-compatibility.md) | Session Cookie Reconstitution Compatibility with Custom JSONPaths | Accepted |
 | [ADR-017](./ADR-017-unauthenticated-workspace-redirection-recovery.md) | Unauthenticated Workspace Redirection Recovery | Accepted |
 | [ADR-018](./ADR-018-workspace-ownership-and-version-metadata.md) | Workspace Owner Association and Server Metadata Reporting | Accepted |
+| [ADR-019](./ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md) | Split-Network OIDC Issuer Alignment and Path-Scoped Cookie Routing | Accepted |
 
 ## How to Read ADRs
 
@@ -61,6 +62,7 @@ graph LR
     ADR013 --> ADR016["ADR-016: Session Cookie Custom JSONPaths"]
     ADR013 --> ADR017["ADR-017: Unauthenticated Workspace Redirection Recovery"]
     ADR015 --> ADR018["ADR-018: Workspace Ownership & Version Metadata"]
+    ADR017 --> ADR019["ADR-019: Split-Network OIDC Issuer & Cookie Pathing"]
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -79,6 +81,7 @@ graph LR
     style ADR016 fill:#4a9eff,color:#fff
     style ADR017 fill:#4a9eff,color:#fff
     style ADR018 fill:#f59e0b,color:#fff
+    style ADR019 fill:#4a9eff,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain

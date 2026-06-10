@@ -12,6 +12,7 @@ export async function registerProxyRoutes(
 	deps: RouteDeps,
 ): Promise<void> {
 	const { proxyPreHandler } = deps.guards;
+	const basePrefix = getBasePrefix();
 
 	// 1. Path-scoped token retrieval endpoint
 	api.get(
@@ -36,7 +37,79 @@ export async function registerProxyRoutes(
 			}
 
 			const token = (request as any).token;
-			return { token: token || null };
+			let session: {
+				sub: string;
+				roles: string[];
+				iat?: number;
+				exp?: number;
+			} | null = null;
+
+			const {
+				getSessionKey,
+				extractTokenFromCookie,
+				verifySessionCookie,
+				extractUserIdentity,
+			} = await import("~/k8s/index.js");
+			const sessKey = getSessionKey();
+			const sessCookie = extractTokenFromCookie(
+				request.headers.cookie,
+				"nocr_sess",
+			);
+			if (sessCookie && sessKey) {
+				const verified = verifySessionCookie(sessCookie, sessKey);
+				if (verified) {
+					session = {
+						sub: verified.sub,
+						roles: verified.roles,
+						iat: verified.iat,
+						exp: verified.exp,
+					};
+				}
+			}
+
+			if (!session && (request as any).jwtPayload) {
+				const jwtPayload = (request as any).jwtPayload;
+				let sub = "";
+				try {
+					sub = extractUserIdentity(jwtPayload, config.auth.subJsonPath);
+				} catch (_) {
+					sub = jwtPayload.sub || jwtPayload.name || "";
+				}
+
+				// Extract roles using JSONPath or fallbacks
+				let roles: string[] = [];
+				try {
+					const { JSONPath } = await import("jsonpath-plus");
+					const match = JSONPath<unknown[]>({
+						path: config.auth.rolesJsonPath || "$.realm_access.roles",
+						json: jwtPayload as object,
+					});
+					const rolesVal = match && match.length > 0 ? match[0] : undefined;
+					if (Array.isArray(rolesVal)) {
+						roles = rolesVal.map(String);
+					} else if (typeof rolesVal === "string") {
+						roles = rolesVal.split(/[\s,]+/);
+					} else {
+						const directRoles =
+							jwtPayload.roles ?? jwtPayload.realm_access?.roles;
+						if (Array.isArray(directRoles)) {
+							roles = directRoles.map(String);
+						}
+					}
+				} catch (_) {}
+
+				session = {
+					sub,
+					roles,
+					iat: typeof jwtPayload.iat === "number" ? jwtPayload.iat : undefined,
+					exp: typeof jwtPayload.exp === "number" ? jwtPayload.exp : undefined,
+				};
+			}
+
+			return {
+				token: token || null,
+				session,
+			};
 		},
 	);
 
@@ -224,7 +297,6 @@ export async function registerProxyRoutes(
 
 		try {
 			const { performTokenRefresh } = await import("~/server/auth.js");
-			const basePrefix = getBasePrefix();
 			const result = await performTokenRefresh(
 				request,
 				decryptedRefresh,
@@ -271,7 +343,7 @@ export async function registerProxyRoutes(
 
 			reply.header(
 				"Set-Cookie",
-				`nocr_token=${result.token}; Path=/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
+				`nocr_token=${result.token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
 			);
 
 			return { token: result.token };
@@ -359,15 +431,14 @@ export async function registerProxyRoutes(
 					const token = (request as any).token;
 					const workspaceId = (request as any).workspaceId;
 					if (token && workspaceId) {
-						// Cookie Path uses raw "/route/{id}/" without basePrefix because
-						// Fastify registers all routes under { prefix: basePrefix }. The
-						// browser sees the full URL (e.g. /gateway/no-crd/route/ws-1/)
-						// but the cookie Path in the Set-Cookie header is taken literally.
-						// The logout handler clears with the same raw path, keeping them
-						// consistent. See ADR-011 for the full analysis.
+						// Cookie Path uses "/route/{id}/" prefixed with basePrefix because
+						// the cookie Path in the Set-Cookie header is matched against the
+						// full browser request path (which includes basePrefix). The logout
+						// handler also clears with the same prefix-consistent path.
+						// See ADR-011 for context on cookie path alignment.
 						reply.header(
 							"Set-Cookie",
-							`nocr_token=${token}; Path=/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
+							`nocr_token=${token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
 						);
 					}
 					reply.send(res.stream);

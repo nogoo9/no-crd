@@ -79,13 +79,12 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 				.map((pod: any) => pod.metadata?.labels?.[ANNOTATION_KEYS.WORKSPACE_ID])
 				.filter(Boolean);
 
-			// Clear per-workspace nocr_token cookies. These use the same raw
-			// Path="/route/{id}/" (without basePrefix) as the proxy Set-Cookie
-			// in proxy.ts, so they match correctly. See ADR-011.
+			// Clear per-workspace nocr_token cookies using matching prefixed paths.
+			// See ADR-011.
 			for (const id of workspaceIds) {
 				reply.header(
 					"Set-Cookie",
-					`nocr_token=; Path=/route/${id}/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+					`nocr_token=; Path=${basePrefix}/route/${id}/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
 				);
 			}
 		} catch (err) {

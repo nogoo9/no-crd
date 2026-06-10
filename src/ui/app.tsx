@@ -411,6 +411,18 @@ function Dashboard() {
 	});
 	const [activeToken, setActiveToken] = useState("");
 	const [toasts, setToasts] = useState<Toast[]>([]);
+	const [isSessionExpiringSoon, setIsSessionExpiringSoon] = useState(false);
+	const [hasRefreshCookie, setHasRefreshCookie] = useState(() => {
+		return localStorage.getItem("nocr_no_refresh") !== "true";
+	});
+	const [workspaceOpenMode, setWorkspaceOpenMode] = useState<"tab" | "inline">(() => {
+		const noRefresh = localStorage.getItem("nocr_no_refresh") === "true";
+		if (noRefresh) return "inline";
+		return (localStorage.getItem("nocr_workspace_mode") as "tab" | "inline") || "tab";
+	});
+	const [isAutoRefresh, setIsAutoRefresh] = useState(() => {
+		return localStorage.getItem("nocr_auto_refresh") !== "false";
+	});
 
 	const isAuthRequired = !!(oauthConfig.discoveryUrl && oauthConfig.clientId);
 	const canConnect = !isAuthRequired || !!activeToken;
@@ -565,6 +577,100 @@ function Dashboard() {
 		}
 	}, []);
 
+	// Monitor active token expiration
+	useEffect(() => {
+		if (!activeToken) {
+			setIsSessionExpiringSoon(false);
+			return;
+		}
+
+		const checkExpiry = () => {
+			const payload = decodeJwt(activeToken);
+			if (payload?.exp) {
+				const timeLeft = payload.exp - Date.now() / 1000;
+				// If less than 60 seconds are left (and we don't have refresh token/cookie to transparently renew)
+				if (timeLeft > 0 && timeLeft < 60) {
+					setIsSessionExpiringSoon(true);
+				} else {
+					setIsSessionExpiringSoon(false);
+				}
+			}
+		};
+
+		checkExpiry();
+		const intervalId = setInterval(checkExpiry, 10000);
+		return () => clearInterval(intervalId);
+	}, [activeToken]);
+
+	// Listen to storage changes (e.g. from popup window)
+	useEffect(() => {
+		const handleStorageChange = (e: StorageEvent) => {
+			if (e.key === "nocr_token" && e.newValue) {
+				console.log("Detected token update from popup / another tab. Updating active token state...");
+				setActiveToken(e.newValue);
+			}
+		};
+		window.addEventListener("storage", handleStorageChange);
+		return () => window.removeEventListener("storage", handleStorageChange);
+	}, []);
+
+	// Popup OIDC session refresh trigger
+	const triggerPopupRefresh = async () => {
+		try {
+			const state = generateRandomString(16);
+			const verifier = generateRandomString(64);
+			localStorage.setItem("nocr_oauth_state", state);
+			localStorage.setItem("nocr_oauth_verifier", verifier);
+			const challenge = await generateChallenge(verifier);
+
+			const discRes = await fetch(oauthConfig.discoveryUrl!);
+			const discData = await discRes.json();
+			const authEndpoint = discData.authorization_endpoint;
+
+			const redirectUri = window.location.origin + window.location.pathname;
+			const url = new URL(authEndpoint);
+			url.searchParams.set("response_type", "code");
+			url.searchParams.set("client_id", oauthConfig.clientId!);
+			url.searchParams.set("redirect_uri", redirectUri);
+			url.searchParams.set("state", state);
+			url.searchParams.set("code_challenge", challenge);
+			url.searchParams.set("code_challenge_method", "S256");
+			const scopes = Array.isArray(oauthConfig.scopes) && oauthConfig.scopes.length > 0
+				? oauthConfig.scopes
+				: ["openid", "profile", "email"];
+			url.searchParams.set("scope", scopes.join(" "));
+
+			const width = 600;
+			const height = 650;
+			const left = window.screen.width / 2 - width / 2;
+			const top = window.screen.height / 2 - height / 2;
+			
+			// Open authorization URL in popup
+			window.open(
+				url.toString(),
+				"OidcAuthPopup",
+				`width=${width},height=${height},top=${top},left=${left},status=yes,toolbar=no,menubar=no,location=yes`
+			);
+		} catch (err) {
+			triggerToast("Failed to initialize OIDC popup refresh", "error");
+		}
+	};
+
+	const activeWorkspaceId = route.view === "workspace" ? route.id : activePreviewWs?.ws.id;
+
+	// Active Workspace Cookie Bootstrapping Hook
+	useEffect(() => {
+		if (activeToken && activeWorkspaceId) {
+			console.log(`Bootstrapping workspace cookie for active workspace: ${activeWorkspaceId}`);
+			void fetch(`${basePath}/route/${activeWorkspaceId}/`, {
+				method: "HEAD",
+				headers: { Authorization: `Bearer ${activeToken}` },
+			}).catch((err) =>
+				console.warn(`Failed to bootstrap cookie for workspace ${activeWorkspaceId}:`, err)
+			);
+		}
+	}, [activeToken, activeWorkspaceId]);
+
 	// Retrieve Data Hook
 	const refreshData = async () => {
 		try {
@@ -652,6 +758,22 @@ function Dashboard() {
 		});
 	}, [isInitialized, namespace]);
 
+	// Auto-Refresh Effect
+	const refreshDataRef = useRef(refreshData);
+	useEffect(() => {
+		refreshDataRef.current = refreshData;
+	}, [refreshData]);
+
+	useEffect(() => {
+		if (!isInitialized || !isAutoRefresh) return;
+
+		const intervalId = setInterval(() => {
+			void refreshDataRef.current();
+		}, 5000);
+
+		return () => clearInterval(intervalId);
+	}, [isInitialized, isAutoRefresh]);
+
 	// PKCE Redirection Trigger
 	const triggerOidcLogin = async () => {
 		try {
@@ -733,7 +855,37 @@ function Dashboard() {
 						if (tokenData.access_token) {
 							localStorage.setItem("nocr_token", tokenData.access_token);
 							setActiveToken(tokenData.access_token);
+
+							if (tokenData.refresh_token) {
+								localStorage.removeItem("nocr_no_refresh");
+								setHasRefreshCookie(true);
+								try {
+									await fetch(`${basePath}/auth/set-refresh`, {
+										method: "POST",
+										headers: {
+											"Content-Type": "application/json",
+											Authorization: `Bearer ${tokenData.access_token}`,
+										},
+										body: JSON.stringify({ refresh_token: tokenData.refresh_token }),
+									});
+								} catch (err) {
+									console.warn("Failed to set refresh token cookie on server:", err);
+								}
+							} else {
+								localStorage.setItem("nocr_no_refresh", "true");
+								setHasRefreshCookie(false);
+								triggerToast(
+									"Warning: No OIDC refresh token was returned by your identity provider. Sessions will expire frequently. Contact your administrator to enable offline_access.",
+									"error",
+								);
+							}
+
 							triggerToast("Signed in successfully!", "success");
+
+							if (window.name === "OidcAuthPopup" || window.opener) {
+								window.close();
+								return;
+							}
 
 							const savedRedirect = sessionStorage.getItem("nocr_post_login_redirect_uri");
 							if (isSafeRedirectUri(savedRedirect)) {
@@ -969,6 +1121,24 @@ function Dashboard() {
 
 	return (
 		<div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+			{isSessionExpiringSoon && !hasRefreshCookie && (
+				<div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-pop">
+					<div className="flex items-center gap-2.5 text-amber-500">
+						<svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+						<div className="text-xs font-semibold text-[var(--ink)]">
+							Your OIDC SSO session is expiring soon. Click "Renew Session" to authenticate silently in a popup.
+						</div>
+					</div>
+					<button
+						onClick={triggerPopupRefresh}
+						className="btn btn-primary bg-amber-500 hover:bg-amber-600 border-0 text-white text-xs py-1.5 px-4 rounded-lg shrink-0 cursor-pointer"
+					>
+						Renew Session
+					</button>
+				</div>
+			)}
 			{/* Top Header */}
 			<header className="flex flex-col md:flex-row md:items-center md:justify-between pb-8 border-b border-[var(--line)] gap-4">
 				<div className="flex items-center gap-3">
@@ -1016,11 +1186,52 @@ function Dashboard() {
 						</button>
 					)}
 
-					{/* Refresh btn */}
-					<button className="btn btn-primary text-xs py-1.5 flex items-center gap-1" disabled={isPending} onClick={refreshData}>
-						<I.refresh className={`w-3.5 h-3.5 ${isPending ? "animate-spin" : ""}`} />
-						Refresh
-					</button>
+					{/* Refresh control */}
+					<div className="flex items-center gap-1.5">
+						<div className="flex items-center border border-[var(--line)] rounded-lg overflow-hidden bg-[var(--card)] p-0.5 select-none">
+							<button
+								type="button"
+								onClick={() => {
+									setIsAutoRefresh(true);
+									localStorage.setItem("nocr_auto_refresh", "true");
+								}}
+								className={`px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer rounded-md flex items-center gap-1 ${
+									isAutoRefresh
+										? "bg-[var(--accent-soft)] text-[var(--accent)] font-semibold"
+										: "text-[var(--ink-3)] hover:text-[var(--ink)]"
+								}`}
+								title="Auto-refresh status every 5s"
+							>
+								{isAutoRefresh && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />}
+								Auto
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setIsAutoRefresh(false);
+									localStorage.setItem("nocr_auto_refresh", "false");
+								}}
+								className={`px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer rounded-md ${
+									!isAutoRefresh
+										? "bg-[var(--surface)] text-[var(--ink)] font-semibold"
+										: "text-[var(--ink-3)] hover:text-[var(--ink)]"
+								}`}
+								title="Manual refresh only"
+							>
+								Manual
+							</button>
+						</div>
+
+						<button
+							type="button"
+							className="btn btn-primary text-xs py-1.5 flex items-center gap-1"
+							disabled={isPending}
+							onClick={refreshData}
+						>
+							<I.refresh className={`w-3.5 h-3.5 ${isPending ? "animate-spin" : ""}`} />
+							Refresh
+						</button>
+					</div>
 				</div>
 			</header>
 
@@ -1070,6 +1281,20 @@ function Dashboard() {
 					>
 						<option value="comfortable">Comfortable Layout</option>
 						<option value="compact">Compact Layout</option>
+					</select>
+
+					{/* Workspace open mode toggler */}
+					<select
+						value={workspaceOpenMode}
+						onChange={(e) => {
+							const mode = e.target.value as "tab" | "inline";
+							setWorkspaceOpenMode(mode);
+							localStorage.setItem("nocr_workspace_mode", mode);
+						}}
+						className="theme-text-input text-xs px-3 py-2 cursor-pointer outline-none rounded-lg font-medium"
+					>
+						<option value="tab">Open: New Browser Tab ↗</option>
+						<option value="inline">Open: Inline Frame 🖥️</option>
 					</select>
 				</div>
 			</div>
@@ -1139,6 +1364,8 @@ function Dashboard() {
 										basePath={basePath}
 										activeToken={activeToken}
 										density={density}
+										currentUser={getDisplayUser()}
+										workspaceOpenMode={workspaceOpenMode}
 										onStop={() => stopWorkspace(ws.id)}
 										onUpgrade={() => upgradeWorkspace(ws.id)}
 										onShowLogs={() => setActiveLogsWs(ws)}
@@ -1169,6 +1396,8 @@ function Dashboard() {
 										basePath={basePath}
 										activeToken={activeToken}
 										density={density}
+										currentUser={getDisplayUser()}
+										workspaceOpenMode={workspaceOpenMode}
 										onStop={() => stopWorkspace(ws.id)}
 										onUpgrade={() => upgradeWorkspace(ws.id)}
 										onShowLogs={() => setActiveLogsWs(ws)}
@@ -1187,6 +1416,7 @@ function Dashboard() {
 					workspaceId={route.id!}
 					namespace={namespace}
 					activeToken={activeToken}
+					currentUser={getDisplayUser()}
 					onBack={() => setRoute({ view: "landing" })}
 					refreshAll={refreshData}
 				/>
@@ -1449,6 +1679,8 @@ interface WorkspaceCardProps {
 	basePath: string;
 	activeToken: string;
 	density: string;
+	currentUser: string;
+	workspaceOpenMode: "tab" | "inline";
 	onStop: () => void;
 	onUpgrade: () => void;
 	onShowLogs: () => void;
@@ -1476,6 +1708,8 @@ function WorkspaceCard({
 	basePath,
 	activeToken,
 	density,
+	currentUser,
+	workspaceOpenMode,
 	onStop,
 	onUpgrade,
 	onShowLogs,
@@ -1487,6 +1721,7 @@ function WorkspaceCard({
 	const pathPart = ws.workspacePath || ws.previewPath || "/";
 	const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
 	const openUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
+	const isOwner = !ws.userSub || ws.userSub === currentUser;
 
 	const [stats, setStats] = useState<Record<string, any> | null>(null);
 	const [lastActivity, setLastActivity] = useState<number | null>(null);
@@ -1657,26 +1892,42 @@ function WorkspaceCard({
 			{/* Action Area */}
 			<div className="border-t border-[var(--line)] pt-3.5 mt-3 space-y-3">
 				{/* Primary Prominent Action */}
-				{ws.status === "Running" ? (
-					<a 
-						href={openUrl} 
-						target="_blank" 
-						rel="noopener noreferrer" 
-						className="w-full btn bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
-					>
-						<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-						</svg>
-						Open Workspace Tab
-					</a>
-				) : ws.status === "Pending" ? (
-					<button 
-						disabled
-						className="w-full btn bg-amber-500/10 border border-amber-500/20 text-amber-500 font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 opacity-80"
-					>
-						<I.refresh className="w-3.5 h-3.5 animate-spin" />
-						Starting Workspace...
-					</button>
+				{isOwner ? (
+					ws.status === "Running" ? (
+						workspaceOpenMode === "inline" ? (
+							<button
+								onClick={() => onShowPreview(ws.previewPath || ws.workspacePath || "/", ws.previewType || ws.workspaceType || "html")}
+								className="w-full btn bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
+							>
+								<I.eye className="w-3.5 h-3.5" />
+								Open Workspace Inline
+							</button>
+						) : (
+							<a 
+								href={openUrl} 
+								target="_blank" 
+								rel="noopener noreferrer" 
+								className="w-full btn bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
+							>
+								<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+								</svg>
+								Open Workspace Tab
+							</a>
+						)
+					) : ws.status === "Pending" ? (
+						<button 
+							disabled
+							className="w-full btn bg-amber-500/10 border border-amber-500/20 text-amber-500 font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 opacity-80"
+						>
+							<I.refresh className="w-3.5 h-3.5 animate-spin" />
+							Starting Workspace...
+						</button>
+					) : (
+						<div className="w-full py-2 bg-[var(--sunken)] rounded-xl border border-[var(--line)] text-center text-xs text-[var(--ink-3)] font-semibold font-mono uppercase tracking-wide">
+							Status: {ws.status}
+						</div>
+					)
 				) : (
 					<div className="w-full py-2 bg-[var(--sunken)] rounded-xl border border-[var(--line)] text-center text-xs text-[var(--ink-3)] font-semibold font-mono uppercase tracking-wide">
 						Status: {ws.status}
@@ -1695,7 +1946,21 @@ function WorkspaceCard({
 							Details
 						</button>
 
-						{ws.status === "Running" && (ws.previewPath || ws.workspacePath) && (
+						{isOwner && ws.status === "Running" && workspaceOpenMode === "inline" && (
+							<a 
+								href={openUrl} 
+								target="_blank" 
+								rel="noopener noreferrer" 
+								className="btn btn-ghost px-2.5 py-1 text-[11px] font-bold text-[var(--ink-2)] hover:text-[var(--ink)] flex items-center gap-1"
+							>
+								<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+								</svg>
+								Open Tab
+							</a>
+						)}
+
+						{isOwner && ws.status === "Running" && workspaceOpenMode === "tab" && (ws.previewPath || ws.workspacePath) && (
 							<button 
 								className="btn btn-ghost px-2.5 py-1 text-[11px] font-bold text-[var(--ink-2)] hover:text-[var(--ink)] flex items-center gap-1" 
 								onClick={() => onShowPreview(ws.previewPath || ws.workspacePath || "/", ws.previewType || ws.workspaceType || "html")}
@@ -1705,7 +1970,7 @@ function WorkspaceCard({
 							</button>
 						)}
 
-						{ws.isOutdated && (
+						{isOwner && ws.isOutdated && (
 							<button 
 								className="btn btn-ghost text-amber-600 hover:bg-amber-500/10 px-2 py-1 text-[10px] font-bold flex items-center gap-1" 
 								onClick={onUpgrade}
@@ -1717,7 +1982,7 @@ function WorkspaceCard({
 					</div>
 
 					<div className="flex">
-						{ws.status === "Running" && (
+						{isOwner && ws.status === "Running" && (
 							<button 
 								className="btn btn-ghost text-red-500 hover:bg-red-500/10 px-2.5 py-1 text-[11px] font-bold flex items-center gap-1" 
 								onClick={onStop}
@@ -1754,6 +2019,7 @@ interface WorkspaceConsoleViewProps {
 	workspaceId: string;
 	namespace: string;
 	activeToken: string;
+	currentUser: string;
 	onBack: () => void;
 	refreshAll: () => void;
 }
@@ -1762,6 +2028,7 @@ function WorkspaceConsoleView({
 	workspaceId,
 	namespace,
 	activeToken,
+	currentUser,
 	onBack,
 	refreshAll,
 }: WorkspaceConsoleViewProps) {
@@ -1830,6 +2097,15 @@ function WorkspaceConsoleView({
 		}
 	}, [ws]);
 
+	useEffect(() => {
+		if (ws) {
+			const isOwner = !ws.userSub || ws.userSub === currentUser;
+			if (!isOwner && (activeTab === "terminal" || activeTab === "preview")) {
+				setActiveTab("logs");
+			}
+		}
+	}, [ws, currentUser, activeTab]);
+
 	if (!ws) {
 		return <div className="py-12 text-center text-[var(--ink-3)] font-mono">Loading details console...</div>;
 	}
@@ -1841,6 +2117,7 @@ function WorkspaceConsoleView({
 	const workspaceUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
 	// Terminal routed path (if terminal template runs ttyd on preview/workspace port or api endpoints)
 	const terminalUrl = `${basePath}/route/${ws.id}/terminal/${tokenQuery}`;
+	const isOwner = !ws.userSub || ws.userSub === currentUser;
 
 	return (
 		<div className="mt-6 flex flex-col gap-6 animate-fadeUp select-text">
@@ -1912,18 +2189,22 @@ function WorkspaceConsoleView({
 					{/* Tab switcher row */}
 					<div className="bg-[var(--surface)] border-b border-[var(--line)] px-4 py-2 flex items-center justify-between">
 						<div className="flex gap-2">
-							<button
-								onClick={() => setActiveTab("terminal")}
-								className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "terminal" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
-							>
-								Interactive Terminal
-							</button>
-							<button
-								onClick={() => setActiveTab("preview")}
-								className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "preview" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
-							>
-								Web Preview
-							</button>
+							{isOwner && (
+								<>
+									<button
+										onClick={() => setActiveTab("terminal")}
+										className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "terminal" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
+									>
+										Interactive Terminal
+									</button>
+									<button
+										onClick={() => setActiveTab("preview")}
+										className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "preview" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
+									>
+										Web Preview
+									</button>
+								</>
+							)}
 							<button
 								onClick={() => setActiveTab("logs")}
 								className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "logs" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
@@ -1944,7 +2225,7 @@ function WorkspaceConsoleView({
 							</button>
 						</div>
 						
-						{["terminal", "preview"].includes(activeTab) && (
+						{isOwner && ["terminal", "preview"].includes(activeTab) && (
 							<a href={activeTab === "terminal" ? terminalUrl : workspaceUrl} target="_blank" className="text-[11px] font-bold text-[var(--accent)] hover:underline flex items-center gap-1" rel="noreferrer">
 								Launch Independent Tab <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
 							</a>
@@ -1953,7 +2234,7 @@ function WorkspaceConsoleView({
 
 					{/* Tab frame display */}
 					<div className="flex-1 bg-[var(--sunken)] relative min-h-[480px]">
-						{activeTab === "terminal" && (
+						{activeTab === "terminal" && isOwner && (
 							<iframe
 								src={terminalUrl}
 								className="w-full h-full border-none absolute inset-0 bg-[#1e1e1e]"
@@ -1962,7 +2243,7 @@ function WorkspaceConsoleView({
 							/>
 						)}
 
-						{activeTab === "preview" && (
+						{activeTab === "preview" && isOwner && (
 							<iframe
 								src={workspaceUrl}
 								className="w-full h-full border-none absolute inset-0 bg-white"
@@ -2948,19 +3229,47 @@ interface WorkspacePreviewModalProps {
 }
 
 function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, onClose }: WorkspacePreviewModalProps) {
+	const [isMaximized, setIsMaximized] = useState(false);
+	const [refreshKey, setRefreshKey] = useState(0);
+
 	const tokenQuery = activeToken ? `?token=${encodeURIComponent(activeToken)}` : "";
 	const cleanPath = path.startsWith("/") ? path : `/${path}`;
 	const targetUrl = `${basePath}/route/${workspace.id}${cleanPath}${tokenQuery}`;
 
+	const handleRefresh = () => {
+		setRefreshKey(prev => prev + 1);
+	};
+
 	return (
 		<div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-4">
-			<div className="theme-modal bg-[var(--card)] border border-[var(--line)] w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] animate-pop">
+			<div className={`theme-modal bg-[var(--card)] border border-[var(--line)] shadow-2xl overflow-hidden flex flex-col animate-pop transition-all ${isMaximized ? "w-[98vw] h-[96vh] rounded-xl" : "w-full max-w-5xl rounded-2xl h-[90vh]"}`}>
 				<div className="px-6 py-4 border-b border-[var(--line)] flex items-center justify-between shrink-0">
 					<div>
 						<h3 className="text-base font-extrabold text-[var(--ink)]">Inline App Preview</h3>
 						<p className="text-xs text-[var(--ink-3)] mt-0.5 font-medium">Workspace Sandbox: <span className="font-mono text-[var(--accent)]">{workspace.id}</span></p>
 					</div>
-					<div className="flex gap-2">
+					<div className="flex gap-2 items-center">
+						<button onClick={handleRefresh} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1" title="Refresh Application">
+							<I.refresh className="w-3.5 h-3.5" />
+							Refresh
+						</button>
+						<button onClick={() => setIsMaximized(!isMaximized)} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1" title={isMaximized ? "Restore Size" : "Maximize"}>
+							{isMaximized ? (
+								<>
+									<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9h-4V5m0 4l5-5M5 15h4v4m0-4l-5 5m14 0h4v-4m-4 4l5 5M9 5v4H5m4-4L4 4" />
+									</svg>
+									Restore
+								</>
+							) : (
+								<>
+									<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 14h6v6m0-6l-6 6m16-6h-6V8m0 6l6-6M4 4h6v6m0-6L4 10m16-6h-6v6m0-6l6 6" />
+									</svg>
+									Maximize
+								</>
+							)}
+						</button>
 						<a href={targetUrl} target="_blank" className="btn btn-ghost px-2.5 py-1 text-[11px]">
 							Open Tab
 						</a>
@@ -2971,6 +3280,7 @@ function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, o
 				</div>
 				<div className="flex-1 bg-[var(--sunken)] relative min-h-[300px]">
 					<iframe
+						key={refreshKey}
 						src={targetUrl}
 						className="w-full h-full border-none absolute inset-0 bg-white"
 						sandbox="allow-scripts allow-same-origin allow-forms allow-popups"

@@ -428,6 +428,7 @@ data:
         <header>
           <h1>Workspace Authorization Demo</h1>
           <p class="subtitle">A mock application illustrating the two workspace authentication mechanisms.</p>
+          <div id="greeting-banner" style="margin-top: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--success); display: none;"></div>
         </header>
 
         <nav class="tabs">
@@ -598,10 +599,12 @@ data:
           }
         }
 
-        // Extract workspace ID from URL path (e.g. /route/ws-1/)
+        // Extract workspace ID and base prefix from URL path (e.g. /route/ws-1/)
         const pathParts = window.location.pathname.split('/');
-        const workspaceIdIndex = pathParts.indexOf('route') !== -1 ? pathParts.indexOf('route') + 1 : -1;
-        const workspaceId = workspaceIdIndex !== -1 ? pathParts[workspaceIdIndex] : 'unknown';
+        const routeIndex = pathParts.indexOf('route');
+        const basePrefix = routeIndex !== -1 ? pathParts.slice(0, routeIndex).join('/') : '';
+        const workspaceId = routeIndex !== -1 ? pathParts[routeIndex + 1] : 'unknown';
+        const workspaceBase = `${basePrefix}/route/${workspaceId}`;
 
         // 1. Fetch Backend Injected Headers
         async function fetchHeaders() {
@@ -609,7 +612,7 @@ data:
           tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Loading headers...</td></tr>';
           
           try {
-            const res = await fetch('./api/headers');
+            const res = await fetch(`${workspaceBase}/api/headers`);
             if (res.status === 401) {
               triggerRedirectFlow();
               return;
@@ -663,7 +666,7 @@ data:
           pre.textContent = 'Fetching from ./_auth/token...';
 
           try {
-            const res = await fetch('./_auth/token');
+            const res = await fetch(`${workspaceBase}/_auth/token`);
             if (res.status === 401) {
               triggerRedirectFlow();
               return;
@@ -676,7 +679,7 @@ data:
               triggerRedirectFlow();
               return;
             }
-            pre.textContent = data.token ? data.token : 'Null (No token returned by gateway)';
+            pre.textContent = `Token:\n${data.token}\n\nSession:\n${JSON.stringify(data.session, null, 2)}`;
           } catch (err) {
             pre.textContent = `Error: ${err.message}`;
           }
@@ -684,12 +687,12 @@ data:
 
         function triggerRedirectFlow() {
           const callbackUrl = window.location.origin + window.location.pathname;
-          window.location.href = `./_auth/authorize?redirect_uri=${encodeURIComponent(callbackUrl)}&response_mode=fragment`;
+          window.location.href = `${workspaceBase}/_auth/authorize?redirect_uri=${encodeURIComponent(callbackUrl)}&response_mode=fragment`;
         }
 
         async function simulateFullLogout() {
           try {
-            await fetch('../../logout', { method: 'POST' });
+            await fetch(`${basePrefix}/logout`, { method: 'POST' });
             alert('All session cookies cleared (including refresh token). Click OK to reload.');
             window.location.reload();
           } catch (err) {
@@ -702,7 +705,7 @@ data:
           pre.style.display = 'block';
           pre.textContent = 'Calling POST ./_auth/refresh...';
           try {
-            const res = await fetch('./_auth/refresh', { method: 'POST' });
+            const res = await fetch(`${workspaceBase}/_auth/refresh`, { method: 'POST' });
             if (!res.ok) {
               throw new Error(`HTTP ${res.status}: ${await res.text() || 'Failed to refresh'}`);
             }
@@ -718,7 +721,7 @@ data:
           pre.style.display = 'block';
           pre.textContent = 'Calling GET ./api/dummy-token...';
           try {
-            const res = await fetch('./api/dummy-token');
+            const res = await fetch(`${workspaceBase}/api/dummy-token`);
             if (!res.ok) {
               throw new Error(`HTTP ${res.status}: ${await res.text() || 'Failed to call API'}`);
             }
@@ -730,15 +733,35 @@ data:
         }
 
         function triggerNotFoundError() {
-          window.open('../../route/non-existent-workspace-xyz', '_blank');
+          window.open(`${basePrefix}/route/non-existent-workspace-xyz`, '_blank');
         }
 
         function triggerForbiddenError() {
-          window.open('../../permissions', '_blank');
+          window.open(`${basePrefix}/permissions`, '_blank');
+        }
+
+        async function loadSessionAndGreet() {
+          try {
+            const res = await fetch(`${workspaceBase}/_auth/token`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.session && data.session.sub) {
+                const banner = document.getElementById('greeting-banner');
+                if (banner) {
+                  banner.textContent = `Hello, ${data.session.sub}!`;
+                  banner.style.display = 'block';
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to load session/greeting:', err);
+          }
         }
 
         // Check URL fragment (hash) on load for redirect callback token
         window.addEventListener('load', () => {
+          loadSessionAndGreet();
+
           if (window.location.hash.includes('token=')) {
             switchTab('token-api');
             const params = new URLSearchParams(window.location.hash.substring(1));

@@ -1556,7 +1556,10 @@ users:
 				],
 			});
 
-			const token = createMockToken({ sub: "user-1" });
+			const token = createMockToken({
+				sub: "user-1",
+				realm_access: { roles: ["admin", "developer"] },
+			});
 			const req = new Request("http://localhost/route/ws-1/_auth/token", {
 				method: "GET",
 				headers: {
@@ -1565,8 +1568,12 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(200);
-			const body = await resp.json();
+			const body = (await resp.json()) as any;
 			expect(body.token).toBe(token);
+			expect(body.session).toBeDefined();
+			expect(body.session.sub).toBe("user-1");
+			expect(body.session.roles).toContain("admin");
+			expect(body.session.roles).toContain("developer");
 		});
 
 		test("Token API - /route/:workspaceId/_auth/token returns 403 if token-api not enabled", async () => {

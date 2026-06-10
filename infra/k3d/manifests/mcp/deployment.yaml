@@ -45,6 +45,8 @@ spec:
               value: "http://localhost:8080"
             - name: JWKS_URI
               value: "http://keycloak.nogoo9.svc.cluster.local:8080/auth/realms/nogoo9/protocol/openid-connect/certs"
+            - name: OAUTH_SERVER_TOKEN_URL
+              value: "http://keycloak.nogoo9.svc.cluster.local:8080/auth/realms/nogoo9/protocol/openid-connect/token"
             - name: AUTH_ISSUER
               value: "http://localhost:8080/auth/realms/nogoo9"
             - name: OAUTH_CLIENT_ID

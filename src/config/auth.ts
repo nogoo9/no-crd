@@ -271,12 +271,24 @@ export const authSchema = {
 		},
 	} satisfies SchemaItem<string | undefined>,
 
-	tokenUrl: {
+	serverDiscoveryUrl: {
 		cli: "-",
-		env: "OAUTH_TOKEN_URL",
+		env: ["OAUTH_SERVER_DISCOVERY_URL", "OAUTH_DISCOVERY_URL"],
 		defaultVal: undefined as string | undefined,
 		allowed: "URL string",
-		description: "Direct OAuth token exchange endpoint.",
+		description:
+			"Discovery URL for the OAuth server used by the backend gateway. Falls back to OAUTH_DISCOVERY_URL.",
+		get value(): string | undefined {
+			return getEnv(this.env);
+		},
+	} satisfies SchemaItem<string | undefined>,
+
+	tokenUrl: {
+		cli: "-",
+		env: ["OAUTH_SERVER_TOKEN_URL", "OAUTH_TOKEN_URL"],
+		defaultVal: undefined as string | undefined,
+		allowed: "URL string",
+		description: "Direct OAuth token exchange endpoint for the backend server.",
 		get value(): string | undefined {
 			return getEnv(this.env);
 		},

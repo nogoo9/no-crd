@@ -33,6 +33,8 @@ spec:
           value: admin
         - name: KC_BOOTSTRAP_ADMIN_PASSWORD
           value: admin
+        - name: KC_HOSTNAME
+          value: http://localhost:8080/auth
         ports:
         - name: http
           containerPort: 8080

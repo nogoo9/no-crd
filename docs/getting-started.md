@@ -139,7 +139,8 @@ The server can be configured via environment variables or CLI flags:
 | - | `PROXY_SESSION_SECRET` | `""` | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 | - | `OAUTH_SCOPES` | `openid profile email offline_access` | Space-separated scope string | OAuth scopes to request during authorization. Include 'offline_access' for refresh tokens. |
 | - | `OAUTH_AUTHORIZATION_URL` | - | URL string | Direct OAuth authorization URL. |
-| - | `OAUTH_TOKEN_URL` | - | URL string | Direct OAuth token exchange endpoint. |
+| - | `OAUTH_SERVER_DISCOVERY_URL`, `OAUTH_DISCOVERY_URL` | - | URL string | Discovery URL for the OAuth server used by the backend gateway. Falls back to OAUTH_DISCOVERY_URL. |
+| - | `OAUTH_SERVER_TOKEN_URL`, `OAUTH_TOKEN_URL` | - | URL string | Direct OAuth token exchange endpoint for the backend server. |
 | - | `OAUTH_END_SESSION_URL` | - | URL string | Direct OAuth logout endpoint. |
 | - | `AUTH_DEFAULT_ROLE` | `viewer` | String | Fallback role if the token does not provide scopes/roles. |
 
