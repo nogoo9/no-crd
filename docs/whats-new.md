@@ -10,6 +10,7 @@ Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'l
 - **Maximize & Reload Control for Inline Workspaces**: Enhanced workspace preview modals with layout toggle options to maximize/restore view width and a toolbar reload option to quickly reload application frames.
 - **Keycloak Hostname and Path Synchronization**: Integrated the `KC_HOSTNAME` environment variable mapping set to `http://localhost:8080/auth` to enforce unified issuer URLs (`http://localhost:8080/auth/realms/nogoo9`) for both external login pathways and backchannel cluster-to-cluster token refresh queries, resolving OIDC path stripping and `invalid_grant` errors.
 - **Dynamic Path-Scoped Cookie Routing**: Extended cookie prefix path resolution to incorporate dynamic base-url subpaths (`Path=/nocr/`), preventing cookie visibility leakage or browser session collision across Dynamic Workspace views.
+- **Cat-Themed Favicon Packaging**: Embedded a lightweight, custom vector cat-themed SVG favicon (using an inline base64 Data URL) inside the HTML templates, ensuring it is automatically packaged inside the NPM distribution package and the Docker container image without requiring external asset serving handlers.
 
 ## What's New in v0.8.1
 

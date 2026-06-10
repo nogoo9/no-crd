@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] — 2026-06-10
+## [0.9.0] — 2026-06-11
 
 ### Added
 
 - **Interactive Popup SSO Renewal & Session Expiry Warnings** ([ADR-019](docs/decisions/ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md)): Added a session expiration banner warning standard users when their token is about to expire, launching a user-initiated SSO renewal flow in a popup window.
 - **Auto/Manual Refresh Dashboard Control**: Added a segmented control in the dashboard toolbar to switch between automated 5-second data polling and manual refresh, persisting the setting in `localStorage`.
 - **Maximize & Reload Control for Inline Workspaces**: Added toolbar controls to maximize/restore the size of the inline preview workspace modal and reload the iframe target.
+- **Cat-Themed Favicon Packaging**: Embedded a custom vector cat SVG favicon via base64 inline URL into HTML templates, ensuring zero external asset dependencies and packaging it directly inside the NPM package and Docker image assets.
 
 ### Fixed
 
