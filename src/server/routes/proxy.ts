@@ -401,7 +401,9 @@ export async function registerProxyRoutes(
 						// Inject raw JWT token if present
 						const token = request.token;
 						if (token) {
-							newHeaders["x-workspace-jwt"] = token;
+							if (config.auth.injectWorkspaceJwt) {
+								newHeaders["x-workspace-jwt"] = token;
+							}
 							newHeaders.authorization = `Bearer ${token}`;
 						}
 					}

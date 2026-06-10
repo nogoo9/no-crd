@@ -2042,6 +2042,121 @@ users:
 			}
 		});
 
+		test("HTTP Proxy - does NOT inject x-workspace-jwt if AUTH_INJECT_WORKSPACE_JWT is false", async () => {
+			process.env.AUTH_INJECT_WORKSPACE_JWT = "false";
+			await resetMcpServer(undefined, false, k8sContext); // Pick up config change
+
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/workspace-auth-mode": "inject-headers",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({ sub: "user-1", roles: ["user"] });
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock((_url: string, init?: any) => {
+				expect(init.headers.get("x-user-sub")).toBe("user-1");
+				expect(init.headers.get("x-workspace-jwt")).toBeNull();
+				expect(init.headers.get("authorization")).toBe(`Bearer ${token}`);
+				return Promise.resolve(new Response("success", { status: 200 }));
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const req = new Request("http://localhost/route/ws-1/resource", {
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+			} finally {
+				globalThis.fetch = originalFetch;
+				delete process.env.AUTH_INJECT_WORKSPACE_JWT;
+				await resetMcpServer(undefined, false, k8sContext);
+			}
+		});
+
+		test("HTTP Proxy - redirects/blocks when nogoo9/auth-require-token is true and only nocr_sess exists", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/auth-require-token": "true",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const { createSessionCookie, resolveSessionSecret } = await import(
+				"~/k8s/index.js"
+			);
+			const key = await resolveSessionSecret(null, "default");
+			const sessCookie = createSessionCookie(
+				{ sub: "user-1", realm_access: { roles: ["user"] } },
+				key,
+				1800,
+				"$.sub",
+				"$.realm_access.roles",
+			);
+
+			// GET request accepting HTML should redirect
+			const req = new Request("http://localhost/route/ws-1/resource", {
+				method: "GET",
+				headers: {
+					Cookie: `nocr_sess=${sessCookie}`,
+					Accept: "text/html",
+				},
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			expect(resp.redirected).toBe(true);
+			expect(resp.url).toContain("redirect_uri=");
+
+			// API request should return 401 Unauthorized
+			const req2 = new Request("http://localhost/route/ws-1/resource", {
+				method: "GET",
+				headers: {
+					Cookie: `nocr_sess=${sessCookie}`,
+					Accept: "application/json",
+				},
+			});
+			const resp2 = await handleWebRequest(req2);
+			expect(resp2.status).toBe(401);
+			const data = await resp2.json();
+			expect(data.error).toBe("Unauthorized");
+			expect(data.message).toContain(
+				"strictly requires a valid OIDC access token",
+			);
+		});
+
 		test("HTTP Proxy - bypasses authentication check if no-auth mode is enabled", async () => {
 			mockListNamespacedPod.mockResolvedValue({
 				items: [

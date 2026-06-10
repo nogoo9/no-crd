@@ -305,6 +305,18 @@ export const authSchema = {
 		},
 	} satisfies SchemaItem<string | undefined>,
 
+	injectWorkspaceJwt: {
+		cli: "--auth-inject-workspace-jwt",
+		env: "AUTH_INJECT_WORKSPACE_JWT",
+		defaultVal: true,
+		allowed: ["true", "false"],
+		description:
+			"Determines if the custom 'x-workspace-jwt' header containing the raw token is injected into proxy requests.",
+		get value(): boolean {
+			return getEnv(this.env) !== "false";
+		},
+	} satisfies SchemaItem<boolean>,
+
 	defaultRole: {
 		cli: "-",
 		env: "AUTH_DEFAULT_ROLE",

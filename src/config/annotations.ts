@@ -28,6 +28,7 @@ export const ANNOTATION_KEYS = {
 	WORKSPACE_AUTH_MODE: "nogoo9/workspace-auth-mode",
 	API_STATS_REFRESH: "nogoo9/api.stats.refresh",
 	API_LAST_ACTIVITY_REFRESH: "nogoo9/api.last_activity.refresh",
+	WORKSPACE_AUTH_REQUIRE_TOKEN: "nogoo9/auth-require-token",
 } as const;
 
 export const ANNOTATION_METADATA: AnnotationParam[] = [
@@ -36,6 +37,12 @@ export const ANNOTATION_METADATA: AnnotationParam[] = [
 		type: "Annotation (Comma-separated)",
 		description:
 			"Configures authorization modes for the workspace proxy. Comma-separated list of: `token-api` (exposes token retrieval endpoints at `_auth/token` & `_auth/authorize` for SPAs), `inject-headers` (rewrites headers to forward user identity like `x-user-sub` and JWTs to container; enabled by default if `AUTH_ENABLED=true`), `no-auth` (bypasses all auth/owner checks for public workspaces). *(Available from v0.6.0, no-auth from v0.8.0)*",
+	},
+	{
+		key: ANNOTATION_KEYS.WORKSPACE_AUTH_REQUIRE_TOKEN,
+		type: 'Annotation ("true" | "false")',
+		description:
+			"Determines if the workspace strictly requires a valid, raw OIDC access/refresh token to function. If set to `true`, session cookie authentication via `nocr_sess` alone is treated as unauthorized for routing proxy access, forcing a redirection to the dashboard login page to authenticate and retrieve a new JWT token. *(Available from v0.9.0)*",
 	},
 	{
 		key: ANNOTATION_KEYS.TEMPLATE_VERSION,

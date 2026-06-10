@@ -524,6 +524,21 @@ export function registerAuthHooks(
 		// Expose workspace annotations early for downstream access (e.g. headers injection)
 		(request as any).workspaceAnnotations = annotations;
 
+		// Force OIDC token retrieval if the workspace requires raw tokens and only session-cookie auth is present
+		const requireToken =
+			annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_REQUIRE_TOKEN] === "true";
+		if (
+			config.auth.enabled &&
+			!isNoAuth &&
+			requireToken &&
+			!(request as any).token
+		) {
+			(request as any).jwtPayload = null;
+			(request as any).authError = new Error(
+				"This workspace strictly requires a valid OIDC access token, but only session authentication is present.",
+			);
+		}
+
 		if (!isNoAuth) {
 			await requireRouteAuth(request, reply);
 			if (reply.sent) return;
