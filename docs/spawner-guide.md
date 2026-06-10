@@ -30,6 +30,7 @@ Pod templates and inline specifications can declare special annotations that dir
 | Annotation / Label Key | Type | Description |
 |---|---|---|
 | `nogoo9/workspace-auth-mode` | Annotation (Comma-separated) | Configures authorization modes for the workspace proxy. Comma-separated list of: `token-api` (exposes token retrieval endpoints at `_auth/token` & `_auth/authorize` for SPAs), `inject-headers` (rewrites headers to forward user identity like `x-user-sub` and JWTs to container; enabled by default if `AUTH_ENABLED=true`), `no-auth` (bypasses all auth/owner checks for public workspaces). *(Available from v0.6.0, no-auth from v0.8.0)* |
+| `nogoo9/auth-require-token` | Annotation ("true" | "false") | Determines if the workspace strictly requires a valid, raw OIDC access/refresh token to function. If set to `true`, session cookie authentication via `nocr_sess` alone is treated as unauthorized for routing proxy access, forcing a redirection to the dashboard login page to authenticate and retrieve a new JWT token. *(Available from v0.9.0)* |
 | `nogoo9/template-version` | Annotation (String) | Specifies the version of the pod template. Used to track if workspaces are outdated. *(Available from v0.8.0)* |
 | `nogoo9/workspace-name` | Annotation (String) | Stores the user-defined display name of the workspace. *(Available from v0.4.0)* |
 | `nogoo9/template-ref` | Annotation (String) | The reference to the pod template used to spawn the workspace (e.g. `default/workspace-terminal`). *(Available from v0.4.0)* |

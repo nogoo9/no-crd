@@ -319,7 +319,9 @@ export function registerUpgradeHandler(
 					}
 				}
 				if (token) {
-					headersToSend["x-workspace-jwt"] = token;
+					if (config.auth.injectWorkspaceJwt) {
+						headersToSend["x-workspace-jwt"] = token;
+					}
 					headersToSend.authorization = `Bearer ${token}`;
 				}
 			}

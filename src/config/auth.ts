@@ -271,12 +271,24 @@ export const authSchema = {
 		},
 	} satisfies SchemaItem<string | undefined>,
 
-	tokenUrl: {
+	serverDiscoveryUrl: {
 		cli: "-",
-		env: "OAUTH_TOKEN_URL",
+		env: ["OAUTH_SERVER_DISCOVERY_URL", "OAUTH_DISCOVERY_URL"],
 		defaultVal: undefined as string | undefined,
 		allowed: "URL string",
-		description: "Direct OAuth token exchange endpoint.",
+		description:
+			"Discovery URL for the OAuth server used by the backend gateway. Falls back to OAUTH_DISCOVERY_URL.",
+		get value(): string | undefined {
+			return getEnv(this.env);
+		},
+	} satisfies SchemaItem<string | undefined>,
+
+	tokenUrl: {
+		cli: "-",
+		env: ["OAUTH_SERVER_TOKEN_URL", "OAUTH_TOKEN_URL"],
+		defaultVal: undefined as string | undefined,
+		allowed: "URL string",
+		description: "Direct OAuth token exchange endpoint for the backend server.",
 		get value(): string | undefined {
 			return getEnv(this.env);
 		},
@@ -292,6 +304,18 @@ export const authSchema = {
 			return getEnv(this.env);
 		},
 	} satisfies SchemaItem<string | undefined>,
+
+	injectWorkspaceJwt: {
+		cli: "--auth-inject-workspace-jwt",
+		env: "AUTH_INJECT_WORKSPACE_JWT",
+		defaultVal: true,
+		allowed: ["true", "false"],
+		description:
+			"Determines if the custom 'x-workspace-jwt' header containing the raw token is injected into proxy requests.",
+		get value(): boolean {
+			return getEnv(this.env) !== "false";
+		},
+	} satisfies SchemaItem<boolean>,
 
 	defaultRole: {
 		cli: "-",

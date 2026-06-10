@@ -411,6 +411,18 @@ function Dashboard() {
 	});
 	const [activeToken, setActiveToken] = useState("");
 	const [toasts, setToasts] = useState<Toast[]>([]);
+	const [isSessionExpiringSoon, setIsSessionExpiringSoon] = useState(false);
+	const [hasRefreshCookie, setHasRefreshCookie] = useState(() => {
+		return localStorage.getItem("nocr_no_refresh") !== "true";
+	});
+	const [workspaceOpenMode, setWorkspaceOpenMode] = useState<"tab" | "inline">(() => {
+		const noRefresh = localStorage.getItem("nocr_no_refresh") === "true";
+		if (noRefresh) return "inline";
+		return (localStorage.getItem("nocr_workspace_mode") as "tab" | "inline") || "tab";
+	});
+	const [isAutoRefresh, setIsAutoRefresh] = useState(() => {
+		return localStorage.getItem("nocr_auto_refresh") !== "false";
+	});
 
 	const isAuthRequired = !!(oauthConfig.discoveryUrl && oauthConfig.clientId);
 	const canConnect = !isAuthRequired || !!activeToken;
@@ -467,6 +479,32 @@ function Dashboard() {
 	
 	// Search, Density & View mode
 	const [searchQuery, setSearchQuery] = useState("");
+	const [isMeowActive, setIsMeowActive] = useState(false);
+	const meowTimerRef = useRef<any>(null);
+
+	const triggerMeowEasterEgg = () => {
+		if (meowTimerRef.current) {
+			clearTimeout(meowTimerRef.current);
+		}
+		setIsMeowActive(false);
+		setTimeout(() => {
+			setIsMeowActive(true);
+			meowTimerRef.current = setTimeout(() => {
+				setIsMeowActive(false);
+				meowTimerRef.current = null;
+			}, 4800);
+		}, 50);
+	};
+
+	const handleSearchQueryChange = (val: string) => {
+		const prevContains = searchQuery.toLowerCase().includes("meow");
+		const nextContains = val.toLowerCase().includes("meow");
+		setSearchQuery(val);
+		if (!prevContains && nextContains) {
+			triggerMeowEasterEgg();
+		}
+	};
+
 	const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
 	const [density, setDensity] = useState("comfortable");
 	const [theme, setTheme] = useState("light");
@@ -565,6 +603,100 @@ function Dashboard() {
 		}
 	}, []);
 
+	// Monitor active token expiration
+	useEffect(() => {
+		if (!activeToken) {
+			setIsSessionExpiringSoon(false);
+			return;
+		}
+
+		const checkExpiry = () => {
+			const payload = decodeJwt(activeToken);
+			if (payload?.exp) {
+				const timeLeft = payload.exp - Date.now() / 1000;
+				// If less than 60 seconds are left (and we don't have refresh token/cookie to transparently renew)
+				if (timeLeft > 0 && timeLeft < 60) {
+					setIsSessionExpiringSoon(true);
+				} else {
+					setIsSessionExpiringSoon(false);
+				}
+			}
+		};
+
+		checkExpiry();
+		const intervalId = setInterval(checkExpiry, 10000);
+		return () => clearInterval(intervalId);
+	}, [activeToken]);
+
+	// Listen to storage changes (e.g. from popup window)
+	useEffect(() => {
+		const handleStorageChange = (e: StorageEvent) => {
+			if (e.key === "nocr_token" && e.newValue) {
+				console.log("Detected token update from popup / another tab. Updating active token state...");
+				setActiveToken(e.newValue);
+			}
+		};
+		window.addEventListener("storage", handleStorageChange);
+		return () => window.removeEventListener("storage", handleStorageChange);
+	}, []);
+
+	// Popup OIDC session refresh trigger
+	const triggerPopupRefresh = async () => {
+		try {
+			const state = generateRandomString(16);
+			const verifier = generateRandomString(64);
+			localStorage.setItem("nocr_oauth_state", state);
+			localStorage.setItem("nocr_oauth_verifier", verifier);
+			const challenge = await generateChallenge(verifier);
+
+			const discRes = await fetch(oauthConfig.discoveryUrl!);
+			const discData = await discRes.json();
+			const authEndpoint = discData.authorization_endpoint;
+
+			const redirectUri = window.location.origin + window.location.pathname;
+			const url = new URL(authEndpoint);
+			url.searchParams.set("response_type", "code");
+			url.searchParams.set("client_id", oauthConfig.clientId!);
+			url.searchParams.set("redirect_uri", redirectUri);
+			url.searchParams.set("state", state);
+			url.searchParams.set("code_challenge", challenge);
+			url.searchParams.set("code_challenge_method", "S256");
+			const scopes = Array.isArray(oauthConfig.scopes) && oauthConfig.scopes.length > 0
+				? oauthConfig.scopes
+				: ["openid", "profile", "email"];
+			url.searchParams.set("scope", scopes.join(" "));
+
+			const width = 600;
+			const height = 650;
+			const left = window.screen.width / 2 - width / 2;
+			const top = window.screen.height / 2 - height / 2;
+			
+			// Open authorization URL in popup
+			window.open(
+				url.toString(),
+				"OidcAuthPopup",
+				`width=${width},height=${height},top=${top},left=${left},status=yes,toolbar=no,menubar=no,location=yes`
+			);
+		} catch (err) {
+			triggerToast("Failed to initialize OIDC popup refresh", "error");
+		}
+	};
+
+	const activeWorkspaceId = route.view === "workspace" ? route.id : activePreviewWs?.ws.id;
+
+	// Active Workspace Cookie Bootstrapping Hook
+	useEffect(() => {
+		if (activeToken && activeWorkspaceId) {
+			console.log(`Bootstrapping workspace cookie for active workspace: ${activeWorkspaceId}`);
+			void fetch(`${basePath}/route/${activeWorkspaceId}/`, {
+				method: "HEAD",
+				headers: { Authorization: `Bearer ${activeToken}` },
+			}).catch((err) =>
+				console.warn(`Failed to bootstrap cookie for workspace ${activeWorkspaceId}:`, err)
+			);
+		}
+	}, [activeToken, activeWorkspaceId]);
+
 	// Retrieve Data Hook
 	const refreshData = async () => {
 		try {
@@ -652,6 +784,22 @@ function Dashboard() {
 		});
 	}, [isInitialized, namespace]);
 
+	// Auto-Refresh Effect
+	const refreshDataRef = useRef(refreshData);
+	useEffect(() => {
+		refreshDataRef.current = refreshData;
+	}, [refreshData]);
+
+	useEffect(() => {
+		if (!isInitialized || !isAutoRefresh) return;
+
+		const intervalId = setInterval(() => {
+			void refreshDataRef.current();
+		}, 5000);
+
+		return () => clearInterval(intervalId);
+	}, [isInitialized, isAutoRefresh]);
+
 	// PKCE Redirection Trigger
 	const triggerOidcLogin = async () => {
 		try {
@@ -733,7 +881,37 @@ function Dashboard() {
 						if (tokenData.access_token) {
 							localStorage.setItem("nocr_token", tokenData.access_token);
 							setActiveToken(tokenData.access_token);
+
+							if (tokenData.refresh_token) {
+								localStorage.removeItem("nocr_no_refresh");
+								setHasRefreshCookie(true);
+								try {
+									await fetch(`${basePath}/auth/set-refresh`, {
+										method: "POST",
+										headers: {
+											"Content-Type": "application/json",
+											Authorization: `Bearer ${tokenData.access_token}`,
+										},
+										body: JSON.stringify({ refresh_token: tokenData.refresh_token }),
+									});
+								} catch (err) {
+									console.warn("Failed to set refresh token cookie on server:", err);
+								}
+							} else {
+								localStorage.setItem("nocr_no_refresh", "true");
+								setHasRefreshCookie(false);
+								triggerToast(
+									"Warning: No OIDC refresh token was returned by your identity provider. Sessions will expire frequently. Contact your administrator to enable offline_access.",
+									"error",
+								);
+							}
+
 							triggerToast("Signed in successfully!", "success");
+
+							if (window.name === "OidcAuthPopup" || window.opener) {
+								window.close();
+								return;
+							}
 
 							const savedRedirect = sessionStorage.getItem("nocr_post_login_redirect_uri");
 							if (isSafeRedirectUri(savedRedirect)) {
@@ -969,6 +1147,24 @@ function Dashboard() {
 
 	return (
 		<div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+			{isSessionExpiringSoon && !hasRefreshCookie && (
+				<div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-pop">
+					<div className="flex items-center gap-2.5 text-amber-500">
+						<svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+						<div className="text-xs font-semibold text-[var(--ink)]">
+							Your OIDC SSO session is expiring soon. Click "Renew Session" to authenticate silently in a popup.
+						</div>
+					</div>
+					<button
+						onClick={triggerPopupRefresh}
+						className="btn btn-primary bg-amber-500 hover:bg-amber-600 border-0 text-white text-xs py-1.5 px-4 rounded-lg shrink-0 cursor-pointer"
+					>
+						Renew Session
+					</button>
+				</div>
+			)}
 			{/* Top Header */}
 			<header className="flex flex-col md:flex-row md:items-center md:justify-between pb-8 border-b border-[var(--line)] gap-4">
 				<div className="flex items-center gap-3">
@@ -983,27 +1179,37 @@ function Dashboard() {
 					</div>
 				</div>
 
-				<div className="flex items-center gap-3 flex-wrap">
+				<div className="flex items-center gap-2 flex-wrap">
+					{/* Namespace display */}
+					<div className="px-3 text-xs font-mono flex items-center gap-1.5 border border-[var(--line)] rounded-lg bg-[var(--card)] h-8 shadow-sm">
+						<span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+						<span className="text-[var(--ink-3)] font-semibold uppercase tracking-wider text-[10px]">Namespace:</span>
+						<span className="font-bold text-[var(--accent)]">{namespace}</span>
+					</div>
+
 					{/* System Info Activator */}
-					<button className="btn btn-ghost text-xs py-1.5" onClick={() => setShowSystemInfo(true)}>
-						<I.info className="w-3.5 h-3.5 mr-1 text-[var(--accent)]" />
+					<button 
+						className="px-3 text-xs font-bold flex items-center gap-1.5 border border-[var(--line)] rounded-lg bg-[var(--card)] hover:bg-[var(--sunken)] transition-colors h-8 text-[var(--ink-2)] hover:text-[var(--ink)] shadow-sm"
+						onClick={() => setShowSystemInfo(true)}
+					>
+						<I.info className="w-3.5 h-3.5 text-[var(--accent)]" />
 						System Info
 					</button>
 
 					{/* Theme & Tweak Widget Activator */}
-					<button className="btn btn-ghost text-xs py-1.5" onClick={() => setShowTweaks(!showTweaks)}>
-						<I.settings className="w-3.5 h-3.5 mr-1" />
+					<button 
+						className="px-3 text-xs font-bold flex items-center gap-1.5 border border-[var(--line)] rounded-lg bg-[var(--card)] hover:bg-[var(--sunken)] transition-colors h-8 text-[var(--ink-2)] hover:text-[var(--ink)] shadow-sm"
+						onClick={() => setShowTweaks(!showTweaks)}
+					>
+						<I.settings className="w-3.5 h-3.5 text-[var(--accent)]" />
 						Design Customize
 					</button>
 
-					{/* Namespace display */}
-					<div className="px-3 py-1.5 badge-pill text-xs font-mono flex items-center gap-2">
-						<span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-						Namespace: <span className="font-bold text-[var(--accent)]">{namespace}</span>
-					</div>
-
 					{/* OIDC User Info */}
-					<button className="btn btn-ghost text-xs flex items-center gap-1.5" onClick={() => setShowTokenSettings(true)}>
+					<button 
+						className="px-3 text-xs font-bold flex items-center gap-1.5 border border-[var(--line)] rounded-lg bg-[var(--card)] hover:bg-[var(--sunken)] transition-colors h-8 text-[var(--ink-2)] hover:text-[var(--ink)] shadow-sm"
+						onClick={() => setShowTokenSettings(true)}
+					>
 						<I.user className="w-3.5 h-3.5 text-[var(--accent)]" />
 						{getDisplayUser()}
 						{capabilities.isAdmin && <span className="px-1 py-0.5 rounded text-[8px] bg-amber-500/10 text-amber-500 font-bold ml-1 uppercase">Admin</span>}
@@ -1011,16 +1217,13 @@ function Dashboard() {
 
 					{/* Sign out */}
 					{activeToken && (
-						<button className="btn btn-ghost text-xs text-red-500" onClick={handleLogout}>
+						<button 
+							className="px-3 text-xs font-bold flex items-center gap-1.5 border border-red-500/20 hover:border-red-500/40 rounded-lg bg-red-500/5 hover:bg-red-500/10 transition-colors h-8 text-red-500 shadow-sm"
+							onClick={handleLogout}
+						>
 							Sign Out
 						</button>
 					)}
-
-					{/* Refresh btn */}
-					<button className="btn btn-primary text-xs py-1.5 flex items-center gap-1" disabled={isPending} onClick={refreshData}>
-						<I.refresh className={`w-3.5 h-3.5 ${isPending ? "animate-spin" : ""}`} />
-						Refresh
-					</button>
 				</div>
 			</header>
 
@@ -1033,28 +1236,76 @@ function Dashboard() {
 					<input
 						type="text"
 						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
+						onChange={(e) => handleSearchQueryChange(e.target.value)}
 						className="theme-text-input w-full pl-9 pr-4 py-2 text-sm outline-none transition"
 						placeholder="Search workspaces, templates, or statuses..."
 					/>
 				</div>
 
-				<div className="flex items-center gap-3">
-					{/* Layout views toggle */}
-					<div className="flex items-center border border-[var(--line)] rounded-lg overflow-hidden bg-[var(--card)]">
+				<div className="flex items-center gap-2 flex-wrap">
+					{/* Refresh control group */}
+					<div className="flex items-center border border-[var(--line)] rounded-lg overflow-hidden bg-[var(--card)] p-0.5 select-none h-8 shadow-sm">
 						<button
-							onClick={() => { setLayoutMode("grid"); localStorage.setItem("nocr_layout", "grid"); }}
-							className={`px-3 py-2 text-xs transition-colors cursor-pointer ${layoutMode === "grid" ? "bg-[var(--surface)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:bg-[var(--surface)]"}`}
-							title="Grid View"
+							type="button"
+							onClick={() => {
+								setIsAutoRefresh(true);
+								localStorage.setItem("nocr_auto_refresh", "true");
+							}}
+							className={`px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer rounded-md flex items-center gap-1 h-full ${
+								isAutoRefresh
+									? "bg-[var(--accent-soft)] text-[var(--accent)]"
+									: "text-[var(--ink-3)] hover:text-[var(--ink)]"
+							}`}
+							title="Auto-refresh status every 5s"
 						>
-							<I.grid className="w-4 h-4" />
+							{isAutoRefresh && <span className="w-1 h-1 rounded-full bg-[var(--accent)] animate-pulse" />}
+							Auto
 						</button>
 						<button
+							type="button"
+							onClick={() => {
+								setIsAutoRefresh(false);
+								localStorage.setItem("nocr_auto_refresh", "false");
+							}}
+							className={`px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer rounded-md h-full ${
+								!isAutoRefresh
+									? "bg-[var(--surface)] text-[var(--ink)]"
+									: "text-[var(--ink-3)] hover:text-[var(--ink)]"
+							}`}
+							title="Manual refresh only"
+						>
+							Manual
+						</button>
+						<div className="h-3.5 w-px bg-[var(--line)] mx-1 shrink-0" />
+						<button
+							type="button"
+							onClick={refreshData}
+							disabled={isPending}
+							className="px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer rounded-md flex items-center gap-1 h-full text-[var(--ink-2)] hover:text-[var(--ink)] hover:bg-[var(--sunken)]"
+							title="Trigger Manual Refresh"
+						>
+							<I.refresh className={`w-3 h-3 text-[var(--accent)] ${isPending ? "animate-spin" : ""}`} />
+							Refresh
+						</button>
+					</div>
+
+					{/* Layout views toggle */}
+					<div className="flex items-center border border-[var(--line)] rounded-lg overflow-hidden bg-[var(--card)] h-8 p-0.5 shadow-sm">
+						<button
+							type="button"
+							onClick={() => { setLayoutMode("grid"); localStorage.setItem("nocr_layout", "grid"); }}
+							className={`px-2.5 py-1 text-xs transition-colors cursor-pointer h-full rounded-md flex items-center justify-center ${layoutMode === "grid" ? "bg-[var(--surface)] text-[var(--ink)] font-semibold" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
+							title="Grid View"
+						>
+							<I.grid className="w-3.5 h-3.5" />
+						</button>
+						<button
+							type="button"
 							onClick={() => { setLayoutMode("list"); localStorage.setItem("nocr_layout", "list"); }}
-							className={`px-3 py-2 text-xs transition-colors border-l border-[var(--line)] cursor-pointer ${layoutMode === "list" ? "bg-[var(--surface)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:bg-[var(--surface)]"}`}
+							className={`px-2.5 py-1 text-xs transition-colors cursor-pointer h-full rounded-md flex items-center justify-center ${layoutMode === "list" ? "bg-[var(--surface)] text-[var(--ink)] font-semibold" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
 							title="List View"
 						>
-							<I.list className="w-4 h-4" />
+							<I.list className="w-3.5 h-3.5" />
 						</button>
 					</div>
 
@@ -1066,10 +1317,24 @@ function Dashboard() {
 							localStorage.setItem("nocr_density", e.target.value);
 							applyThemeStyles(theme, e.target.value, accentColor);
 						}}
-						className="theme-text-input text-xs px-3 py-2 cursor-pointer outline-none rounded-lg font-medium"
+						className="theme-text-input text-xs px-3 py-1.5 cursor-pointer outline-none rounded-lg font-bold border border-[var(--line)] h-8 shadow-sm"
 					>
 						<option value="comfortable">Comfortable Layout</option>
 						<option value="compact">Compact Layout</option>
+					</select>
+
+					{/* Workspace open mode toggler */}
+					<select
+						value={workspaceOpenMode}
+						onChange={(e) => {
+							const mode = e.target.value as "tab" | "inline";
+							setWorkspaceOpenMode(mode);
+							localStorage.setItem("nocr_workspace_mode", mode);
+						}}
+						className="theme-text-input text-xs px-3 py-1.5 cursor-pointer outline-none rounded-lg font-bold border border-[var(--line)] h-8 shadow-sm"
+					>
+						<option value="tab">Open: New Browser Tab ↗</option>
+						<option value="inline">Open: Inline Frame 🖥️</option>
 					</select>
 				</div>
 			</div>
@@ -1139,6 +1404,8 @@ function Dashboard() {
 										basePath={basePath}
 										activeToken={activeToken}
 										density={density}
+										currentUser={getDisplayUser()}
+										workspaceOpenMode={workspaceOpenMode}
 										onStop={() => stopWorkspace(ws.id)}
 										onUpgrade={() => upgradeWorkspace(ws.id)}
 										onShowLogs={() => setActiveLogsWs(ws)}
@@ -1169,6 +1436,8 @@ function Dashboard() {
 										basePath={basePath}
 										activeToken={activeToken}
 										density={density}
+										currentUser={getDisplayUser()}
+										workspaceOpenMode={workspaceOpenMode}
 										onStop={() => stopWorkspace(ws.id)}
 										onUpgrade={() => upgradeWorkspace(ws.id)}
 										onShowLogs={() => setActiveLogsWs(ws)}
@@ -1187,6 +1456,7 @@ function Dashboard() {
 					workspaceId={route.id!}
 					namespace={namespace}
 					activeToken={activeToken}
+					currentUser={getDisplayUser()}
 					onBack={() => setRoute({ view: "landing" })}
 					refreshAll={refreshData}
 				/>
@@ -1247,6 +1517,7 @@ function Dashboard() {
 						}
 					}}
 					onClose={() => setSelectedTemplate(null)}
+					onMeowTrigger={triggerMeowEasterEgg}
 				/>
 			)}
 
@@ -1404,6 +1675,7 @@ function Dashboard() {
 					</div>
 				))}
 			</div>
+			{isMeowActive && <MeowEasterEgg />}
 
 			<footer className="mt-16 pb-8 border-t border-[var(--line)] pt-8 flex flex-col items-center gap-4 text-center">
 				<div className="flex items-center gap-4">
@@ -1449,6 +1721,8 @@ interface WorkspaceCardProps {
 	basePath: string;
 	activeToken: string;
 	density: string;
+	currentUser: string;
+	workspaceOpenMode: "tab" | "inline";
 	onStop: () => void;
 	onUpgrade: () => void;
 	onShowLogs: () => void;
@@ -1476,6 +1750,8 @@ function WorkspaceCard({
 	basePath,
 	activeToken,
 	density,
+	currentUser,
+	workspaceOpenMode,
 	onStop,
 	onUpgrade,
 	onShowLogs,
@@ -1483,10 +1759,10 @@ function WorkspaceCard({
 	onOpenDetails,
 	onShowPreview,
 }: WorkspaceCardProps) {
-	const tokenQuery = activeToken ? `?token=${encodeURIComponent(activeToken)}` : "";
 	const pathPart = ws.workspacePath || ws.previewPath || "/";
 	const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
-	const openUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
+	const openUrl = `${basePath}/route/${ws.id}${cleanPath}`;
+	const isOwner = !ws.userSub || ws.userSub === currentUser;
 
 	const [stats, setStats] = useState<Record<string, any> | null>(null);
 	const [lastActivity, setLastActivity] = useState<number | null>(null);
@@ -1657,26 +1933,42 @@ function WorkspaceCard({
 			{/* Action Area */}
 			<div className="border-t border-[var(--line)] pt-3.5 mt-3 space-y-3">
 				{/* Primary Prominent Action */}
-				{ws.status === "Running" ? (
-					<a 
-						href={openUrl} 
-						target="_blank" 
-						rel="noopener noreferrer" 
-						className="w-full btn bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
-					>
-						<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-						</svg>
-						Open Workspace Tab
-					</a>
-				) : ws.status === "Pending" ? (
-					<button 
-						disabled
-						className="w-full btn bg-amber-500/10 border border-amber-500/20 text-amber-500 font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 opacity-80"
-					>
-						<I.refresh className="w-3.5 h-3.5 animate-spin" />
-						Starting Workspace...
-					</button>
+				{isOwner ? (
+					ws.status === "Running" ? (
+						workspaceOpenMode === "inline" ? (
+							<button
+								onClick={() => onShowPreview(ws.previewPath || ws.workspacePath || "/", ws.previewType || ws.workspaceType || "html")}
+								className="w-full btn bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
+							>
+								<I.eye className="w-3.5 h-3.5" />
+								Open Workspace Inline
+							</button>
+						) : (
+							<a 
+								href={openUrl} 
+								target="_blank" 
+								rel="noopener noreferrer" 
+								className="w-full btn bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
+							>
+								<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+								</svg>
+								Open Workspace Tab
+							</a>
+						)
+					) : ws.status === "Pending" ? (
+						<button 
+							disabled
+							className="w-full btn bg-amber-500/10 border border-amber-500/20 text-amber-500 font-extrabold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-1.5 opacity-80"
+						>
+							<I.refresh className="w-3.5 h-3.5 animate-spin" />
+							Starting Workspace...
+						</button>
+					) : (
+						<div className="w-full py-2 bg-[var(--sunken)] rounded-xl border border-[var(--line)] text-center text-xs text-[var(--ink-3)] font-semibold font-mono uppercase tracking-wide">
+							Status: {ws.status}
+						</div>
+					)
 				) : (
 					<div className="w-full py-2 bg-[var(--sunken)] rounded-xl border border-[var(--line)] text-center text-xs text-[var(--ink-3)] font-semibold font-mono uppercase tracking-wide">
 						Status: {ws.status}
@@ -1695,7 +1987,21 @@ function WorkspaceCard({
 							Details
 						</button>
 
-						{ws.status === "Running" && (ws.previewPath || ws.workspacePath) && (
+						{isOwner && ws.status === "Running" && workspaceOpenMode === "inline" && (
+							<a 
+								href={openUrl} 
+								target="_blank" 
+								rel="noopener noreferrer" 
+								className="btn btn-ghost px-2.5 py-1 text-[11px] font-bold text-[var(--ink-2)] hover:text-[var(--ink)] flex items-center gap-1"
+							>
+								<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+								</svg>
+								Open Tab
+							</a>
+						)}
+
+						{isOwner && ws.status === "Running" && workspaceOpenMode === "tab" && (ws.previewPath || ws.workspacePath) && (
 							<button 
 								className="btn btn-ghost px-2.5 py-1 text-[11px] font-bold text-[var(--ink-2)] hover:text-[var(--ink)] flex items-center gap-1" 
 								onClick={() => onShowPreview(ws.previewPath || ws.workspacePath || "/", ws.previewType || ws.workspaceType || "html")}
@@ -1705,7 +2011,7 @@ function WorkspaceCard({
 							</button>
 						)}
 
-						{ws.isOutdated && (
+						{isOwner && ws.isOutdated && (
 							<button 
 								className="btn btn-ghost text-amber-600 hover:bg-amber-500/10 px-2 py-1 text-[10px] font-bold flex items-center gap-1" 
 								onClick={onUpgrade}
@@ -1717,7 +2023,7 @@ function WorkspaceCard({
 					</div>
 
 					<div className="flex">
-						{ws.status === "Running" && (
+						{isOwner && ws.status === "Running" && (
 							<button 
 								className="btn btn-ghost text-red-500 hover:bg-red-500/10 px-2.5 py-1 text-[11px] font-bold flex items-center gap-1" 
 								onClick={onStop}
@@ -1754,6 +2060,7 @@ interface WorkspaceConsoleViewProps {
 	workspaceId: string;
 	namespace: string;
 	activeToken: string;
+	currentUser: string;
 	onBack: () => void;
 	refreshAll: () => void;
 }
@@ -1762,6 +2069,7 @@ function WorkspaceConsoleView({
 	workspaceId,
 	namespace,
 	activeToken,
+	currentUser,
 	onBack,
 	refreshAll,
 }: WorkspaceConsoleViewProps) {
@@ -1830,6 +2138,15 @@ function WorkspaceConsoleView({
 		}
 	}, [ws]);
 
+	useEffect(() => {
+		if (ws) {
+			const isOwner = !ws.userSub || ws.userSub === currentUser;
+			if (!isOwner && (activeTab === "terminal" || activeTab === "preview")) {
+				setActiveTab("logs");
+			}
+		}
+	}, [ws, currentUser, activeTab]);
+
 	if (!ws) {
 		return <div className="py-12 text-center text-[var(--ink-3)] font-mono">Loading details console...</div>;
 	}
@@ -1837,10 +2154,15 @@ function WorkspaceConsoleView({
 	const pathPart = ws.workspacePath || ws.previewPath || "/";
 	const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
 	
-	// Routed URL targets
+	// Routed URL targets (iframe targets with token query for bootstrapping)
 	const workspaceUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
-	// Terminal routed path (if terminal template runs ttyd on preview/workspace port or api endpoints)
 	const terminalUrl = `${basePath}/route/${ws.id}/terminal/${tokenQuery}`;
+
+	// Tab URL targets (clean URLs without token query for new tabs)
+	const workspaceTabUrl = `${basePath}/route/${ws.id}${cleanPath}`;
+	const terminalTabUrl = `${basePath}/route/${ws.id}/terminal/`;
+
+	const isOwner = !ws.userSub || ws.userSub === currentUser;
 
 	return (
 		<div className="mt-6 flex flex-col gap-6 animate-fadeUp select-text">
@@ -1912,18 +2234,22 @@ function WorkspaceConsoleView({
 					{/* Tab switcher row */}
 					<div className="bg-[var(--surface)] border-b border-[var(--line)] px-4 py-2 flex items-center justify-between">
 						<div className="flex gap-2">
-							<button
-								onClick={() => setActiveTab("terminal")}
-								className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "terminal" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
-							>
-								Interactive Terminal
-							</button>
-							<button
-								onClick={() => setActiveTab("preview")}
-								className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "preview" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
-							>
-								Web Preview
-							</button>
+							{isOwner && (
+								<>
+									<button
+										onClick={() => setActiveTab("terminal")}
+										className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "terminal" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
+									>
+										Interactive Terminal
+									</button>
+									<button
+										onClick={() => setActiveTab("preview")}
+										className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "preview" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
+									>
+										Web Preview
+									</button>
+								</>
+							)}
 							<button
 								onClick={() => setActiveTab("logs")}
 								className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-colors ${activeTab === "logs" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
@@ -1944,8 +2270,8 @@ function WorkspaceConsoleView({
 							</button>
 						</div>
 						
-						{["terminal", "preview"].includes(activeTab) && (
-							<a href={activeTab === "terminal" ? terminalUrl : workspaceUrl} target="_blank" className="text-[11px] font-bold text-[var(--accent)] hover:underline flex items-center gap-1" rel="noreferrer">
+						{isOwner && ["terminal", "preview"].includes(activeTab) && (
+							<a href={activeTab === "terminal" ? terminalTabUrl : workspaceTabUrl} target="_blank" className="text-[11px] font-bold text-[var(--accent)] hover:underline flex items-center gap-1" rel="noreferrer">
 								Launch Independent Tab <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
 							</a>
 						)}
@@ -1953,7 +2279,7 @@ function WorkspaceConsoleView({
 
 					{/* Tab frame display */}
 					<div className="flex-1 bg-[var(--sunken)] relative min-h-[480px]">
-						{activeTab === "terminal" && (
+						{activeTab === "terminal" && isOwner && (
 							<iframe
 								src={terminalUrl}
 								className="w-full h-full border-none absolute inset-0 bg-[#1e1e1e]"
@@ -1962,7 +2288,7 @@ function WorkspaceConsoleView({
 							/>
 						)}
 
-						{activeTab === "preview" && (
+						{activeTab === "preview" && isOwner && (
 							<iframe
 								src={workspaceUrl}
 								className="w-full h-full border-none absolute inset-0 bg-white"
@@ -2127,9 +2453,10 @@ interface SpawnWorkspaceModalProps {
 	existingWorkspaces: Workspace[];
 	onSpawn: (id: string, name: string, userSub: string, contextVars: Record<string, string>) => void;
 	onClose: () => void;
+	onMeowTrigger?: () => void;
 }
 
-function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, onClose }: SpawnWorkspaceModalProps) {
+function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, onClose, onMeowTrigger }: SpawnWorkspaceModalProps) {
 	const [workspaceId, setWorkspaceId] = useState("");
 	const [workspaceName, setWorkspaceName] = useState("");
 	const [targetUser, setTargetUser] = useState("");
@@ -2159,6 +2486,15 @@ function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, o
 			setContextVars({});
 		}
 	}, [template, existingWorkspaces]);
+
+	const handleWorkspaceNameChange = (val: string) => {
+		const prevContains = workspaceName.toLowerCase().includes("meow");
+		const nextContains = val.toLowerCase().includes("meow");
+		setWorkspaceName(val);
+		if (!prevContains && nextContains && onMeowTrigger) {
+			onMeowTrigger();
+		}
+	};
 
 	return (
 		<div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-4">
@@ -2196,7 +2532,7 @@ function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, o
 						<input
 							type="text"
 							value={workspaceName}
-							onChange={(e) => setWorkspaceName(e.target.value)}
+							onChange={(e) => handleWorkspaceNameChange(e.target.value)}
 							className="theme-text-input w-full px-4 py-2.5 text-sm"
 							placeholder="e.g. Main Node project"
 						/>
@@ -2948,37 +3284,125 @@ interface WorkspacePreviewModalProps {
 }
 
 function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, onClose }: WorkspacePreviewModalProps) {
+	const [isMaximized, setIsMaximized] = useState(() => {
+		const stored = localStorage.getItem("nocr_inline_maximized");
+		return stored !== "false"; // Defaults to true if not set
+	});
+	const [isHeaderOpen, setIsHeaderOpen] = useState(true);
+	const [refreshKey, setRefreshKey] = useState(0);
+
 	const tokenQuery = activeToken ? `?token=${encodeURIComponent(activeToken)}` : "";
 	const cleanPath = path.startsWith("/") ? path : `/${path}`;
 	const targetUrl = `${basePath}/route/${workspace.id}${cleanPath}${tokenQuery}`;
+	const tabUrl = `${basePath}/route/${workspace.id}${cleanPath}`;
+
+	const handleRefresh = () => {
+		setRefreshKey(prev => prev + 1);
+	};
+
+	const toggleMaximize = () => {
+		const next = !isMaximized;
+		setIsMaximized(next);
+		localStorage.setItem("nocr_inline_maximized", String(next));
+	};
 
 	return (
-		<div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-4">
-			<div className="theme-modal bg-[var(--card)] border border-[var(--line)] w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] animate-pop">
-				<div className="px-6 py-4 border-b border-[var(--line)] flex items-center justify-between shrink-0">
-					<div>
-						<h3 className="text-base font-extrabold text-[var(--ink)]">Inline App Preview</h3>
-						<p className="text-xs text-[var(--ink-3)] mt-0.5 font-medium">Workspace Sandbox: <span className="font-mono text-[var(--accent)]">{workspace.id}</span></p>
-					</div>
-					<div className="flex gap-2">
-						<a href={targetUrl} target="_blank" className="btn btn-ghost px-2.5 py-1 text-[11px]">
-							Open Tab
-						</a>
-						<button className="btn btn-quiet p-1 rounded-lg text-[var(--ink-3)]" onClick={onClose}>
-							<I.cross className="w-5 h-5" />
+		<div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-0 md:p-4">
+			<div className={`theme-modal bg-[var(--sunken)] overflow-hidden flex flex-col animate-pop transition-all relative ${isMaximized ? "fixed inset-0 w-screen h-screen rounded-none border-0" : "w-full max-w-6xl rounded-2xl h-[92vh] border border-[var(--line)] shadow-2xl"}`}>
+				
+				{/* Top-Sliding Floating Control Drawer */}
+				<div className={`absolute top-0 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 transform ${isHeaderOpen ? "translate-y-0" : "-translate-y-full"}`}>
+					<div 
+						className="border border-t-0 border-[var(--line)] px-6 py-2.5 rounded-b-2xl shadow-2xl flex flex-col items-center gap-1.5 shrink-0"
+						style={{
+							backgroundColor: "color-mix(in srgb, var(--card) 85%, transparent)",
+							backdropFilter: "blur(12px)",
+							WebkitBackdropFilter: "blur(12px)",
+						}}
+					>
+						<div className="flex items-center gap-5">
+							<div className="flex flex-col pr-4 border-r border-[var(--line)] text-left">
+								<span className="text-[11px] font-extrabold text-[var(--ink)] whitespace-nowrap">Inline App Preview</span>
+								<span className="text-[9px] font-mono text-[var(--accent)] whitespace-nowrap">{workspace.id}</span>
+							</div>
+							
+							<div className="flex items-center gap-1.5">
+								<button onClick={handleRefresh} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Refresh Application">
+									<I.refresh className="w-3.5 h-3.5" />
+									Refresh
+								</button>
+								
+								<a href={tabUrl} target="_blank" className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Open in New Tab">
+									<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+									</svg>
+									Open Tab
+								</a>
+
+								<button onClick={toggleMaximize} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title={isMaximized ? "Restore Size" : "Maximize"}>
+									{isMaximized ? (
+										<>
+											<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9h-4V5m0 4l5-5M5 15h4v4m0-4l-5 5m14 0h4v-4m-4 4l5 5M9 5v4H5m4-4L4 4" />
+											</svg>
+											Restore
+										</>
+									) : (
+										<>
+											<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 14h6v6m0-6l-6 6m16-6h-6V8m0 6l6-6M4 4h6v6m0-6L4 10m16-6h-6v6m0-6l6 6" />
+											</svg>
+											Maximize
+										</>
+									)}
+								</button>
+								
+								<button className="btn btn-quiet p-1 rounded-lg text-[var(--ink-3)] hover:text-red-500 flex items-center justify-center" onClick={onClose} title="Close Preview">
+									<I.cross className="w-4 h-4" />
+								</button>
+							</div>
+						</div>
+						
+						{/* Collapse Drawer Tab/Button */}
+						<button 
+							onClick={() => setIsHeaderOpen(false)}
+							className="text-[9px] text-[var(--ink-3)] hover:text-[var(--accent)] flex items-center gap-0.5 select-none cursor-pointer border-none bg-transparent font-semibold mt-0.5 transition-colors"
+						>
+							<span>Collapse Panel</span>
+							<svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" />
+							</svg>
 						</button>
 					</div>
 				</div>
-				<div className="flex-1 bg-[var(--sunken)] relative min-h-[300px]">
+
+				{/* Floating Expand Tab when Collapsed */}
+				<div className="absolute top-0 left-1/2 -translate-x-1/2 z-50">
+					<button 
+						onClick={() => setIsHeaderOpen(true)}
+						className={`border border-[var(--line)] border-t-0 px-4 py-1.5 rounded-b-xl shadow-md flex items-center gap-1 text-[10px] text-[var(--ink-2)] transition-all cursor-pointer select-none font-extrabold ${isHeaderOpen ? "opacity-0 pointer-events-none -translate-y-full" : "opacity-100 translate-y-0"}`}
+						style={{
+							backgroundColor: "color-mix(in srgb, var(--card) 85%, transparent)",
+							backdropFilter: "blur(8px)",
+							WebkitBackdropFilter: "blur(8px)",
+						}}
+					>
+						<span>Show Control Panel</span>
+						<svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+						</svg>
+					</button>
+				</div>
+
+				{/* Immersive Full-Screen Iframe Viewport */}
+				<div className="flex-1 bg-white relative w-full h-full">
 					<iframe
+						key={refreshKey}
 						src={targetUrl}
 						className="w-full h-full border-none absolute inset-0 bg-white"
 						sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
 						title={`Preview frame of ${workspace.id}`}
 					/>
-				</div>
-				<div className="px-6 py-4 border-t border-[var(--line)] flex justify-end shrink-0">
-					<button className="btn btn-ghost text-xs" onClick={onClose}>Close</button>
 				</div>
 			</div>
 		</div>
@@ -3084,6 +3508,226 @@ function TweaksWidgetPanel({
 					))}
 				</div>
 			</div>
+		</div>
+	);
+}
+
+function MeowEasterEgg() {
+	return (
+		<div className="meow-ufo-container">
+			<style>{`
+				.meow-ufo-container {
+					position: fixed;
+					inset: 0;
+					pointer-events: none;
+					z-index: 99999;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					overflow: hidden;
+					background: transparent;
+				}
+				.meow-ufo {
+					width: 180px;
+					height: 180px;
+					position: relative;
+					animation: meow-ufo-fly 4.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+					filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.45));
+				}
+				@keyframes meow-ufo-fly {
+					0% {
+						transform: translate(-100vw, 100vh) scale(0.2) rotate(-35deg);
+						opacity: 0;
+					}
+					25% {
+						transform: translate(-20vw, 15vh) scale(0.7) rotate(15deg);
+						opacity: 1;
+					}
+					45% {
+						transform: translate(0vw, -5vh) scale(1) rotate(-8deg);
+					}
+					55% {
+						transform: translate(8vw, 2vh) scale(1.1) rotate(5deg);
+					}
+					65% {
+						transform: translate(-5vw, -12vh) scale(1.05) rotate(-10deg);
+					}
+					80% {
+						transform: translate(25vw, -25vh) scale(0.75) rotate(20deg);
+						opacity: 1;
+					}
+					100% {
+						transform: translate(100vw, -100vh) scale(0.2) rotate(45deg);
+						opacity: 0;
+					}
+				}
+				
+				.meow-ufo-beam {
+					animation: meow-beam-pulse 0.4s infinite ease-in-out;
+					transform-origin: 50% 65%;
+				}
+				@keyframes meow-beam-pulse {
+					0%, 100% { opacity: 0.25; transform: scaleX(0.95); }
+					50% { opacity: 0.55; transform: scaleX(1.05); }
+				}
+
+				.meow-ufo-light {
+					animation: meow-light-flash 0.3s infinite alternate;
+				}
+				@keyframes meow-light-flash {
+					0% { fill: #39ff14; filter: drop-shadow(0 0 1px #39ff14); }
+					100% { fill: #106005; filter: none; }
+				}
+
+				.meow-char {
+					position: absolute;
+					font-family: 'Outfit', 'Inter', sans-serif;
+					font-weight: 900;
+					font-size: 2.2rem;
+					color: #eae6da;
+					background: #c96442;
+					padding: 4px 12px;
+					border: 3px solid #1f1e1c;
+					border-radius: 12px;
+					box-shadow: 0 8px 0 #1f1e1c;
+					pointer-events: none;
+					opacity: 0;
+					text-transform: uppercase;
+					white-space: nowrap;
+				}
+
+				.meow-char-1 {
+					left: 28%;
+					top: 55%;
+					animation: meow-drop-1 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 0.8s forwards;
+				}
+				@keyframes meow-drop-1 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.1) rotate(-15deg); }
+					100% { transform: translateY(40vh) scale(1.8) rotate(35deg); opacity: 0; }
+				}
+
+				.meow-char-2 {
+					left: 42%;
+					top: 50%;
+					animation: meow-drop-2 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 1.3s forwards;
+				}
+				@keyframes meow-drop-2 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.2) rotate(20deg); }
+					100% { transform: translateY(45vh) scale(1.9) rotate(-40deg); opacity: 0; }
+				}
+
+				.meow-char-3 {
+					left: 55%;
+					top: 48%;
+					animation: meow-drop-3 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 1.8s forwards;
+				}
+				@keyframes meow-drop-3 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.2) rotate(-10deg); }
+					100% { transform: translateY(45vh) scale(2) rotate(45deg); opacity: 0; }
+				}
+
+				.meow-char-4 {
+					left: 48%;
+					top: 45%;
+					animation: meow-drop-4 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 2.3s forwards;
+				}
+				@keyframes meow-drop-4 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.3) rotate(25deg); }
+					100% { transform: translateY(50vh) scale(2.2) rotate(-30deg); opacity: 0; }
+				}
+
+				.meow-char-5 {
+					left: 62%;
+					top: 38%;
+					animation: meow-drop-5 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 2.8s forwards;
+				}
+				@keyframes meow-drop-5 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.35) rotate(-20deg); }
+					100% { transform: translateY(55vh) scale(2.4) rotate(50deg); opacity: 0; }
+				}
+
+				.meow-char-6 {
+					left: 74%;
+					top: 32%;
+					animation: meow-drop-6 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 3.3s forwards;
+				}
+				@keyframes meow-drop-6 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.2) rotate(15deg); }
+					100% { transform: translateY(50vh) scale(2.2) rotate(-20deg); opacity: 0; }
+				}
+			`}</style>
+			
+			<div className="meow-ufo">
+				<svg viewBox="0 0 100 100" width="100%" height="100%">
+					<defs>
+						<linearGradient id="beam-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+							<stop offset="0%" stopColor="#39ff14" stopOpacity="0.8" />
+							<stop offset="100%" stopColor="#39ff14" stopOpacity="0" />
+						</linearGradient>
+					</defs>
+					
+					{/* Tractor Beam */}
+					<polygon points="35,66 10,100 90,100 65,66" fill="url(#beam-grad)" className="meow-ufo-beam" />
+					
+					{/* Cockpit glass dome */}
+					<path d="M 22 56 A 28 28 0 0 1 78 56 Z" fill="rgba(150, 240, 255, 0.25)" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1.5" />
+					
+					{/* Cute Terracotta Cat inside the egg */}
+					{/* Ears */}
+					<polygon points="32,32 28,14 44,27" fill="#c96442" stroke="#c96442" strokeWidth="1" strokeLinejoin="round" />
+					<polygon points="68,32 72,14 56,27" fill="#c96442" stroke="#c96442" strokeWidth="1" strokeLinejoin="round" />
+					<polygon points="33,30 30,17 42,26" fill="#f5d6cc" />
+					<polygon points="67,30 70,17 58,26" fill="#f5d6cc" />
+					{/* Head */}
+					<circle cx="50" cy="40" r="16" fill="#c96442" />
+					{/* Eyes */}
+					<circle cx="44" cy="38" r="3" fill="#1f1e1c" />
+					<circle cx="56" cy="38" r="3" fill="#1f1e1c" />
+					<circle cx="42.5" cy="36.5" r="1" fill="#ffffff" />
+					<circle cx="54.5" cy="36.5" r="1" fill="#ffffff" />
+					{/* Muzzle */}
+					<ellipse cx="50" cy="45" rx="6" ry="4" fill="#eae6da" />
+					<polygon points="50,43.5 48,41.5 52,41.5" fill="#1f1e1c" />
+					<path d="M47,46 C47,48 50,48 50,46 C50,48 53,48 53,46" fill="none" stroke="#1f1e1c" strokeWidth="1.5" strokeLinecap="round" />
+					{/* Whiskers */}
+					<line x1="28" y1="44" x2="16" y2="43" stroke="#1f1e1c" strokeWidth="1" />
+					<line x1="28" y1="47" x2="15" y2="47" stroke="#1f1e1c" strokeWidth="1" />
+					<line x1="72" y1="44" x2="84" y2="43" stroke="#1f1e1c" strokeWidth="1" />
+					<line x1="72" y1="47" x2="85" y2="47" stroke="#1f1e1c" strokeWidth="1" />
+					
+					{/* Cracked Egg Shell bottom */}
+					<path d="M 22 56 C 22 78, 78 78, 78 56 L 70 51 L 62 56 L 54 49 L 46 56 L 38 49 L 30 56 Z" fill="#eae6da" stroke="#d5d0c0" strokeWidth="1.5" strokeLinejoin="round" />
+					
+					{/* Cat Paws resting on egg rim */}
+					<circle cx="34" cy="55" r="3.5" fill="#eae6da" stroke="#1f1e1c" strokeWidth="1" />
+					<circle cx="66" cy="55" r="3.5" fill="#eae6da" stroke="#1f1e1c" strokeWidth="1" />
+					
+					{/* UFO base/disk ring */}
+					<ellipse cx="50" cy="65" rx="43" ry="12" fill="#3a3d40" stroke="#1f1e1c" strokeWidth="1.5" />
+					<ellipse cx="50" cy="65" rx="38" ry="8" fill="#585c60" />
+					
+					{/* Glowing flashing lights */}
+					<circle cx="16" cy="64" r="2" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0s" }} />
+					<circle cx="30" cy="68" r="2.5" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0.1s" }} />
+					<circle cx="50" cy="70" r="3" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0.2s" }} />
+					<circle cx="70" cy="68" r="2.5" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0.3s" }} />
+					<circle cx="84" cy="64" r="2" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0.4s" }} />
+				</svg>
+			</div>
+			
+			{/* Falling big MEOW letters */}
+			<div className="meow-char meow-char-1">MEOW!</div>
+			<div className="meow-char meow-char-2">MEOW</div>
+			<div className="meow-char meow-char-3">MEOW~</div>
+			<div className="meow-char meow-char-4">MEOW!</div>
+			<div className="meow-char meow-char-5">MEOW</div>
+			<div className="meow-char meow-char-6">MEOW~</div>
 		</div>
 	);
 }

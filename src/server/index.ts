@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import rateLimit from "@fastify/rate-limit";
 import { getLogger } from "@logtape/logtape";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -191,6 +192,20 @@ export async function createFastifyApp(options?: {
 		};
 	}
 	const app = fastify(serverOptions);
+
+	await app.register(rateLimit, {
+		global: false,
+		keyGenerator: (request) => {
+			const forwardedFor = request.headers["x-forwarded-for"];
+			const ip = Array.isArray(forwardedFor)
+				? forwardedFor[0]
+				: forwardedFor ||
+					request.ip ||
+					request.raw?.socket?.remoteAddress ||
+					"127.0.0.1";
+			return ip;
+		},
+	});
 
 	registerUpgradeHandler(app, { getK8sContext });
 

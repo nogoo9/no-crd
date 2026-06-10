@@ -3,6 +3,16 @@
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
 
+## What's New in v0.9.0
+
+- **Interactive Popup SSO Renewal & Session Expiry Warnings**: Added a top-level session expiration warning banner prompting users to renew their access session when expiring and OIDC refresh tokens are unavailable/disabled on the Identity Provider. Renewals run inside an auto-closing popup window triggered via voluntary user interaction to satisfy browser security bounds.
+- **Auto/Manual Refresh Dashboard Control**: Added a premium segmented dashboard toggle enabling users to choose between automated data polling (every 5 seconds) and manually triggered data refresh, persisting preferences in `localStorage`.
+- **Maximize & Reload Control for Inline Workspaces**: Enhanced workspace preview modals with layout toggle options to maximize/restore view width and a toolbar reload option to quickly reload application frames.
+- **Keycloak Hostname and Path Synchronization**: Integrated the `KC_HOSTNAME` environment variable mapping set to `http://localhost:8080/auth` to enforce unified issuer URLs (`http://localhost:8080/auth/realms/nogoo9`) for both external login pathways and backchannel cluster-to-cluster token refresh queries, resolving OIDC path stripping and `invalid_grant` errors.
+- **Dynamic Path-Scoped Cookie Routing**: Extended cookie prefix path resolution to incorporate dynamic base-url subpaths (`Path=/nocr/`), preventing cookie visibility leakage or browser session collision across Dynamic Workspace views.
+- **Cat-Themed Favicon Packaging**: Embedded a lightweight, custom vector cat-themed SVG favicon (using an inline base64 Data URL) inside the HTML templates, ensuring it is automatically packaged inside the NPM distribution package and the Docker container image without requiring external asset serving handlers.
+- **Official Fastify Rate Limiting Plugin Integration**: Replaced the custom in-memory rate limiting implementation with the official `@fastify/rate-limit` plugin. This hardens sensitive authentication endpoints (token retrieval, OIDC authorize redirect, and OIDC refresh) using a parameterizable rate-limiter configuration (`RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW` environment variables) with proxy-aware client IP extraction to correctly identify clients behind reverse proxies.
+
 ## What's New in v0.8.1
 
 - **NPM and GitHub Links & Dynamic Version Reporting**: Integrated direct navigation links to the [GitHub Repository](https://github.com/nogoo9/no-crd) and the [npm Package](https://www.npmjs.com/package/@nogoo9/no-crd) inside the gateway dashboard footer. Added a styled mono-badge displaying the dynamic server capabilities version returned by the backend (e.g. `no-crd v0.8.1`).

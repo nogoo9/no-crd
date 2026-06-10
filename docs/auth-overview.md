@@ -289,6 +289,15 @@ If you navigate directly to a workspace URL (e.g., copying and pasting `http://l
    ```
 4. **Active Session**: The proxy validates the token, sets the `nocr_token` session cookie, and displays the workspace UI seamlessly.
 
+### 3. Transparent Token Refresh & Fallback Popup Renewal
+To keep user and workspace application sessions active dynamically:
+*   **Transparent BFF Refresh**: If the OIDC Identity Provider returns a `refresh_token` during initial authentication, the BFF gateway proxy encrypts it inside a secure, `HttpOnly` cookie (`nocr_refresh`). When the user's access token expires, the gateway automatically intercepts the request in the background, exchanges the refresh token for a new access token, updates the client cookies, and completes the request transparently.
+*   **User-Initiated Fallback (Popup Window)**: In environments where refresh tokens are disabled or restricted by the OIDC Identity Provider:
+    - **Session Warning Banner**: The dashboard renders a warning banner at the top of the interface when the active token is within 60 seconds of expiration (e.g., *Your session is expiring. [Renew Session]*).
+    - **SSO Popup**: Clicking *[Renew Session]* launches a user-initiated popup window targeting the OIDC authorization endpoint. Because this is triggered by a direct user action, modern browsers allow the popup without blocking it.
+    - **Frictionless Sync**: If the user's session is still active with the SSO provider, the authorization completes instantly and closes the popup. The parent dashboard tab intercepts this, updates the session, and dynamically propagates the new `nocr_token` cookie to any open inline frames or terminal active connections.
+    - **Cross-Tab Synchronization**: Token state modifications are immediately synchronized across all open browser tabs and workspace sessions via window `storage` listeners.
+
 ---
 
 ## 🛠️ Script: Generating Test Tokens

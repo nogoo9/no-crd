@@ -12,11 +12,20 @@ export async function registerProxyRoutes(
 	deps: RouteDeps,
 ): Promise<void> {
 	const { proxyPreHandler } = deps.guards;
+	const basePrefix = getBasePrefix();
 
 	// 1. Path-scoped token retrieval endpoint
 	api.get(
 		"/route/:workspaceId/_auth/token",
-		{ preHandler: proxyPreHandler },
+		{
+			config: {
+				rateLimit: {
+					max: config.server.rateLimitMax,
+					timeWindow: config.server.rateLimitWindow,
+				},
+			},
+			preHandler: proxyPreHandler,
+		},
 		async (request, reply) => {
 			setCorsHeaders(reply);
 
@@ -36,14 +45,94 @@ export async function registerProxyRoutes(
 			}
 
 			const token = (request as any).token;
-			return { token: token || null };
+			let session: {
+				sub: string;
+				roles: string[];
+				iat?: number;
+				exp?: number;
+			} | null = null;
+
+			const {
+				getSessionKey,
+				extractTokenFromCookie,
+				verifySessionCookie,
+				extractUserIdentity,
+			} = await import("~/k8s/index.js");
+			const sessKey = getSessionKey();
+			const sessCookie = extractTokenFromCookie(
+				request.headers.cookie,
+				"nocr_sess",
+			);
+			if (sessCookie && sessKey) {
+				const verified = verifySessionCookie(sessCookie, sessKey);
+				if (verified) {
+					session = {
+						sub: verified.sub,
+						roles: verified.roles,
+						iat: verified.iat,
+						exp: verified.exp,
+					};
+				}
+			}
+
+			if (!session && (request as any).jwtPayload) {
+				const jwtPayload = (request as any).jwtPayload;
+				let sub = "";
+				try {
+					sub = extractUserIdentity(jwtPayload, config.auth.subJsonPath);
+				} catch (_) {
+					sub = jwtPayload.sub || jwtPayload.name || "";
+				}
+
+				// Extract roles using JSONPath or fallbacks
+				let roles: string[] = [];
+				try {
+					const { JSONPath } = await import("jsonpath-plus");
+					const match = JSONPath<unknown[]>({
+						path: config.auth.rolesJsonPath || "$.realm_access.roles",
+						json: jwtPayload as object,
+					});
+					const rolesVal = match && match.length > 0 ? match[0] : undefined;
+					if (Array.isArray(rolesVal)) {
+						roles = rolesVal.map(String);
+					} else if (typeof rolesVal === "string") {
+						roles = rolesVal.split(/[\s,]+/);
+					} else {
+						const directRoles =
+							jwtPayload.roles ?? jwtPayload.realm_access?.roles;
+						if (Array.isArray(directRoles)) {
+							roles = directRoles.map(String);
+						}
+					}
+				} catch (_) {}
+
+				session = {
+					sub,
+					roles,
+					iat: typeof jwtPayload.iat === "number" ? jwtPayload.iat : undefined,
+					exp: typeof jwtPayload.exp === "number" ? jwtPayload.exp : undefined,
+				};
+			}
+
+			return {
+				token: token || null,
+				session,
+			};
 		},
 	);
 
 	// 2. Redirect authorize endpoint
 	api.get(
 		"/route/:workspaceId/_auth/authorize",
-		{ preHandler: proxyPreHandler },
+		{
+			config: {
+				rateLimit: {
+					max: config.server.rateLimitMax,
+					timeWindow: config.server.rateLimitWindow,
+				},
+			},
+			preHandler: proxyPreHandler,
+		},
 		async (request, reply) => {
 			setCorsHeaders(reply);
 
@@ -121,171 +210,181 @@ export async function registerProxyRoutes(
 	);
 
 	// 2b. Explicit refresh endpoint for SPAs
-	api.post("/route/:workspaceId/_auth/refresh", async (request, reply) => {
-		setCorsHeaders(reply);
+	api.post(
+		"/route/:workspaceId/_auth/refresh",
+		{
+			config: {
+				rateLimit: {
+					max: config.server.rateLimitMax,
+					timeWindow: config.server.rateLimitWindow,
+				},
+			},
+		},
+		async (request, reply) => {
+			setCorsHeaders(reply);
 
-		const { workspaceId } = request.params as { workspaceId: string };
-		if (!workspaceId) {
-			reply.status(400);
-			return reply.send({
-				error: "Bad Request",
-				message: "Workspace ID is required",
-			});
-		}
-
-		// 1. Look up workspace pod to check user sub and mode annotation
-		const {
-			DEFAULT_NAMESPACE,
-			MODE,
-			resolveNamespace,
-			getSessionKey,
-			extractTokenFromCookie,
-			decryptRefreshToken,
-			encryptRefreshToken,
-			createSessionCookie,
-			extractUserIdentity,
-		} = await import("~/k8s/index.js");
-
-		const ns = resolveNamespace(undefined, MODE, DEFAULT_NAMESPACE);
-		const k8sCtx = deps.getK8sContext();
-		let pod: any;
-		try {
-			const res = await k8sCtx.coreApi.listNamespacedPod({
-				namespace: ns,
-				labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${workspaceId}`,
-			});
-			if (res.items.length === 0) {
-				reply.status(404);
+			const { workspaceId } = request.params as { workspaceId: string };
+			if (!workspaceId) {
+				reply.status(400);
 				return reply.send({
-					error: "Not Found",
-					message: "Workspace not found",
+					error: "Bad Request",
+					message: "Workspace ID is required",
 				});
 			}
-			pod = res.items[0];
-		} catch (err) {
-			logger.error("Failed to query workspace pod during refresh: {error}", {
-				error: err,
-			});
-			reply.status(500);
-			return reply.send({
-				error: "Internal Server Error",
-				message: "Internal Server Error",
-			});
-		}
 
-		// 2. Verify if token-api mode is enabled
-		const annotations = pod.metadata?.annotations || {};
-		const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
-		const modes = authMode
-			.split(",")
-			.map((m: string) => m.trim().toLowerCase());
+			// 1. Look up workspace pod to check user sub and mode annotation
+			const {
+				DEFAULT_NAMESPACE,
+				MODE,
+				resolveNamespace,
+				getSessionKey,
+				extractTokenFromCookie,
+				decryptRefreshToken,
+				encryptRefreshToken,
+				createSessionCookie,
+				extractUserIdentity,
+			} = await import("~/k8s/index.js");
 
-		if (!modes.includes("token-api")) {
-			reply.status(403);
-			return reply.send({
-				error: "Forbidden",
-				message: "token-api mode is not enabled for this workspace",
-			});
-		}
+			const ns = resolveNamespace(undefined, MODE, DEFAULT_NAMESPACE);
+			const k8sCtx = deps.getK8sContext();
+			let pod: any;
+			try {
+				const res = await k8sCtx.coreApi.listNamespacedPod({
+					namespace: ns,
+					labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${workspaceId}`,
+				});
+				if (res.items.length === 0) {
+					reply.status(404);
+					return reply.send({
+						error: "Not Found",
+						message: "Workspace not found",
+					});
+				}
+				pod = res.items[0];
+			} catch (err) {
+				logger.error("Failed to query workspace pod during refresh: {error}", {
+					error: err,
+				});
+				reply.status(500);
+				return reply.send({
+					error: "Internal Server Error",
+					message: "Internal Server Error",
+				});
+			}
 
-		if (!config.auth.enabled) {
-			return { token: "auth-disabled" };
-		}
+			// 2. Verify if token-api mode is enabled
+			const annotations = pod.metadata?.annotations || {};
+			const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
+			const modes = authMode
+				.split(",")
+				.map((m: string) => m.trim().toLowerCase());
 
-		const sessKey = getSessionKey();
-		if (!sessKey) {
-			reply.status(500);
-			return reply.send({
-				error: "Internal Server Error",
-				message: "Session secret not resolved",
-			});
-		}
-
-		const refreshCookie = extractTokenFromCookie(
-			request.headers.cookie,
-			"nocr_refresh",
-		);
-		if (!refreshCookie) {
-			reply.status(401);
-			return reply.send({
-				error: "Unauthorized",
-				message: "Missing refresh cookie",
-			});
-		}
-
-		const decryptedRefresh = decryptRefreshToken(refreshCookie, sessKey);
-		if (!decryptedRefresh) {
-			reply.status(401);
-			return reply.send({
-				error: "Unauthorized",
-				message: "Invalid refresh cookie",
-			});
-		}
-
-		try {
-			const { performTokenRefresh } = await import("~/server/auth.js");
-			const basePrefix = getBasePrefix();
-			const result = await performTokenRefresh(
-				request,
-				decryptedRefresh,
-				sessKey,
-				basePrefix,
-			);
-
-			// 3. Verify user owns the workspace
-			const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
-			const userSub = extractUserIdentity(
-				result.jwtPayload,
-				config.auth.subJsonPath,
-			);
-
-			if (podSub !== userSub) {
+			if (!modes.includes("token-api")) {
 				reply.status(403);
 				return reply.send({
 					error: "Forbidden",
-					message: "You do not own this workspace",
+					message: "token-api mode is not enabled for this workspace",
 				});
 			}
 
-			// 4. Update cookies
-			const newSessCookie = createSessionCookie(
-				result.jwtPayload,
-				sessKey,
-				config.auth.sessionTtlSeconds,
-				config.auth.subJsonPath,
-				config.auth.rolesJsonPath,
-			);
-			reply.header(
-				"Set-Cookie",
-				`nocr_sess=${newSessCookie}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${config.auth.sessionTtlSeconds}`,
-			);
+			if (!config.auth.enabled) {
+				return { token: "auth-disabled" };
+			}
 
-			const encryptedNewRefresh = encryptRefreshToken(
-				result.rotatedRefreshToken,
-				sessKey,
-			);
-			reply.header(
-				"Set-Cookie",
-				`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`,
-			);
+			const sessKey = getSessionKey();
+			if (!sessKey) {
+				reply.status(500);
+				return reply.send({
+					error: "Internal Server Error",
+					message: "Session secret not resolved",
+				});
+			}
 
-			reply.header(
-				"Set-Cookie",
-				`nocr_token=${result.token}; Path=/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
+			const refreshCookie = extractTokenFromCookie(
+				request.headers.cookie,
+				"nocr_refresh",
 			);
+			if (!refreshCookie) {
+				reply.status(401);
+				return reply.send({
+					error: "Unauthorized",
+					message: "Missing refresh cookie",
+				});
+			}
 
-			return { token: result.token };
-		} catch (err) {
-			logger.warn("SPA refresh request failed: {error}", {
-				error: err instanceof Error ? err.message : String(err),
-			});
-			reply.status(401);
-			return reply.send({
-				error: "Unauthorized",
-				message: err instanceof Error ? err.message : String(err),
-			});
-		}
-	});
+			const decryptedRefresh = decryptRefreshToken(refreshCookie, sessKey);
+			if (!decryptedRefresh) {
+				reply.status(401);
+				return reply.send({
+					error: "Unauthorized",
+					message: "Invalid refresh cookie",
+				});
+			}
+
+			try {
+				const { performTokenRefresh } = await import("~/server/auth.js");
+				const result = await performTokenRefresh(
+					request,
+					decryptedRefresh,
+					sessKey,
+					basePrefix,
+				);
+
+				// 3. Verify user owns the workspace
+				const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
+				const userSub = extractUserIdentity(
+					result.jwtPayload,
+					config.auth.subJsonPath,
+				);
+
+				if (podSub !== userSub) {
+					reply.status(403);
+					return reply.send({
+						error: "Forbidden",
+						message: "You do not own this workspace",
+					});
+				}
+
+				// 4. Update cookies
+				const newSessCookie = createSessionCookie(
+					result.jwtPayload,
+					sessKey,
+					config.auth.sessionTtlSeconds,
+					config.auth.subJsonPath,
+					config.auth.rolesJsonPath,
+				);
+				reply.header(
+					"Set-Cookie",
+					`nocr_sess=${newSessCookie}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${config.auth.sessionTtlSeconds}`,
+				);
+
+				const encryptedNewRefresh = encryptRefreshToken(
+					result.rotatedRefreshToken,
+					sessKey,
+				);
+				reply.header(
+					"Set-Cookie",
+					`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`,
+				);
+
+				reply.header(
+					"Set-Cookie",
+					`nocr_token=${result.token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
+				);
+
+				return { token: result.token };
+			} catch (err) {
+				logger.warn("SPA refresh request failed: {error}", {
+					error: err instanceof Error ? err.message : String(err),
+				});
+				reply.status(401);
+				return reply.send({
+					error: "Unauthorized",
+					message: err instanceof Error ? err.message : String(err),
+				});
+			}
+		},
+	);
 
 	// 3. HTTP Proxy with request header rewriting
 	await api.register(
@@ -329,7 +428,9 @@ export async function registerProxyRoutes(
 						// Inject raw JWT token if present
 						const token = request.token;
 						if (token) {
-							newHeaders["x-workspace-jwt"] = token;
+							if (config.auth.injectWorkspaceJwt) {
+								newHeaders["x-workspace-jwt"] = token;
+							}
 							newHeaders.authorization = `Bearer ${token}`;
 						}
 					}
@@ -359,15 +460,14 @@ export async function registerProxyRoutes(
 					const token = (request as any).token;
 					const workspaceId = (request as any).workspaceId;
 					if (token && workspaceId) {
-						// Cookie Path uses raw "/route/{id}/" without basePrefix because
-						// Fastify registers all routes under { prefix: basePrefix }. The
-						// browser sees the full URL (e.g. /gateway/no-crd/route/ws-1/)
-						// but the cookie Path in the Set-Cookie header is taken literally.
-						// The logout handler clears with the same raw path, keeping them
-						// consistent. See ADR-011 for the full analysis.
+						// Cookie Path uses "/route/{id}/" prefixed with basePrefix because
+						// the cookie Path in the Set-Cookie header is matched against the
+						// full browser request path (which includes basePrefix). The logout
+						// handler also clears with the same prefix-consistent path.
+						// See ADR-011 for context on cookie path alignment.
 						reply.header(
 							"Set-Cookie",
-							`nocr_token=${token}; Path=/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
+							`nocr_token=${token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
 						);
 					}
 					reply.send(res.stream);

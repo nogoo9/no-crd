@@ -32,14 +32,15 @@ let lastDiscoveryFetch = 0;
 const DISCOVERY_CACHE_TTL = 300000; // 5 minutes
 
 async function getTokenEndpoint(): Promise<string> {
-	const discoveryUrl = config.ui.oauth.discoveryUrl;
+	const tokenUrl = config.auth.tokenUrl;
+	if (tokenUrl) {
+		return tokenUrl;
+	}
+
+	const discoveryUrl = config.auth.serverDiscoveryUrl;
 	if (!discoveryUrl) {
-		const tokenUrl = config.auth.tokenUrl;
-		if (tokenUrl) {
-			return tokenUrl;
-		}
 		throw new Error(
-			"Neither OAUTH_DISCOVERY_URL nor OAUTH_TOKEN_URL is configured on the server",
+			"Neither OAUTH_SERVER_TOKEN_URL nor OAUTH_SERVER_DISCOVERY_URL is configured on the server",
 		);
 	}
 
@@ -522,6 +523,21 @@ export function registerAuthHooks(
 
 		// Expose workspace annotations early for downstream access (e.g. headers injection)
 		(request as any).workspaceAnnotations = annotations;
+
+		// Force OIDC token retrieval if the workspace requires raw tokens and only session-cookie auth is present
+		const requireToken =
+			annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_REQUIRE_TOKEN] === "true";
+		if (
+			config.auth.enabled &&
+			!isNoAuth &&
+			requireToken &&
+			!(request as any).token
+		) {
+			(request as any).jwtPayload = null;
+			(request as any).authError = new Error(
+				"This workspace strictly requires a valid OIDC access token, but only session authentication is present.",
+			);
+		}
 
 		if (!isNoAuth) {
 			await requireRouteAuth(request, reply);

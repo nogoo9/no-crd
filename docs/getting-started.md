@@ -78,6 +78,8 @@ The server can be configured via environment variables or CLI flags:
 | - | `STATELESS` | `false` | `true`, `false` | Enable stateless request handling (no session affinity). |
 | `-l, --log-level` | `LOG_LEVEL` | `info` | `debug`, `info`, `warning`, `error`, `fatal` | Logging verbosity filter. |
 | - | `LOG_FILE` | `nogoo9-mcp.log` | String | Output file path for file logging. |
+| - | `RATE_LIMIT_MAX` | `100` | Number | Maximum requests allowed per window for rate limited routes. |
+| - | `RATE_LIMIT_WINDOW` | `60000` | Number | Time window in milliseconds for rate limited routes. |
 
 ### 🔒 TLS Configuration
 
@@ -139,8 +141,10 @@ The server can be configured via environment variables or CLI flags:
 | - | `PROXY_SESSION_SECRET` | `""` | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 | - | `OAUTH_SCOPES` | `openid profile email offline_access` | Space-separated scope string | OAuth scopes to request during authorization. Include 'offline_access' for refresh tokens. |
 | - | `OAUTH_AUTHORIZATION_URL` | - | URL string | Direct OAuth authorization URL. |
-| - | `OAUTH_TOKEN_URL` | - | URL string | Direct OAuth token exchange endpoint. |
+| - | `OAUTH_SERVER_DISCOVERY_URL`, `OAUTH_DISCOVERY_URL` | - | URL string | Discovery URL for the OAuth server used by the backend gateway. Falls back to OAUTH_DISCOVERY_URL. |
+| - | `OAUTH_SERVER_TOKEN_URL`, `OAUTH_TOKEN_URL` | - | URL string | Direct OAuth token exchange endpoint for the backend server. |
 | - | `OAUTH_END_SESSION_URL` | - | URL string | Direct OAuth logout endpoint. |
+| `--auth-inject-workspace-jwt` | `AUTH_INJECT_WORKSPACE_JWT` | `true` | `true`, `false` | Determines if the custom 'x-workspace-jwt' header containing the raw token is injected into proxy requests. |
 | - | `AUTH_DEFAULT_ROLE` | `viewer` | String | Fallback role if the token does not provide scopes/roles. |
 
 ### 🖥️ UI & Themes Configuration

@@ -8,6 +8,7 @@ metadata:
   annotations:
     nogoo9/description: "Auth Demo - Combined Mode. Demonstrates both Header Injection and Token & Redirect API modes."
     nogoo9/tag: "demo"
+    nogoo9/auth-require-token: "true"
     nogoo9/workspace-port: "3000"
     nogoo9/workspace-path: "/"
     nogoo9/workspace-auth-mode: "inject-headers,token-api"

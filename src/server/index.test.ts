@@ -1556,7 +1556,10 @@ users:
 				],
 			});
 
-			const token = createMockToken({ sub: "user-1" });
+			const token = createMockToken({
+				sub: "user-1",
+				realm_access: { roles: ["admin", "developer"] },
+			});
 			const req = new Request("http://localhost/route/ws-1/_auth/token", {
 				method: "GET",
 				headers: {
@@ -1565,8 +1568,12 @@ users:
 			});
 			const resp = await handleWebRequest(req);
 			expect(resp.status).toBe(200);
-			const body = await resp.json();
+			const body = (await resp.json()) as any;
 			expect(body.token).toBe(token);
+			expect(body.session).toBeDefined();
+			expect(body.session.sub).toBe("user-1");
+			expect(body.session.roles).toContain("admin");
+			expect(body.session.roles).toContain("developer");
 		});
 
 		test("Token API - /route/:workspaceId/_auth/token returns 403 if token-api not enabled", async () => {
@@ -2035,6 +2042,121 @@ users:
 			}
 		});
 
+		test("HTTP Proxy - does NOT inject x-workspace-jwt if AUTH_INJECT_WORKSPACE_JWT is false", async () => {
+			process.env.AUTH_INJECT_WORKSPACE_JWT = "false";
+			await resetMcpServer(undefined, false, k8sContext); // Pick up config change
+
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/workspace-auth-mode": "inject-headers",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({ sub: "user-1", roles: ["user"] });
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock((_url: string, init?: any) => {
+				expect(init.headers.get("x-user-sub")).toBe("user-1");
+				expect(init.headers.get("x-workspace-jwt")).toBeNull();
+				expect(init.headers.get("authorization")).toBe(`Bearer ${token}`);
+				return Promise.resolve(new Response("success", { status: 200 }));
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const req = new Request("http://localhost/route/ws-1/resource", {
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+			} finally {
+				globalThis.fetch = originalFetch;
+				delete process.env.AUTH_INJECT_WORKSPACE_JWT;
+				await resetMcpServer(undefined, false, k8sContext);
+			}
+		});
+
+		test("HTTP Proxy - redirects/blocks when nogoo9/auth-require-token is true and only nocr_sess exists", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/auth-require-token": "true",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const { createSessionCookie, resolveSessionSecret } = await import(
+				"~/k8s/index.js"
+			);
+			const key = await resolveSessionSecret(null, "default");
+			const sessCookie = createSessionCookie(
+				{ sub: "user-1", realm_access: { roles: ["user"] } },
+				key,
+				1800,
+				"$.sub",
+				"$.realm_access.roles",
+			);
+
+			// GET request accepting HTML should redirect
+			const req = new Request("http://localhost/route/ws-1/resource", {
+				method: "GET",
+				headers: {
+					Cookie: `nocr_sess=${sessCookie}`,
+					Accept: "text/html",
+				},
+			});
+			const resp = await handleWebRequest(req);
+			expect(resp.status).toBe(200);
+			expect(resp.redirected).toBe(true);
+			expect(resp.url).toContain("redirect_uri=");
+
+			// API request should return 401 Unauthorized
+			const req2 = new Request("http://localhost/route/ws-1/resource", {
+				method: "GET",
+				headers: {
+					Cookie: `nocr_sess=${sessCookie}`,
+					Accept: "application/json",
+				},
+			});
+			const resp2 = await handleWebRequest(req2);
+			expect(resp2.status).toBe(401);
+			const data = await resp2.json();
+			expect(data.error).toBe("Unauthorized");
+			expect(data.message).toContain(
+				"strictly requires a valid OIDC access token",
+			);
+		});
+
 		test("HTTP Proxy - bypasses authentication check if no-auth mode is enabled", async () => {
 			mockListNamespacedPod.mockResolvedValue({
 				items: [
@@ -2200,6 +2322,66 @@ users:
 				delete process.env.AUTH_SUB_JSONPATH;
 				delete process.env.AUTH_ROLES_JSONPATH;
 			}
+		});
+
+		test("Rate Limiting API - /route/:workspaceId/_auth/token triggers 429 after exceeding limit", async () => {
+			process.env.RATE_LIMIT_MAX = "3";
+			process.env.RATE_LIMIT_WINDOW = "1000";
+			await resetMcpServer(undefined, false, k8sContext); // Apply config
+
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({ sub: "user-1" });
+
+			const makeRequest = async () => {
+				const req = new Request("http://localhost/route/ws-1/_auth/token", {
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+						"x-forwarded-for": "1.1.1.1",
+					},
+				});
+				return await handleWebRequest(req);
+			};
+
+			// First 3 requests should pass (limit is 3)
+			const resp1 = await makeRequest();
+			expect(resp1.status).toBe(200);
+
+			const resp2 = await makeRequest();
+			expect(resp2.status).toBe(200);
+
+			const resp3 = await makeRequest();
+			expect(resp3.status).toBe(200);
+
+			// 4th request should exceed limit and trigger 429
+			const resp4 = await makeRequest();
+			expect(resp4.status).toBe(429);
+			const body = (await resp4.json()) as any;
+			expect(body.error).toBe("Too Many Requests");
+
+			// Clean up env variables and reset
+			delete process.env.RATE_LIMIT_MAX;
+			delete process.env.RATE_LIMIT_WINDOW;
+			await resetMcpServer(undefined, false, k8sContext);
 		});
 	});
 });

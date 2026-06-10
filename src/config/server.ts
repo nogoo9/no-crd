@@ -81,6 +81,30 @@ export const serverSchema = {
 			return getEnv(this.env) ?? this.defaultVal;
 		},
 	} satisfies SchemaItem<string>,
+
+	rateLimitMax: {
+		cli: "-",
+		env: "RATE_LIMIT_MAX",
+		defaultVal: 100,
+		allowed: "Number",
+		description: "Maximum requests allowed per window for rate limited routes.",
+		get value(): number {
+			const val = getEnv(this.env);
+			return val ? Number(val) : this.defaultVal;
+		},
+	} satisfies SchemaItem<number>,
+
+	rateLimitWindow: {
+		cli: "-",
+		env: "RATE_LIMIT_WINDOW",
+		defaultVal: 60000,
+		allowed: "Number",
+		description: "Time window in milliseconds for rate limited routes.",
+		get value(): number {
+			const val = getEnv(this.env);
+			return val ? Number(val) : this.defaultVal;
+		},
+	} satisfies SchemaItem<number>,
 };
 
 export const serverConfig = parseConfig(serverSchema);

@@ -269,6 +269,8 @@ The server and command-line utility are configurable using CLI options or enviro
 | - | `STATELESS` | `false` | `true`, `false` | Enable stateless request handling (no session affinity). |
 | `-l, --log-level` | `LOG_LEVEL` | `info` | `debug`, `info`, `warning`, `error`, `fatal` | Logging verbosity filter. |
 | - | `LOG_FILE` | `nogoo9-mcp.log` | String | Output file path for file logging. |
+| - | `RATE_LIMIT_MAX` | `100` | Number | Maximum requests allowed per window for rate limited routes. |
+| - | `RATE_LIMIT_WINDOW` | `60000` | Number | Time window in milliseconds for rate limited routes. |
 
 ### 🔒 TLS Configuration
 
@@ -330,8 +332,10 @@ The server and command-line utility are configurable using CLI options or enviro
 | - | `PROXY_SESSION_SECRET` | `""` | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 | - | `OAUTH_SCOPES` | `openid profile email offline_access` | Space-separated scope string | OAuth scopes to request during authorization. Include 'offline_access' for refresh tokens. |
 | - | `OAUTH_AUTHORIZATION_URL` | - | URL string | Direct OAuth authorization URL. |
-| - | `OAUTH_TOKEN_URL` | - | URL string | Direct OAuth token exchange endpoint. |
+| - | `OAUTH_SERVER_DISCOVERY_URL`, `OAUTH_DISCOVERY_URL` | - | URL string | Discovery URL for the OAuth server used by the backend gateway. Falls back to OAUTH_DISCOVERY_URL. |
+| - | `OAUTH_SERVER_TOKEN_URL`, `OAUTH_TOKEN_URL` | - | URL string | Direct OAuth token exchange endpoint for the backend server. |
 | - | `OAUTH_END_SESSION_URL` | - | URL string | Direct OAuth logout endpoint. |
+| `--auth-inject-workspace-jwt` | `AUTH_INJECT_WORKSPACE_JWT` | `true` | `true`, `false` | Determines if the custom 'x-workspace-jwt' header containing the raw token is injected into proxy requests. |
 | - | `AUTH_DEFAULT_ROLE` | `viewer` | String | Fallback role if the token does not provide scopes/roles. |
 
 ### 🖥️ UI & Themes Configuration
@@ -555,6 +559,7 @@ The spawner inspects `ConfigMap` metadata annotations (and custom inline annotat
 | Annotation / Label Key | Type | Description |
 |---|---|---|
 | `nogoo9/workspace-auth-mode` | Annotation (Comma-separated) | Configures authorization modes for the workspace proxy. Comma-separated list of: `token-api` (exposes token retrieval endpoints at `_auth/token` & `_auth/authorize` for SPAs), `inject-headers` (rewrites headers to forward user identity like `x-user-sub` and JWTs to container; enabled by default if `AUTH_ENABLED=true`), `no-auth` (bypasses all auth/owner checks for public workspaces). *(Available from v0.6.0, no-auth from v0.8.0)* |
+| `nogoo9/auth-require-token` | Annotation ("true" | "false") | Determines if the workspace strictly requires a valid, raw OIDC access/refresh token to function. If set to `true`, session cookie authentication via `nocr_sess` alone is treated as unauthorized for routing proxy access, forcing a redirection to the dashboard login page to authenticate and retrieve a new JWT token. *(Available from v0.9.0)* |
 | `nogoo9/template-version` | Annotation (String) | Specifies the version of the pod template. Used to track if workspaces are outdated. *(Available from v0.8.0)* |
 | `nogoo9/workspace-name` | Annotation (String) | Stores the user-defined display name of the workspace. *(Available from v0.4.0)* |
 | `nogoo9/template-ref` | Annotation (String) | The reference to the pod template used to spawn the workspace (e.g. `default/workspace-terminal`). *(Available from v0.4.0)* |
