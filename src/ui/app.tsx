@@ -479,6 +479,32 @@ function Dashboard() {
 	
 	// Search, Density & View mode
 	const [searchQuery, setSearchQuery] = useState("");
+	const [isMeowActive, setIsMeowActive] = useState(false);
+	const meowTimerRef = useRef<any>(null);
+
+	const triggerMeowEasterEgg = () => {
+		if (meowTimerRef.current) {
+			clearTimeout(meowTimerRef.current);
+		}
+		setIsMeowActive(false);
+		setTimeout(() => {
+			setIsMeowActive(true);
+			meowTimerRef.current = setTimeout(() => {
+				setIsMeowActive(false);
+				meowTimerRef.current = null;
+			}, 4800);
+		}, 50);
+	};
+
+	const handleSearchQueryChange = (val: string) => {
+		const prevContains = searchQuery.toLowerCase().includes("meow");
+		const nextContains = val.toLowerCase().includes("meow");
+		setSearchQuery(val);
+		if (!prevContains && nextContains) {
+			triggerMeowEasterEgg();
+		}
+	};
+
 	const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
 	const [density, setDensity] = useState("comfortable");
 	const [theme, setTheme] = useState("light");
@@ -1153,27 +1179,37 @@ function Dashboard() {
 					</div>
 				</div>
 
-				<div className="flex items-center gap-3 flex-wrap">
+				<div className="flex items-center gap-2 flex-wrap">
+					{/* Namespace display */}
+					<div className="px-3 text-xs font-mono flex items-center gap-1.5 border border-[var(--line)] rounded-lg bg-[var(--card)] h-8 shadow-sm">
+						<span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+						<span className="text-[var(--ink-3)] font-semibold uppercase tracking-wider text-[10px]">Namespace:</span>
+						<span className="font-bold text-[var(--accent)]">{namespace}</span>
+					</div>
+
 					{/* System Info Activator */}
-					<button className="btn btn-ghost text-xs py-1.5" onClick={() => setShowSystemInfo(true)}>
-						<I.info className="w-3.5 h-3.5 mr-1 text-[var(--accent)]" />
+					<button 
+						className="px-3 text-xs font-bold flex items-center gap-1.5 border border-[var(--line)] rounded-lg bg-[var(--card)] hover:bg-[var(--sunken)] transition-colors h-8 text-[var(--ink-2)] hover:text-[var(--ink)] shadow-sm"
+						onClick={() => setShowSystemInfo(true)}
+					>
+						<I.info className="w-3.5 h-3.5 text-[var(--accent)]" />
 						System Info
 					</button>
 
 					{/* Theme & Tweak Widget Activator */}
-					<button className="btn btn-ghost text-xs py-1.5" onClick={() => setShowTweaks(!showTweaks)}>
-						<I.settings className="w-3.5 h-3.5 mr-1" />
+					<button 
+						className="px-3 text-xs font-bold flex items-center gap-1.5 border border-[var(--line)] rounded-lg bg-[var(--card)] hover:bg-[var(--sunken)] transition-colors h-8 text-[var(--ink-2)] hover:text-[var(--ink)] shadow-sm"
+						onClick={() => setShowTweaks(!showTweaks)}
+					>
+						<I.settings className="w-3.5 h-3.5 text-[var(--accent)]" />
 						Design Customize
 					</button>
 
-					{/* Namespace display */}
-					<div className="px-3 py-1.5 badge-pill text-xs font-mono flex items-center gap-2">
-						<span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-						Namespace: <span className="font-bold text-[var(--accent)]">{namespace}</span>
-					</div>
-
 					{/* OIDC User Info */}
-					<button className="btn btn-ghost text-xs flex items-center gap-1.5" onClick={() => setShowTokenSettings(true)}>
+					<button 
+						className="px-3 text-xs font-bold flex items-center gap-1.5 border border-[var(--line)] rounded-lg bg-[var(--card)] hover:bg-[var(--sunken)] transition-colors h-8 text-[var(--ink-2)] hover:text-[var(--ink)] shadow-sm"
+						onClick={() => setShowTokenSettings(true)}
+					>
 						<I.user className="w-3.5 h-3.5 text-[var(--accent)]" />
 						{getDisplayUser()}
 						{capabilities.isAdmin && <span className="px-1 py-0.5 rounded text-[8px] bg-amber-500/10 text-amber-500 font-bold ml-1 uppercase">Admin</span>}
@@ -1181,57 +1217,13 @@ function Dashboard() {
 
 					{/* Sign out */}
 					{activeToken && (
-						<button className="btn btn-ghost text-xs text-red-500" onClick={handleLogout}>
+						<button 
+							className="px-3 text-xs font-bold flex items-center gap-1.5 border border-red-500/20 hover:border-red-500/40 rounded-lg bg-red-500/5 hover:bg-red-500/10 transition-colors h-8 text-red-500 shadow-sm"
+							onClick={handleLogout}
+						>
 							Sign Out
 						</button>
 					)}
-
-					{/* Refresh control */}
-					<div className="flex items-center gap-1.5">
-						<div className="flex items-center border border-[var(--line)] rounded-lg overflow-hidden bg-[var(--card)] p-0.5 select-none">
-							<button
-								type="button"
-								onClick={() => {
-									setIsAutoRefresh(true);
-									localStorage.setItem("nocr_auto_refresh", "true");
-								}}
-								className={`px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer rounded-md flex items-center gap-1 ${
-									isAutoRefresh
-										? "bg-[var(--accent-soft)] text-[var(--accent)] font-semibold"
-										: "text-[var(--ink-3)] hover:text-[var(--ink)]"
-								}`}
-								title="Auto-refresh status every 5s"
-							>
-								{isAutoRefresh && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />}
-								Auto
-							</button>
-							<button
-								type="button"
-								onClick={() => {
-									setIsAutoRefresh(false);
-									localStorage.setItem("nocr_auto_refresh", "false");
-								}}
-								className={`px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer rounded-md ${
-									!isAutoRefresh
-										? "bg-[var(--surface)] text-[var(--ink)] font-semibold"
-										: "text-[var(--ink-3)] hover:text-[var(--ink)]"
-								}`}
-								title="Manual refresh only"
-							>
-								Manual
-							</button>
-						</div>
-
-						<button
-							type="button"
-							className="btn btn-primary text-xs py-1.5 flex items-center gap-1"
-							disabled={isPending}
-							onClick={refreshData}
-						>
-							<I.refresh className={`w-3.5 h-3.5 ${isPending ? "animate-spin" : ""}`} />
-							Refresh
-						</button>
-					</div>
 				</div>
 			</header>
 
@@ -1244,28 +1236,76 @@ function Dashboard() {
 					<input
 						type="text"
 						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
+						onChange={(e) => handleSearchQueryChange(e.target.value)}
 						className="theme-text-input w-full pl-9 pr-4 py-2 text-sm outline-none transition"
 						placeholder="Search workspaces, templates, or statuses..."
 					/>
 				</div>
 
-				<div className="flex items-center gap-3">
-					{/* Layout views toggle */}
-					<div className="flex items-center border border-[var(--line)] rounded-lg overflow-hidden bg-[var(--card)]">
+				<div className="flex items-center gap-2 flex-wrap">
+					{/* Refresh control group */}
+					<div className="flex items-center border border-[var(--line)] rounded-lg overflow-hidden bg-[var(--card)] p-0.5 select-none h-8 shadow-sm">
 						<button
-							onClick={() => { setLayoutMode("grid"); localStorage.setItem("nocr_layout", "grid"); }}
-							className={`px-3 py-2 text-xs transition-colors cursor-pointer ${layoutMode === "grid" ? "bg-[var(--surface)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:bg-[var(--surface)]"}`}
-							title="Grid View"
+							type="button"
+							onClick={() => {
+								setIsAutoRefresh(true);
+								localStorage.setItem("nocr_auto_refresh", "true");
+							}}
+							className={`px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer rounded-md flex items-center gap-1 h-full ${
+								isAutoRefresh
+									? "bg-[var(--accent-soft)] text-[var(--accent)]"
+									: "text-[var(--ink-3)] hover:text-[var(--ink)]"
+							}`}
+							title="Auto-refresh status every 5s"
 						>
-							<I.grid className="w-4 h-4" />
+							{isAutoRefresh && <span className="w-1 h-1 rounded-full bg-[var(--accent)] animate-pulse" />}
+							Auto
 						</button>
 						<button
+							type="button"
+							onClick={() => {
+								setIsAutoRefresh(false);
+								localStorage.setItem("nocr_auto_refresh", "false");
+							}}
+							className={`px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer rounded-md h-full ${
+								!isAutoRefresh
+									? "bg-[var(--surface)] text-[var(--ink)]"
+									: "text-[var(--ink-3)] hover:text-[var(--ink)]"
+							}`}
+							title="Manual refresh only"
+						>
+							Manual
+						</button>
+						<div className="h-3.5 w-px bg-[var(--line)] mx-1 shrink-0" />
+						<button
+							type="button"
+							onClick={refreshData}
+							disabled={isPending}
+							className="px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer rounded-md flex items-center gap-1 h-full text-[var(--ink-2)] hover:text-[var(--ink)] hover:bg-[var(--sunken)]"
+							title="Trigger Manual Refresh"
+						>
+							<I.refresh className={`w-3 h-3 text-[var(--accent)] ${isPending ? "animate-spin" : ""}`} />
+							Refresh
+						</button>
+					</div>
+
+					{/* Layout views toggle */}
+					<div className="flex items-center border border-[var(--line)] rounded-lg overflow-hidden bg-[var(--card)] h-8 p-0.5 shadow-sm">
+						<button
+							type="button"
+							onClick={() => { setLayoutMode("grid"); localStorage.setItem("nocr_layout", "grid"); }}
+							className={`px-2.5 py-1 text-xs transition-colors cursor-pointer h-full rounded-md flex items-center justify-center ${layoutMode === "grid" ? "bg-[var(--surface)] text-[var(--ink)] font-semibold" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
+							title="Grid View"
+						>
+							<I.grid className="w-3.5 h-3.5" />
+						</button>
+						<button
+							type="button"
 							onClick={() => { setLayoutMode("list"); localStorage.setItem("nocr_layout", "list"); }}
-							className={`px-3 py-2 text-xs transition-colors border-l border-[var(--line)] cursor-pointer ${layoutMode === "list" ? "bg-[var(--surface)] text-[var(--ink)]" : "text-[var(--ink-3)] hover:bg-[var(--surface)]"}`}
+							className={`px-2.5 py-1 text-xs transition-colors cursor-pointer h-full rounded-md flex items-center justify-center ${layoutMode === "list" ? "bg-[var(--surface)] text-[var(--ink)] font-semibold" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
 							title="List View"
 						>
-							<I.list className="w-4 h-4" />
+							<I.list className="w-3.5 h-3.5" />
 						</button>
 					</div>
 
@@ -1277,7 +1317,7 @@ function Dashboard() {
 							localStorage.setItem("nocr_density", e.target.value);
 							applyThemeStyles(theme, e.target.value, accentColor);
 						}}
-						className="theme-text-input text-xs px-3 py-2 cursor-pointer outline-none rounded-lg font-medium"
+						className="theme-text-input text-xs px-3 py-1.5 cursor-pointer outline-none rounded-lg font-bold border border-[var(--line)] h-8 shadow-sm"
 					>
 						<option value="comfortable">Comfortable Layout</option>
 						<option value="compact">Compact Layout</option>
@@ -1291,7 +1331,7 @@ function Dashboard() {
 							setWorkspaceOpenMode(mode);
 							localStorage.setItem("nocr_workspace_mode", mode);
 						}}
-						className="theme-text-input text-xs px-3 py-2 cursor-pointer outline-none rounded-lg font-medium"
+						className="theme-text-input text-xs px-3 py-1.5 cursor-pointer outline-none rounded-lg font-bold border border-[var(--line)] h-8 shadow-sm"
 					>
 						<option value="tab">Open: New Browser Tab ↗</option>
 						<option value="inline">Open: Inline Frame 🖥️</option>
@@ -1477,6 +1517,7 @@ function Dashboard() {
 						}
 					}}
 					onClose={() => setSelectedTemplate(null)}
+					onMeowTrigger={triggerMeowEasterEgg}
 				/>
 			)}
 
@@ -1634,6 +1675,7 @@ function Dashboard() {
 					</div>
 				))}
 			</div>
+			{isMeowActive && <MeowEasterEgg />}
 
 			<footer className="mt-16 pb-8 border-t border-[var(--line)] pt-8 flex flex-col items-center gap-4 text-center">
 				<div className="flex items-center gap-4">
@@ -1717,10 +1759,9 @@ function WorkspaceCard({
 	onOpenDetails,
 	onShowPreview,
 }: WorkspaceCardProps) {
-	const tokenQuery = activeToken ? `?token=${encodeURIComponent(activeToken)}` : "";
 	const pathPart = ws.workspacePath || ws.previewPath || "/";
 	const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
-	const openUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
+	const openUrl = `${basePath}/route/${ws.id}${cleanPath}`;
 	const isOwner = !ws.userSub || ws.userSub === currentUser;
 
 	const [stats, setStats] = useState<Record<string, any> | null>(null);
@@ -2113,10 +2154,14 @@ function WorkspaceConsoleView({
 	const pathPart = ws.workspacePath || ws.previewPath || "/";
 	const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
 	
-	// Routed URL targets
+	// Routed URL targets (iframe targets with token query for bootstrapping)
 	const workspaceUrl = `${basePath}/route/${ws.id}${cleanPath}${tokenQuery}`;
-	// Terminal routed path (if terminal template runs ttyd on preview/workspace port or api endpoints)
 	const terminalUrl = `${basePath}/route/${ws.id}/terminal/${tokenQuery}`;
+
+	// Tab URL targets (clean URLs without token query for new tabs)
+	const workspaceTabUrl = `${basePath}/route/${ws.id}${cleanPath}`;
+	const terminalTabUrl = `${basePath}/route/${ws.id}/terminal/`;
+
 	const isOwner = !ws.userSub || ws.userSub === currentUser;
 
 	return (
@@ -2226,7 +2271,7 @@ function WorkspaceConsoleView({
 						</div>
 						
 						{isOwner && ["terminal", "preview"].includes(activeTab) && (
-							<a href={activeTab === "terminal" ? terminalUrl : workspaceUrl} target="_blank" className="text-[11px] font-bold text-[var(--accent)] hover:underline flex items-center gap-1" rel="noreferrer">
+							<a href={activeTab === "terminal" ? terminalTabUrl : workspaceTabUrl} target="_blank" className="text-[11px] font-bold text-[var(--accent)] hover:underline flex items-center gap-1" rel="noreferrer">
 								Launch Independent Tab <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
 							</a>
 						)}
@@ -2408,9 +2453,10 @@ interface SpawnWorkspaceModalProps {
 	existingWorkspaces: Workspace[];
 	onSpawn: (id: string, name: string, userSub: string, contextVars: Record<string, string>) => void;
 	onClose: () => void;
+	onMeowTrigger?: () => void;
 }
 
-function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, onClose }: SpawnWorkspaceModalProps) {
+function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, onClose, onMeowTrigger }: SpawnWorkspaceModalProps) {
 	const [workspaceId, setWorkspaceId] = useState("");
 	const [workspaceName, setWorkspaceName] = useState("");
 	const [targetUser, setTargetUser] = useState("");
@@ -2440,6 +2486,15 @@ function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, o
 			setContextVars({});
 		}
 	}, [template, existingWorkspaces]);
+
+	const handleWorkspaceNameChange = (val: string) => {
+		const prevContains = workspaceName.toLowerCase().includes("meow");
+		const nextContains = val.toLowerCase().includes("meow");
+		setWorkspaceName(val);
+		if (!prevContains && nextContains && onMeowTrigger) {
+			onMeowTrigger();
+		}
+	};
 
 	return (
 		<div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center p-4">
@@ -2477,7 +2532,7 @@ function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, o
 						<input
 							type="text"
 							value={workspaceName}
-							onChange={(e) => setWorkspaceName(e.target.value)}
+							onChange={(e) => handleWorkspaceNameChange(e.target.value)}
 							className="theme-text-input w-full px-4 py-2.5 text-sm"
 							placeholder="e.g. Main Node project"
 						/>
@@ -3239,6 +3294,7 @@ function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, o
 	const tokenQuery = activeToken ? `?token=${encodeURIComponent(activeToken)}` : "";
 	const cleanPath = path.startsWith("/") ? path : `/${path}`;
 	const targetUrl = `${basePath}/route/${workspace.id}${cleanPath}${tokenQuery}`;
+	const tabUrl = `${basePath}/route/${workspace.id}${cleanPath}`;
 
 	const handleRefresh = () => {
 		setRefreshKey(prev => prev + 1);
@@ -3256,7 +3312,14 @@ function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, o
 				
 				{/* Top-Sliding Floating Control Drawer */}
 				<div className={`absolute top-0 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 transform ${isHeaderOpen ? "translate-y-0" : "-translate-y-full"}`}>
-					<div className="bg-[var(--card)] border border-t-0 border-[var(--line)] px-6 py-2.5 rounded-b-2xl shadow-2xl flex flex-col items-center gap-1.5 shrink-0">
+					<div 
+						className="border border-t-0 border-[var(--line)] px-6 py-2.5 rounded-b-2xl shadow-2xl flex flex-col items-center gap-1.5 shrink-0"
+						style={{
+							backgroundColor: "color-mix(in srgb, var(--card) 85%, transparent)",
+							backdropFilter: "blur(12px)",
+							WebkitBackdropFilter: "blur(12px)",
+						}}
+					>
 						<div className="flex items-center gap-5">
 							<div className="flex flex-col pr-4 border-r border-[var(--line)] text-left">
 								<span className="text-[11px] font-extrabold text-[var(--ink)] whitespace-nowrap">Inline App Preview</span>
@@ -3269,6 +3332,13 @@ function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, o
 									Refresh
 								</button>
 								
+								<a href={tabUrl} target="_blank" className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Open in New Tab">
+									<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+									</svg>
+									Open Tab
+								</a>
+
 								<button onClick={toggleMaximize} className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title={isMaximized ? "Restore Size" : "Maximize"}>
 									{isMaximized ? (
 										<>
@@ -3286,13 +3356,6 @@ function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, o
 										</>
 									)}
 								</button>
-								
-								<a href={targetUrl} target="_blank" className="btn btn-ghost px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Open in New Tab">
-									<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-									</svg>
-									Open Tab
-								</a>
 								
 								<button className="btn btn-quiet p-1 rounded-lg text-[var(--ink-3)] hover:text-red-500 flex items-center justify-center" onClick={onClose} title="Close Preview">
 									<I.cross className="w-4 h-4" />
@@ -3317,7 +3380,12 @@ function WorkspacePreviewModal({ workspace, path, type, basePath, activeToken, o
 				<div className="absolute top-0 left-1/2 -translate-x-1/2 z-50">
 					<button 
 						onClick={() => setIsHeaderOpen(true)}
-						className={`bg-[var(--card)] border border-[var(--line)] border-t-0 px-4 py-1.5 rounded-b-xl shadow-md hover:bg-[var(--sunken)] flex items-center gap-1 text-[10px] text-[var(--ink-2)] transition-all cursor-pointer select-none font-extrabold ${isHeaderOpen ? "opacity-0 pointer-events-none -translate-y-full" : "opacity-100 translate-y-0"}`}
+						className={`border border-[var(--line)] border-t-0 px-4 py-1.5 rounded-b-xl shadow-md flex items-center gap-1 text-[10px] text-[var(--ink-2)] transition-all cursor-pointer select-none font-extrabold ${isHeaderOpen ? "opacity-0 pointer-events-none -translate-y-full" : "opacity-100 translate-y-0"}`}
+						style={{
+							backgroundColor: "color-mix(in srgb, var(--card) 85%, transparent)",
+							backdropFilter: "blur(8px)",
+							WebkitBackdropFilter: "blur(8px)",
+						}}
 					>
 						<span>Show Control Panel</span>
 						<svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3440,6 +3508,226 @@ function TweaksWidgetPanel({
 					))}
 				</div>
 			</div>
+		</div>
+	);
+}
+
+function MeowEasterEgg() {
+	return (
+		<div className="meow-ufo-container">
+			<style>{`
+				.meow-ufo-container {
+					position: fixed;
+					inset: 0;
+					pointer-events: none;
+					z-index: 99999;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					overflow: hidden;
+					background: transparent;
+				}
+				.meow-ufo {
+					width: 180px;
+					height: 180px;
+					position: relative;
+					animation: meow-ufo-fly 4.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+					filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.45));
+				}
+				@keyframes meow-ufo-fly {
+					0% {
+						transform: translate(-100vw, 100vh) scale(0.2) rotate(-35deg);
+						opacity: 0;
+					}
+					25% {
+						transform: translate(-20vw, 15vh) scale(0.7) rotate(15deg);
+						opacity: 1;
+					}
+					45% {
+						transform: translate(0vw, -5vh) scale(1) rotate(-8deg);
+					}
+					55% {
+						transform: translate(8vw, 2vh) scale(1.1) rotate(5deg);
+					}
+					65% {
+						transform: translate(-5vw, -12vh) scale(1.05) rotate(-10deg);
+					}
+					80% {
+						transform: translate(25vw, -25vh) scale(0.75) rotate(20deg);
+						opacity: 1;
+					}
+					100% {
+						transform: translate(100vw, -100vh) scale(0.2) rotate(45deg);
+						opacity: 0;
+					}
+				}
+				
+				.meow-ufo-beam {
+					animation: meow-beam-pulse 0.4s infinite ease-in-out;
+					transform-origin: 50% 65%;
+				}
+				@keyframes meow-beam-pulse {
+					0%, 100% { opacity: 0.25; transform: scaleX(0.95); }
+					50% { opacity: 0.55; transform: scaleX(1.05); }
+				}
+
+				.meow-ufo-light {
+					animation: meow-light-flash 0.3s infinite alternate;
+				}
+				@keyframes meow-light-flash {
+					0% { fill: #39ff14; filter: drop-shadow(0 0 1px #39ff14); }
+					100% { fill: #106005; filter: none; }
+				}
+
+				.meow-char {
+					position: absolute;
+					font-family: 'Outfit', 'Inter', sans-serif;
+					font-weight: 900;
+					font-size: 2.2rem;
+					color: #eae6da;
+					background: #c96442;
+					padding: 4px 12px;
+					border: 3px solid #1f1e1c;
+					border-radius: 12px;
+					box-shadow: 0 8px 0 #1f1e1c;
+					pointer-events: none;
+					opacity: 0;
+					text-transform: uppercase;
+					white-space: nowrap;
+				}
+
+				.meow-char-1 {
+					left: 28%;
+					top: 55%;
+					animation: meow-drop-1 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 0.8s forwards;
+				}
+				@keyframes meow-drop-1 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.1) rotate(-15deg); }
+					100% { transform: translateY(40vh) scale(1.8) rotate(35deg); opacity: 0; }
+				}
+
+				.meow-char-2 {
+					left: 42%;
+					top: 50%;
+					animation: meow-drop-2 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 1.3s forwards;
+				}
+				@keyframes meow-drop-2 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.2) rotate(20deg); }
+					100% { transform: translateY(45vh) scale(1.9) rotate(-40deg); opacity: 0; }
+				}
+
+				.meow-char-3 {
+					left: 55%;
+					top: 48%;
+					animation: meow-drop-3 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 1.8s forwards;
+				}
+				@keyframes meow-drop-3 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.2) rotate(-10deg); }
+					100% { transform: translateY(45vh) scale(2) rotate(45deg); opacity: 0; }
+				}
+
+				.meow-char-4 {
+					left: 48%;
+					top: 45%;
+					animation: meow-drop-4 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 2.3s forwards;
+				}
+				@keyframes meow-drop-4 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.3) rotate(25deg); }
+					100% { transform: translateY(50vh) scale(2.2) rotate(-30deg); opacity: 0; }
+				}
+
+				.meow-char-5 {
+					left: 62%;
+					top: 38%;
+					animation: meow-drop-5 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 2.8s forwards;
+				}
+				@keyframes meow-drop-5 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.35) rotate(-20deg); }
+					100% { transform: translateY(55vh) scale(2.4) rotate(50deg); opacity: 0; }
+				}
+
+				.meow-char-6 {
+					left: 74%;
+					top: 32%;
+					animation: meow-drop-6 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) 3.3s forwards;
+				}
+				@keyframes meow-drop-6 {
+					0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+					15% { opacity: 1; transform: scale(1.2) rotate(15deg); }
+					100% { transform: translateY(50vh) scale(2.2) rotate(-20deg); opacity: 0; }
+				}
+			`}</style>
+			
+			<div className="meow-ufo">
+				<svg viewBox="0 0 100 100" width="100%" height="100%">
+					<defs>
+						<linearGradient id="beam-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+							<stop offset="0%" stopColor="#39ff14" stopOpacity="0.8" />
+							<stop offset="100%" stopColor="#39ff14" stopOpacity="0" />
+						</linearGradient>
+					</defs>
+					
+					{/* Tractor Beam */}
+					<polygon points="35,66 10,100 90,100 65,66" fill="url(#beam-grad)" className="meow-ufo-beam" />
+					
+					{/* Cockpit glass dome */}
+					<path d="M 22 56 A 28 28 0 0 1 78 56 Z" fill="rgba(150, 240, 255, 0.25)" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="1.5" />
+					
+					{/* Cute Terracotta Cat inside the egg */}
+					{/* Ears */}
+					<polygon points="32,32 28,14 44,27" fill="#c96442" stroke="#c96442" strokeWidth="1" strokeLinejoin="round" />
+					<polygon points="68,32 72,14 56,27" fill="#c96442" stroke="#c96442" strokeWidth="1" strokeLinejoin="round" />
+					<polygon points="33,30 30,17 42,26" fill="#f5d6cc" />
+					<polygon points="67,30 70,17 58,26" fill="#f5d6cc" />
+					{/* Head */}
+					<circle cx="50" cy="40" r="16" fill="#c96442" />
+					{/* Eyes */}
+					<circle cx="44" cy="38" r="3" fill="#1f1e1c" />
+					<circle cx="56" cy="38" r="3" fill="#1f1e1c" />
+					<circle cx="42.5" cy="36.5" r="1" fill="#ffffff" />
+					<circle cx="54.5" cy="36.5" r="1" fill="#ffffff" />
+					{/* Muzzle */}
+					<ellipse cx="50" cy="45" rx="6" ry="4" fill="#eae6da" />
+					<polygon points="50,43.5 48,41.5 52,41.5" fill="#1f1e1c" />
+					<path d="M47,46 C47,48 50,48 50,46 C50,48 53,48 53,46" fill="none" stroke="#1f1e1c" strokeWidth="1.5" strokeLinecap="round" />
+					{/* Whiskers */}
+					<line x1="28" y1="44" x2="16" y2="43" stroke="#1f1e1c" strokeWidth="1" />
+					<line x1="28" y1="47" x2="15" y2="47" stroke="#1f1e1c" strokeWidth="1" />
+					<line x1="72" y1="44" x2="84" y2="43" stroke="#1f1e1c" strokeWidth="1" />
+					<line x1="72" y1="47" x2="85" y2="47" stroke="#1f1e1c" strokeWidth="1" />
+					
+					{/* Cracked Egg Shell bottom */}
+					<path d="M 22 56 C 22 78, 78 78, 78 56 L 70 51 L 62 56 L 54 49 L 46 56 L 38 49 L 30 56 Z" fill="#eae6da" stroke="#d5d0c0" strokeWidth="1.5" strokeLinejoin="round" />
+					
+					{/* Cat Paws resting on egg rim */}
+					<circle cx="34" cy="55" r="3.5" fill="#eae6da" stroke="#1f1e1c" strokeWidth="1" />
+					<circle cx="66" cy="55" r="3.5" fill="#eae6da" stroke="#1f1e1c" strokeWidth="1" />
+					
+					{/* UFO base/disk ring */}
+					<ellipse cx="50" cy="65" rx="43" ry="12" fill="#3a3d40" stroke="#1f1e1c" strokeWidth="1.5" />
+					<ellipse cx="50" cy="65" rx="38" ry="8" fill="#585c60" />
+					
+					{/* Glowing flashing lights */}
+					<circle cx="16" cy="64" r="2" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0s" }} />
+					<circle cx="30" cy="68" r="2.5" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0.1s" }} />
+					<circle cx="50" cy="70" r="3" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0.2s" }} />
+					<circle cx="70" cy="68" r="2.5" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0.3s" }} />
+					<circle cx="84" cy="64" r="2" fill="#39ff14" className="meow-ufo-light" style={{ animationDelay: "0.4s" }} />
+				</svg>
+			</div>
+			
+			{/* Falling big MEOW letters */}
+			<div className="meow-char meow-char-1">MEOW!</div>
+			<div className="meow-char meow-char-2">MEOW</div>
+			<div className="meow-char meow-char-3">MEOW~</div>
+			<div className="meow-char meow-char-4">MEOW!</div>
+			<div className="meow-char meow-char-5">MEOW</div>
+			<div className="meow-char meow-char-6">MEOW~</div>
 		</div>
 	);
 }
