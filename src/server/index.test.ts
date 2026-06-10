@@ -2323,5 +2323,65 @@ users:
 				delete process.env.AUTH_ROLES_JSONPATH;
 			}
 		});
+
+		test("Rate Limiting API - /route/:workspaceId/_auth/token triggers 429 after exceeding limit", async () => {
+			process.env.RATE_LIMIT_MAX = "3";
+			process.env.RATE_LIMIT_WINDOW = "1000";
+			await resetMcpServer(undefined, false, k8sContext); // Apply config
+
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-auth-mode": "token-api",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({ sub: "user-1" });
+
+			const makeRequest = async () => {
+				const req = new Request("http://localhost/route/ws-1/_auth/token", {
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${token}`,
+						"x-forwarded-for": "1.1.1.1",
+					},
+				});
+				return await handleWebRequest(req);
+			};
+
+			// First 3 requests should pass (limit is 3)
+			const resp1 = await makeRequest();
+			expect(resp1.status).toBe(200);
+
+			const resp2 = await makeRequest();
+			expect(resp2.status).toBe(200);
+
+			const resp3 = await makeRequest();
+			expect(resp3.status).toBe(200);
+
+			// 4th request should exceed limit and trigger 429
+			const resp4 = await makeRequest();
+			expect(resp4.status).toBe(429);
+			const body = (await resp4.json()) as any;
+			expect(body.error).toBe("Too Many Requests");
+
+			// Clean up env variables and reset
+			delete process.env.RATE_LIMIT_MAX;
+			delete process.env.RATE_LIMIT_WINDOW;
+			await resetMcpServer(undefined, false, k8sContext);
+		});
 	});
 });

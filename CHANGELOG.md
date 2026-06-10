@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto/Manual Refresh Dashboard Control**: Added a segmented control in the dashboard toolbar to switch between automated 5-second data polling and manual refresh, persisting the setting in `localStorage`.
 - **Maximize & Reload Control for Inline Workspaces**: Added toolbar controls to maximize/restore the size of the inline preview workspace modal and reload the iframe target.
 - **Cat-Themed Favicon Packaging**: Embedded a custom vector cat SVG favicon via base64 inline URL into HTML templates, ensuring zero external asset dependencies and packaging it directly inside the NPM package and Docker image assets.
+- **Official Fastify Rate Limiting Plugin Integration**: Replaced the custom in-memory rate limiting implementation with the official `@fastify/rate-limit` plugin, protecting sensitive authentication endpoints (`/route/:workspaceId/_auth/token`, `/route/:workspaceId/_auth/authorize`, and `/route/:workspaceId/_auth/refresh`) with a fully parameterizable rate-limiting policy (`RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW`) and proxy-aware IP resolution.
 
 ### Fixed
 

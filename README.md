@@ -269,6 +269,8 @@ The server and command-line utility are configurable using CLI options or enviro
 | - | `STATELESS` | `false` | `true`, `false` | Enable stateless request handling (no session affinity). |
 | `-l, --log-level` | `LOG_LEVEL` | `info` | `debug`, `info`, `warning`, `error`, `fatal` | Logging verbosity filter. |
 | - | `LOG_FILE` | `nogoo9-mcp.log` | String | Output file path for file logging. |
+| - | `RATE_LIMIT_MAX` | `100` | Number | Maximum requests allowed per window for rate limited routes. |
+| - | `RATE_LIMIT_WINDOW` | `60000` | Number | Time window in milliseconds for rate limited routes. |
 
 ### 🔒 TLS Configuration
 

@@ -11,6 +11,7 @@ Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'l
 - **Keycloak Hostname and Path Synchronization**: Integrated the `KC_HOSTNAME` environment variable mapping set to `http://localhost:8080/auth` to enforce unified issuer URLs (`http://localhost:8080/auth/realms/nogoo9`) for both external login pathways and backchannel cluster-to-cluster token refresh queries, resolving OIDC path stripping and `invalid_grant` errors.
 - **Dynamic Path-Scoped Cookie Routing**: Extended cookie prefix path resolution to incorporate dynamic base-url subpaths (`Path=/nocr/`), preventing cookie visibility leakage or browser session collision across Dynamic Workspace views.
 - **Cat-Themed Favicon Packaging**: Embedded a lightweight, custom vector cat-themed SVG favicon (using an inline base64 Data URL) inside the HTML templates, ensuring it is automatically packaged inside the NPM distribution package and the Docker container image without requiring external asset serving handlers.
+- **Official Fastify Rate Limiting Plugin Integration**: Replaced the custom in-memory rate limiting implementation with the official `@fastify/rate-limit` plugin. This hardens sensitive authentication endpoints (token retrieval, OIDC authorize redirect, and OIDC refresh) using a parameterizable rate-limiter configuration (`RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW` environment variables) with proxy-aware client IP extraction to correctly identify clients behind reverse proxies.
 
 ## What's New in v0.8.1
 

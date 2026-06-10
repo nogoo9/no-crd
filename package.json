@@ -76,6 +76,7 @@
 	},
 	"dependencies": {
 		"@fastify/http-proxy": "^11.4.4",
+		"@fastify/rate-limit": "^11.0.0",
 		"@fastify/static": "^9.1.3",
 		"@kubernetes/client-node": "^1.4.0",
 		"@logtape/logtape": "^0.8.2",
