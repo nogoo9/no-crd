@@ -4,6 +4,10 @@
   <img src="docs/public/logo.png" alt="nogoo9 logo" width="200" height="200" />
 </p>
 
+<p align="center">
+  <img src="docs/public/dashboard_screenshot.png" alt="no-crd Dashboard" width="800" />
+</p>
+
 > **Agent-Driven, On-Demand Pod Orchestration in Kubernetes — Without Custom Resource Definitions.**
 
 [![npm version](https://img.shields.io/npm/v/@nogoo9%2Fno-crd.svg?color=c65f5f&logo=npm&logoColor=ffffff&style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd) [![npm downloads](https://img.shields.io/npm/dm/@nogoo9%2Fno-crd.svg?color=c65f5f&logo=npm&logoColor=ffffff&style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd) [![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-5f7f9f.svg?logo=github&logoColor=ffffff&style=flat-square)](https://nogoo9.github.io/no-crd/) [![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?color=c65f5f&style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE) [![Coverage Status](https://img.shields.io/coveralls/github/nogoo9/no-crd?color=6fa37f&style=flat-square)](https://coveralls.io/github/nogoo9/no-crd?branch=main) [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/nogoo9/no-crd/badge)](https://securityscorecards.dev/viewer/?uri=github.com/nogoo9/no-crd) [![Semgrep](https://img.shields.io/badge/Security-Semgrep-80679c?logo=semgrep&logoColor=ffffff&style=flat-square)](https://semgrep.dev/)

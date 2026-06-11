@@ -2,6 +2,9 @@
 
 `nogoo9` is a platform for agent-driven, on-demand pod orchestration in Kubernetes (k8s/k3s) **without Custom Resource Definitions (CRDs)**. It allows developers and AI agents to dynamically spin up, route to, and manage ephemeral workloads.
 
+![no-crd Dashboard Screenshot](/dashboard_screenshot.png)
+
+
 ## Architecture Topology
 
 <!-- 

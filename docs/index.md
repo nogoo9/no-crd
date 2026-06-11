@@ -30,3 +30,7 @@ features:
   - title: "Embedded Dashboard"
     details: "A built-in interactive React UI to view active sandboxes, templates, logs, and manage token details."
 ---
+
+<p align="center" style="margin-top: 3rem; margin-bottom: 3rem;">
+  <img src="/dashboard_screenshot.png" alt="no-crd Dashboard Screenshot" style="border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08);" width="850" />
+</p>
