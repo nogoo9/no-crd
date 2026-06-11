@@ -429,4 +429,98 @@ describe("admin scope and access hierarchy", () => {
 		expect(hasRequiredScope(payload, "nogoo9:read")).toBe(true);
 		expect(hasRequiredScope(payload, "nogoo9:write")).toBe(true);
 	});
+
+	test("hasRequiredScope allows nogoo9:write to satisfy nogoo9:read checks", () => {
+		const payload = { scope: "nogoo9:write" };
+		expect(hasRequiredScope(payload, "nogoo9:read")).toBe(true);
+	});
+
+	describe("granular matrix combinations (ADR-020)", () => {
+		test("Missing scope + viewer role + workspace:write -> Allowed", () => {
+			const payload = { realm_access: { roles: ["viewer"] } };
+			expect(() =>
+				verifyAccessOrThrow(payload, "workspace:write"),
+			).not.toThrow();
+		});
+
+		test("nogoo9:read scope + viewer role + workspace:write -> Blocked", () => {
+			const payload = {
+				scope: "nogoo9:read",
+				realm_access: { roles: ["viewer"] },
+			};
+			expect(() => verifyAccessOrThrow(payload, "workspace:write")).toThrow(
+				"Forbidden: Missing required scope: nogoo9:write",
+			);
+		});
+
+		test("nogoo9:write scope + viewer role + workspace:write -> Allowed", () => {
+			const payload = {
+				scope: "nogoo9:write",
+				realm_access: { roles: ["viewer"] },
+			};
+			expect(() =>
+				verifyAccessOrThrow(payload, "workspace:write"),
+			).not.toThrow();
+		});
+
+		test("nogoo9:write scope + viewer role + template:create -> Blocked", () => {
+			const payload = {
+				scope: "nogoo9:write",
+				realm_access: { roles: ["viewer"] },
+			};
+			expect(() => verifyAccessOrThrow(payload, "template:create")).toThrow(
+				"Forbidden: Missing required role: user",
+			);
+		});
+
+		test("nogoo9:write scope + user role + template:create -> Allowed", () => {
+			const payload = {
+				scope: "nogoo9:write",
+				realm_access: { roles: ["user"] },
+			};
+			expect(() =>
+				verifyAccessOrThrow(payload, "template:create"),
+			).not.toThrow();
+		});
+
+		test("nogoo9:write scope + user role + template:write -> Allowed", () => {
+			const payload = {
+				scope: "nogoo9:write",
+				realm_access: { roles: ["user"] },
+			};
+			expect(() =>
+				verifyAccessOrThrow(payload, "template:write"),
+			).not.toThrow();
+		});
+
+		test("nogoo9:admin scope + admin role + workspace:write -> Allowed", () => {
+			const payload = {
+				scope: "nogoo9:admin",
+				realm_access: { roles: ["admin"] },
+			};
+			expect(() =>
+				verifyAccessOrThrow(payload, "workspace:write"),
+			).not.toThrow();
+		});
+
+		test("nogoo9:admin scope + user role + admin -> Blocked", () => {
+			const payload = {
+				scope: "nogoo9:admin",
+				realm_access: { roles: ["user"] },
+			};
+			expect(() => verifyAccessOrThrow(payload, "admin")).toThrow(
+				"Forbidden: Missing required role: admin",
+			);
+		});
+
+		test("nogoo9:write scope + admin role + admin -> Blocked", () => {
+			const payload = {
+				scope: "nogoo9:write",
+				realm_access: { roles: ["admin"] },
+			};
+			expect(() => verifyAccessOrThrow(payload, "admin")).toThrow(
+				"Forbidden: Missing required scope: nogoo9:admin",
+			);
+		});
+	});
 });

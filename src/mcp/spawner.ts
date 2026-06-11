@@ -856,7 +856,7 @@ export function registerSpawnerTools(
 						return errorResult(k8sContext.kc, err, { id, status: "" });
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "workspace:write");
 						let isAdmin = false;
 						try {
 							verifyAccessOrThrow(activeJwtPayload, "admin");
@@ -1044,7 +1044,7 @@ export function registerSpawnerTools(
 						return errorResult(k8sContext.kc, err, { id, podName: "" });
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "workspace:write");
 						const callerSub = extractUserIdentity(
 							activeJwtPayload,
 							config.auth.subJsonPath,
@@ -1487,7 +1487,7 @@ export function registerSpawnerTools(
 						return errorResult(k8sContext.kc, err, { id, status: "Failed" });
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "workspace:write");
 						try {
 							verifyAccessOrThrow(activeJwtPayload, "admin");
 							isAdmin = true;
@@ -1575,7 +1575,7 @@ export function registerSpawnerTools(
 						});
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "workspace:write");
 						try {
 							verifyAccessOrThrow(activeJwtPayload, "admin");
 							isAdmin = true;

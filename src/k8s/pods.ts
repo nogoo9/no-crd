@@ -194,11 +194,12 @@ export interface WorkspaceApi {
 	desc?: string;
 	method?: string;
 	refresh?: string;
+	visibility?: string;
 }
 
 /**
  * Parses additional workspace APIs exposed via kubernetes metadata annotations.
- * Pattern: `nogoo9/api.<api-name>.(port|path|desc|method|refresh)`
+ * Pattern: `nogoo9/api.<api-name>.(port|path|desc|method|refresh|visibility)`
  *
  * @param annotations Pod metadata annotations.
  * @returns Parsed list of WorkspaceApi instances.
@@ -213,7 +214,9 @@ export function parseWorkspaceApis(
 		if (key === "__proto__" || key === "constructor") continue;
 		if (key.startsWith(ANNOTATION_KEYS.PORT_PREFIX)) {
 			const rest = key.substring(ANNOTATION_KEYS.PORT_PREFIX.length);
-			const match = rest.match(/^([^.]+)\.(port|path|desc|method|refresh)$/);
+			const match = rest.match(
+				/^([^.]+)\.(port|path|desc|method|refresh|visibility)$/,
+			);
 			if (match) {
 				const [_, apiName, field] = match;
 				if (!apisMap.has(apiName)) {
@@ -230,6 +233,8 @@ export function parseWorkspaceApis(
 					api.method = value;
 				} else if (field === "refresh") {
 					api.refresh = value;
+				} else if (field === "visibility") {
+					api.visibility = value;
 				}
 			}
 		}
@@ -238,6 +243,19 @@ export function parseWorkspaceApis(
 	const apis: WorkspaceApi[] = [];
 	for (const [_, api] of apisMap.entries()) {
 		if (api.port) {
+			let visibility = api.visibility;
+			if (!visibility) {
+				const lowerName = api.name!.toLowerCase();
+				if (
+					lowerName === "stats" ||
+					lowerName === "last_activity" ||
+					lowerName === "last-activity"
+				) {
+					visibility = "admin";
+				} else {
+					visibility = "private";
+				}
+			}
 			apis.push({
 				name: api.name!,
 				port: api.port,
@@ -245,6 +263,7 @@ export function parseWorkspaceApis(
 				desc: api.desc,
 				method: api.method,
 				refresh: api.refresh,
+				visibility: visibility,
 			});
 		}
 	}

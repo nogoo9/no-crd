@@ -209,6 +209,14 @@ Access control checks are evaluated against both the client application's capabi
 * **Admin Scope Hierarchy**: The admin scope acts as a superset. If a token contains the admin scope, it automatically satisfies standard read (`AUTH_REQUIRED_READ_SCOPE`) and write (`AUTH_REQUIRED_WRITE_SCOPE`) scope validation checks, simplifying client configuration.
 * **Scope Bypass for Scope-less Tokens**: If a token completely lacks a scope claim (i.e. `scope` or `scp` fields are absent or null), the scope checks are bypassed, delegating access checks solely to the roles claim (or `AUTH_DEFAULT_ROLE` fallback).
 
+### Action-Level Access Policies
+The platform defines specific action categories mapped to roles and scopes:
+- **`read`**: Discover and retrieve workspace lists, namespaces, and template specs. Satisfied by the `admin`, `user`, or `viewer` roles, with the `nogoo9:read` scope. Non-admin users can only view their own sandboxes (owner isolation).
+- **`workspace:write`**: Spawn or stop workspace pods. Satisfied by `admin`, `user`, or `viewer` roles, with the `nogoo9:write` scope. Standard Readers (`viewer`) and Writers (`user`) are isolated to managing only workspaces they own, whereas Admins bypass this.
+- **`template:create`**: Create new ConfigMap pod templates. Restricted to `admin` or `user` roles, with the `nogoo9:write` scope. Standard Readers (`viewer`) are blocked.
+- **`template:write`**: Update or delete ConfigMap templates. Restricted to `admin` or `user` roles, with the `nogoo9:write` scope. Standard Writers (`user`) can only update/delete templates created by them (tracked via the `nogoo9/user-sub` label).
+- **`admin`**: Cluster-wide overrides and operations on behalf of other users. Restricted to the `admin` role with the `nogoo9:admin` scope.
+
 ### Authorization Evaluation Matrix
 
 The following matrix shows access decisions for different combinations of scopes, roles, and requested actions:

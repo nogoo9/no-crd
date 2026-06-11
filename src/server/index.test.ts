@@ -930,6 +930,436 @@ users:
 		});
 	});
 
+	describe("Proxy API visibility controls (ADR-020)", () => {
+		beforeEach(() => {
+			process.env.AUTH_ENABLED = "true";
+			process.env.JWT_VERIFICATION_REQUIRED = "false";
+			process.env.AUTH_REQUIRED_READ_SCOPE = "";
+			process.env.AUTH_REQUIRED_WRITE_SCOPE = "";
+			process.env.AUTH_REQUIRED_READ_ROLE = "";
+			process.env.AUTH_REQUIRED_WRITE_ROLE = "";
+			process.env.AUTH_ADMIN_ROLE = "admin";
+			process.env.AUTH_REQUIRED_ADMIN_SCOPE = "nogoo9:admin";
+		});
+
+		afterEach(() => {
+			delete process.env.AUTH_ENABLED;
+			delete process.env.JWT_VERIFICATION_REQUIRED;
+			delete process.env.AUTH_REQUIRED_READ_SCOPE;
+			delete process.env.AUTH_REQUIRED_WRITE_SCOPE;
+			delete process.env.AUTH_REQUIRED_READ_ROLE;
+			delete process.env.AUTH_REQUIRED_WRITE_ROLE;
+			delete process.env.AUTH_ADMIN_ROLE;
+			delete process.env.AUTH_REQUIRED_ADMIN_SCOPE;
+		});
+
+		function createMockToken(payload: any) {
+			const header = { alg: "RS256" };
+			const p = {
+				aud: "http://localhost",
+				exp: Math.floor(Date.now() / 1000) + 3600,
+				...payload,
+			};
+			return (
+				Buffer.from(JSON.stringify(header)).toString("base64url") +
+				"." +
+				Buffer.from(JSON.stringify(p)).toString("base64url") +
+				".sig"
+			);
+		}
+
+		test("private visibility blocks non-owner and blocks admin", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: { "nogoo9/user-sub": "user-1" },
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/api.terminal.port": "8080",
+								"nogoo9/api.terminal.path": "/terminal",
+								"nogoo9/api.terminal.visibility": "private",
+							},
+						},
+						status: { phase: "Running", podIP: "10.0.0.5" },
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock(() =>
+				Promise.resolve(Response.json({ status: "ok" })),
+			);
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				// 1. Owner can access
+				const ownerToken = createMockToken({ sub: "user-1" });
+				const ownerReq = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${ownerToken}` },
+				});
+				const ownerResp = await handleWebRequest(ownerReq);
+				console.log(
+					"DEBUG OWNER RESP TEXT:",
+					ownerResp.status,
+					await ownerResp.text(),
+				);
+				expect(ownerResp.status).toBe(200);
+
+				// 2. Non-owner is blocked
+				const nonOwnerToken = createMockToken({ sub: "user-2" });
+				const nonOwnerReq = new Request(
+					"http://localhost/route/ws-1/terminal",
+					{
+						headers: { Authorization: `Bearer ${nonOwnerToken}` },
+					},
+				);
+				const nonOwnerResp = await handleWebRequest(nonOwnerReq);
+				expect(nonOwnerResp.status).toBe(403);
+
+				// 3. Admin is blocked (admins cannot access standard private paths)
+				const adminToken = createMockToken({
+					sub: "admin-user",
+					scope: "nogoo9:admin",
+					realm_access: { roles: ["admin"] },
+				});
+				const adminReq = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${adminToken}` },
+				});
+				const adminResp = await handleWebRequest(adminReq);
+				expect(adminResp.status).toBe(403);
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("internal visibility allows any authenticated session", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: { "nogoo9/user-sub": "user-1" },
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/api.terminal.port": "8080",
+								"nogoo9/api.terminal.path": "/terminal",
+								"nogoo9/api.terminal.visibility": "internal",
+							},
+						},
+						status: { phase: "Running", podIP: "10.0.0.5" },
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock(() =>
+				Promise.resolve(Response.json({ status: "ok" })),
+			);
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				// 1. Non-owner can access
+				const nonOwnerToken = createMockToken({ sub: "user-2" });
+				const nonOwnerReq = new Request(
+					"http://localhost/route/ws-1/terminal",
+					{
+						headers: { Authorization: `Bearer ${nonOwnerToken}` },
+					},
+				);
+				const nonOwnerResp = await handleWebRequest(nonOwnerReq);
+				expect(nonOwnerResp.status).toBe(200);
+
+				// 2. Admin can access
+				const adminToken = createMockToken({
+					sub: "admin-user",
+					scope: "nogoo9:admin",
+					realm_access: { roles: ["admin"] },
+				});
+				const adminReq = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${adminToken}` },
+				});
+				const adminResp = await handleWebRequest(adminReq);
+				expect(adminResp.status).toBe(200);
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("admin visibility allows owner and admin scope", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: { "nogoo9/user-sub": "user-1" },
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/api.terminal.port": "8080",
+								"nogoo9/api.terminal.path": "/terminal",
+								"nogoo9/api.terminal.visibility": "admin",
+							},
+						},
+						status: { phase: "Running", podIP: "10.0.0.5" },
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock(() =>
+				Promise.resolve(Response.json({ status: "ok" })),
+			);
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				// 1. Non-owner (non-admin) is blocked
+				const nonOwnerToken = createMockToken({ sub: "user-2" });
+				const nonOwnerReq = new Request(
+					"http://localhost/route/ws-1/terminal",
+					{
+						headers: { Authorization: `Bearer ${nonOwnerToken}` },
+					},
+				);
+				const nonOwnerResp = await handleWebRequest(nonOwnerReq);
+				expect(nonOwnerResp.status).toBe(403);
+
+				// 2. Admin (with admin scope) can access
+				const adminToken = createMockToken({
+					sub: "admin-user",
+					scope: "nogoo9:admin",
+					realm_access: { roles: ["admin"] },
+				});
+				const adminReq = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${adminToken}` },
+				});
+				const adminResp = await handleWebRequest(adminReq);
+				expect(adminResp.status).toBe(200);
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("list of subjects visibility restricts access correctly", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: { "nogoo9/user-sub": "user-1" },
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/api.terminal.port": "8080",
+								"nogoo9/api.terminal.path": "/terminal",
+								"nogoo9/api.terminal.visibility": "user-2,user-3",
+							},
+						},
+						status: { phase: "Running", podIP: "10.0.0.5" },
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock(() =>
+				Promise.resolve(Response.json({ status: "ok" })),
+			);
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				// 1. user-2 is allowed
+				const token2 = createMockToken({ sub: "user-2" });
+				const req2 = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${token2}` },
+				});
+				const resp2 = await handleWebRequest(req2);
+				expect(resp2.status).toBe(200);
+
+				// 2. user-4 is blocked
+				const token4 = createMockToken({ sub: "user-4" });
+				const req4 = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${token4}` },
+				});
+				const resp4 = await handleWebRequest(req4);
+				expect(resp4.status).toBe(403);
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("reserved stats/last_activity APIs automatically default to admin visibility", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: { "nogoo9/user-sub": "user-1" },
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/api.stats.port": "8080",
+								"nogoo9/api.stats.path": "/stats",
+								"nogoo9/api.last_activity.port": "8080",
+								"nogoo9/api.last_activity.path": "/last-activity",
+							},
+						},
+						status: { phase: "Running", podIP: "10.0.0.5" },
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock(() =>
+				Promise.resolve(Response.json({ status: "ok" })),
+			);
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				// 1. Non-owner stats check -> blocked
+				const token2 = createMockToken({ sub: "user-2" });
+				const reqStats2 = new Request("http://localhost/route/ws-1/stats", {
+					headers: { Authorization: `Bearer ${token2}` },
+				});
+				const respStats2 = await handleWebRequest(reqStats2);
+				expect(respStats2.status).toBe(403);
+
+				// 2. Admin stats check -> allowed
+				const adminToken = createMockToken({
+					sub: "admin-user",
+					scope: "nogoo9:admin",
+					realm_access: { roles: ["admin"] },
+				});
+				const reqStatsAdmin = new Request("http://localhost/route/ws-1/stats", {
+					headers: { Authorization: `Bearer ${adminToken}` },
+				});
+				const respStatsAdmin = await handleWebRequest(reqStatsAdmin);
+				expect(respStatsAdmin.status).toBe(200);
+
+				// 3. Admin last_activity check -> allowed
+				const reqActAdmin = new Request(
+					"http://localhost/route/ws-1/last-activity",
+					{
+						headers: { Authorization: `Bearer ${adminToken}` },
+					},
+				);
+				const respActAdmin = await handleWebRequest(reqActAdmin);
+				expect(respActAdmin.status).toBe(200);
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("scope visibility restricts access to callers with the required scope", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: { "nogoo9/user-sub": "user-1" },
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/api.terminal.port": "8080",
+								"nogoo9/api.terminal.path": "/terminal",
+								"nogoo9/api.terminal.visibility": "scope:mcp:custom-read",
+							},
+						},
+						status: { phase: "Running", podIP: "10.0.0.5" },
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock(() =>
+				Promise.resolve(Response.json({ status: "ok" })),
+			);
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				// 1. Caller with required scope is allowed
+				const allowedToken = createMockToken({
+					sub: "user-2",
+					scope: "mcp:custom-read",
+				});
+				const allowedReq = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${allowedToken}` },
+				});
+				const allowedResp = await handleWebRequest(allowedReq);
+				expect(allowedResp.status).toBe(200);
+
+				// 2. Caller without scope claim is blocked (strict checking)
+				const noScopeToken = createMockToken({ sub: "user-3" });
+				const noScopeReq = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${noScopeToken}` },
+				});
+				const noScopeResp = await handleWebRequest(noScopeReq);
+				expect(noScopeResp.status).toBe(403);
+
+				// 3. Caller with wrong scope is blocked
+				const wrongScopeToken = createMockToken({
+					sub: "user-4",
+					scope: "mcp:wrong-scope",
+				});
+				const wrongScopeReq = new Request(
+					"http://localhost/route/ws-1/terminal",
+					{
+						headers: { Authorization: `Bearer ${wrongScopeToken}` },
+					},
+				);
+				const wrongScopeResp = await handleWebRequest(wrongScopeReq);
+				expect(wrongScopeResp.status).toBe(403);
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
+		test("role visibility restricts access to callers with the required role", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: { "nogoo9/user-sub": "user-1" },
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+								"nogoo9/api.terminal.port": "8080",
+								"nogoo9/api.terminal.path": "/terminal",
+								"nogoo9/api.terminal.visibility": "role:custom-role",
+							},
+						},
+						status: { phase: "Running", podIP: "10.0.0.5" },
+					},
+				],
+			});
+
+			const originalFetch = globalThis.fetch;
+			const mockFetch = mock(() =>
+				Promise.resolve(Response.json({ status: "ok" })),
+			);
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				// 1. Caller with required role is allowed
+				const allowedToken = createMockToken({
+					sub: "user-2",
+					realm_access: { roles: ["custom-role"] },
+				});
+				const allowedReq = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${allowedToken}` },
+				});
+				const allowedResp = await handleWebRequest(allowedReq);
+				expect(allowedResp.status).toBe(200);
+
+				// 2. Caller without role is blocked
+				const noRoleToken = createMockToken({ sub: "user-3" });
+				const noRoleReq = new Request("http://localhost/route/ws-1/terminal", {
+					headers: { Authorization: `Bearer ${noRoleToken}` },
+				});
+				const noRoleResp = await handleWebRequest(noRoleReq);
+				expect(noRoleResp.status).toBe(403);
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+	});
+
 	test("logout endpoint clears cookies for active workspaces", async () => {
 		mockListNamespacedPod.mockResolvedValue({
 			items: [

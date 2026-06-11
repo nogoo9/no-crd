@@ -4,6 +4,10 @@
   <img src="docs/public/logo.png" alt="nogoo9 logo" width="200" height="200" />
 </p>
 
+<p align="center">
+  <img src="docs/public/dashboard_screenshot.png" alt="no-crd Dashboard" width="800" />
+</p>
+
 > **Agent-Driven, On-Demand Pod Orchestration in Kubernetes — Without Custom Resource Definitions.**
 
 [![npm version](https://img.shields.io/npm/v/@nogoo9%2Fno-crd.svg?color=c65f5f&logo=npm&logoColor=ffffff&style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd) [![npm downloads](https://img.shields.io/npm/dm/@nogoo9%2Fno-crd.svg?color=c65f5f&logo=npm&logoColor=ffffff&style=flat-square)](https://www.npmjs.com/package/@nogoo9/no-crd) [![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-5f7f9f.svg?logo=github&logoColor=ffffff&style=flat-square)](https://nogoo9.github.io/no-crd/) [![License](https://img.shields.io/npm/l/@nogoo9%2Fno-crd.svg?color=c65f5f&style=flat-square)](https://github.com/nogoo9/no-crd/blob/main/LICENSE) [![Coverage Status](https://img.shields.io/coveralls/github/nogoo9/no-crd?color=6fa37f&style=flat-square)](https://coveralls.io/github/nogoo9/no-crd?branch=main) [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/nogoo9/no-crd/badge)](https://securityscorecards.dev/viewer/?uri=github.com/nogoo9/no-crd) [![Semgrep](https://img.shields.io/badge/Security-Semgrep-80679c?logo=semgrep&logoColor=ffffff&style=flat-square)](https://semgrep.dev/)
@@ -584,6 +588,7 @@ The spawner inspects `ConfigMap` metadata annotations (and custom inline annotat
 | `nogoo9/preview-path` | Annotation (String) | The default folder or file subpath to render in the UI files preview tab. |
 | `nogoo9/preview-type` | Annotation (String) | Fallback preview rendering mode for the preview tab (e.g. `markdown`, `html`). |
 | `nogoo9/api.<api-name>.port` | Annotation (Number) | Defines an additional HTTP service port exposed by the workspace. |
+| `nogoo9/api.<api-name>.visibility` | Annotation (String) | Specifies access visibility for the custom API endpoint. Supported values: `private` (accessible only by the workspace owner), `internal` (accessible by any logged-in user), `admin` (accessible by the owner or users with the admin scope and role), `scope:<scope_name>` (accessible by users possessing the specified OIDC scope), `role:<role_name>` (accessible by users possessing the specified user role), or a comma-separated list of allowed user subjects. |
 | `nogoo9/api.<api-name>.path` | Annotation (String) | Defines the subpath routing prefix for this specific API (e.g. `/terminal`). |
 | `nogoo9/api.<api-name>.desc` | Annotation (String) | A short description of this additional API, shown in the UI interface. |
 | `nogoo9/api.<api-name>.method` | Annotation (String) | Comma-separated list of supported HTTP methods (e.g. `GET,POST`, `*`, defaults to any method). |

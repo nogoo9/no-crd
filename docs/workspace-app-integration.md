@@ -353,6 +353,35 @@ The gateway acts as an OAuth 2.0 **Backend-for-Frontend (BFF) Mediator**:
 3.  **Graceful Degradation**:
     *   If the refresh token has expired or is revoked, standard web requests (`GET` with `Accept: text/html`) are redirected to the login landing page for a seamless sign-in loop.
     *   API endpoints (`fetch` / `XMLHttpRequest` / `POST`) receive a `401 Unauthorized` response, allowing frontends to gracefully prompt users or store local state.
+## 📡 Dynamic sub-API Registration & Visibility Control
+
+Workspaces running within the cluster can expose multiple auxiliary endpoints or developer API services (such as administrative stats, debug consoles, or auxiliary services) alongside their main web interface. The gateway routing proxy handles authorization and path rewriting dynamically based on annotations declared on the workspace pod template.
+
+### 1. API Registration Annotations
+To register an auxiliary API on your workspace, define the following annotations on your pod template:
+
+*   `nogoo9/api.<api-name>.port` (Required): The internal container port to route traffic to (e.g. `"8080"`).
+*   `nogoo9/api.<api-name>.path` (Optional): The request path prefix suffix (e.g. `"/terminal"`, defaults to `/`).
+*   `nogoo9/api.<api-name>.method` (Optional): Comma-separated HTTP methods allowed (e.g. `GET,POST`, defaults to `*`).
+*   `nogoo9/api.<api-name>.visibility` (Optional): Access control visibility policy for the API.
+*   `nogoo9/api.<api-name>.refresh` (Optional): Auto-refresh interval (e.g. `30s`, `1m`) or `init` to load once.
+
+### 2. Visibility Access Control Matrix
+The gateway reverse proxy matches incoming requests (`/route/:workspaceId/<api-path>`) and evaluates the `visibility` rule:
+
+| Visibility Value | Access Check Logic |
+| :--- | :--- |
+| `private` (default) | Allowed only for the workspace creator (`userSub` matches the pod owner). |
+| `internal` | Allowed for any authenticated session. |
+| `admin` | Allowed if the caller is the owner, OR has the admin scope AND role. |
+| `scope:<scope_name>` | Allowed if the caller's JWT contains the specified OAuth scope (e.g. `scope:mcp:read`). |
+| `role:<role_name>` | Allowed if the caller's JWT contains the specified user role (e.g. `role:viewer`). |
+| Comma-separated list | Allowed if the caller is the owner, OR their `userSub` matches a value in the list (e.g. `user-1,user-2`). |
+
+### 3. Reserved API Defaults
+For backward compatibility and out-of-the-box security, registered sub-APIs named `stats` or `last_activity` (and `last-activity`) automatically default to `admin` visibility if no custom `visibility` annotation is explicitly provided.
+
+---
 
 ## Known Gotchas
 

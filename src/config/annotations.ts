@@ -189,6 +189,12 @@ export const ANNOTATION_METADATA: AnnotationParam[] = [
 			"Defines an additional HTTP service port exposed by the workspace.",
 	},
 	{
+		key: "nogoo9/api.<api-name>.visibility",
+		type: "Annotation (String)",
+		description:
+			"Specifies access visibility for the custom API endpoint. Supported values: `private` (accessible only by the workspace owner), `internal` (accessible by any logged-in user), `admin` (accessible by the owner or users with the admin scope and role), `scope:<scope_name>` (accessible by users possessing the specified OIDC scope), `role:<role_name>` (accessible by users possessing the specified user role), or a comma-separated list of allowed user subjects.",
+	},
+	{
 		key: "nogoo9/api.<api-name>.path",
 		type: "Annotation (String)",
 		description:
