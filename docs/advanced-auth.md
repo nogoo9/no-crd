@@ -2,8 +2,8 @@
 
 This guide details the advanced authorization capabilities of `@nogoo9/no-crd` and documents strategies for scaling identity and access management across multiple remote applications.
 
-> [!IMPORTANT]
-> **Experimental Feature**: Advanced authorization checks and tenant isolation are available from **v0.3.0** and are currently marked as experimental.
+> [!NOTE]
+> Advanced authorization checks, granular roles (Reader/Writer/Admin), and tenant isolation are fully integrated as core platform components.
 
 ---
 
@@ -14,7 +14,7 @@ This guide details the advanced authorization capabilities of `@nogoo9/no-crd` a
 ```mermaid
 flowchart TD
     A["Authentication (JWT)"] --> B["1. RBAC (Scope & Role Check)"]
-    B -->|"Verify capability: mcp:read/write \n Verify role: mcp-reader/writer"| C["2. ABAC (Tenant & Resource Isolation)"]
+    B -->|"Verify capability: nogoo9:read/write \n Verify role: viewer/user"| C["2. ABAC (Tenant & Resource Isolation)"]
     C -->|"Verify ownership: Subject.sub == Resource.user-sub"| D["Access Granted"]
     
     style A fill:#4F46E5,stroke:#fff,stroke-width:2px,color:#fff
@@ -25,8 +25,8 @@ flowchart TD
 
 ### 1. Scope & Role Enforcement (RBAC)
 This layer authorizes based on the capability of the client application and the job function of the user:
-- **Scopes (Client-centric)**: Dictates what the client application is authorized to request (e.g., the UI requests `mcp:write` to write).
-- **Roles (User-centric)**: Dictates what the user is authorized to perform (e.g., `writeuser` carries the role `mcp-writer`).
+- **Scopes (Client-centric)**: Dictates what the client application is authorized to request (e.g., the UI requests `nogoo9:write` to write).
+- **Roles (User-centric)**: Dictates what the user is authorized to perform (e.g., a standard writer carries the role `user`).
 
 If a user lacks the required write role, the execution is blocked at the gateway boundary before any resource operations are initiated.
 
@@ -40,7 +40,7 @@ This layer checks whether the authenticated user has access to a **specific reso
 
 ## 🔄 Extending to a Pure ABAC Model
 
-In a pure ABAC model, you can eliminate user-centric roles entirely. Instead of verifying roles like `mcp-reader` or `mcp-writer`, the MCP server evaluates dynamic attributes of the subject, resource, and action to grant permissions:
+In a pure ABAC model, you can eliminate user-centric roles entirely. Instead of verifying roles like `viewer` or `user`, the MCP server evaluates dynamic attributes of the subject, resource, and action to grant permissions:
 
 * **Subject attributes**: e.g., `user.clearance_level`, `user.department`, `user.groups`.
 * **Resource attributes**: e.g., `pod.environment: "prod"`, `pod.sensitivity: "restricted"`, `pod.owner: "sub-id"`.
@@ -168,9 +168,9 @@ Use the following strategies to prevent role sprawl:
 ### Strategy 1: Realm Roles vs. Client-Scoped Roles
 Avoid assigning application-level roles directly to users. Instead, split your roles into two tiers:
 - **Functional Roles (Realm level)**: Broad business roles (e.g. `SoftwareEngineer`, `DataScientist`). A user is assigned exactly one functional role based on their job.
-- **Technical Roles (Client level)**: Application-scoped roles defined inside the OIDC client registry (e.g., client `nogoo9-mcp` defines roles `reader` and `writer`).
+- **Technical Roles (Client level)**: Application-scoped roles defined inside the OIDC client registry (e.g., client `nogoo9-mcp` defines roles `viewer` and `user`).
 
-In your IdP, configure composite role mappings: when a user is assigned the `SoftwareEngineer` realm role, they automatically inherit the client role `nogoo9-mcp/writer`.
+In your IdP, configure composite role mappings: when a user is assigned the `SoftwareEngineer` realm role, they automatically inherit the client role `nogoo9-mcp/user`.
 
 ### Strategy 2: Group-Based Access Control (GBAC)
 Standardize authorization around organization groups (e.g., `/RnD/Engineering/Platform`).
@@ -185,9 +185,9 @@ const isReader = userGroups.some(g => g.startsWith("/Product/"));
 ```
 
 ### Strategy 3: Dynamic Scope Mapping
-Standardize on capabilities rather than roles. The client application requests the scopes it needs to run (e.g., `scope: "mcp:read mcp:write"`).
-- In Keycloak, configure **Client Scope Policies** so that the `mcp:write` scope is dynamically stripped or granted at login based on user attributes or LDAP group memberships.
-- The MCP server only verifies the scope claim: if `mcp:write` is present, it allows mutations.
+Standardize on capabilities rather than roles. The client application requests the scopes it needs to run (e.g., `scope: "nogoo9:read nogoo9:write"`).
+- In Keycloak, configure **Client Scope Policies** so that the `nogoo9:write` scope is dynamically stripped or granted at login based on user attributes or LDAP group memberships.
+- The MCP server only verifies the scope claim: if `nogoo9:write` is present, it allows mutations.
 
 ### Strategy 4: Externalized Authorization (Policy-as-Code / OPA)
 For complex deployments, decouple authentication from authorization entirely by delegating to a policy engine like **Open Policy Agent (OPA)**.
