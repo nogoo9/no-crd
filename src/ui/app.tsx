@@ -360,6 +360,9 @@ interface Template {
 	workspacePath?: string;
 	workspaceType?: string;
 	apis?: WorkspaceApi[];
+	isLocal?: boolean;
+	userSub?: string;
+	version?: string;
 }
 
 interface Toast {
@@ -730,7 +733,7 @@ function Dashboard() {
 			// Fetch Templates
 			const tmplRes = await app.callServerTool({
 				name: "list_templates",
-				arguments: { namespace },
+				arguments: { namespace, jwtPayload },
 			});
 			if (tmplRes && !tmplRes.isError && tmplRes.structuredContent) {
 				setTemplates((tmplRes.structuredContent as any).templates || []);
@@ -1021,6 +1024,27 @@ function Dashboard() {
 				refreshData();
 			} else {
 				throw new Error(String(res?.error || "Error upgrading workspaces"));
+			}
+		} catch (err) {
+			triggerToast(err instanceof Error ? err.message : String(err), "error");
+		}
+	};
+
+	const deleteTemplate = async (name: string) => {
+		if (!confirm(`Are you sure you want to delete template "${name}"?`)) {
+			return;
+		}
+		try {
+			triggerToast(`Deleting template ${name}...`);
+			const res = await app.callServerTool({
+				name: "delete_template",
+				arguments: { name, namespace, jwtPayload: activeToken ? decodeJwt(activeToken) : undefined },
+			});
+			if (res && !res.isError) {
+				triggerToast(`Template ${name} deleted successfully.`, "success");
+				refreshData();
+			} else {
+				throw new Error(String(res?.error || "Error deleting template"));
 			}
 		} catch (err) {
 			triggerToast(err instanceof Error ? err.message : String(err), "error");
@@ -1359,10 +1383,29 @@ function Dashboard() {
 								<div key={tmpl.name} className="card card-ws-hover p-5 flex flex-col justify-between min-h-[140px]">
 									<div>
 										<div className="flex items-center justify-between mb-2">
-											<h3 className="text-sm font-extrabold font-mono text-[var(--ink)]">{tmpl.name}</h3>
-											<span className="badge-pill text-[9px]">{tmpl.tag || "dev"}</span>
+											<h3 className="text-sm font-extrabold font-mono text-[var(--ink)] truncate" title={tmpl.name}>{tmpl.name}</h3>
+											<div className="flex items-center gap-1.5 shrink-0">
+												<span className="badge-pill text-[9px]">{tmpl.tag || "dev"}</span>
+												{!tmpl.isLocal && (tmpl.userSub === getDisplayUser() || capabilities.isAdmin) && (
+													<button
+														onClick={() => deleteTemplate(tmpl.name)}
+														className="btn btn-ghost p-1 text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
+														title="Delete Template Spec"
+													>
+														<I.trash className="w-3.5 h-3.5" />
+													</button>
+												)}
+											</div>
 										</div>
 										<p className="text-xs text-[var(--ink-2)] leading-relaxed">{tmpl.description || "Reusable container pod sandbox template ConfigMap."}</p>
+										<div className="flex flex-wrap gap-2 text-[10px] text-[var(--ink-3)] mt-2 font-mono">
+											{tmpl.version && <span>Version: <strong className="text-[var(--ink-2)]">{tmpl.version}</strong></span>}
+											{tmpl.isLocal ? (
+												<span>Source: <strong className="text-[var(--ink-2)]">Local (Immutable)</strong></span>
+											) : (
+												tmpl.userSub && <span>Creator: <strong className="text-[var(--ink-2)]">{tmpl.userSub}</strong></span>
+											)}
+										</div>
 									</div>
 									<div className="flex items-center justify-between mt-4 border-t border-[var(--line)] pt-3">
 										<button className="btn btn-quiet text-xs py-1" onClick={() => setActiveTmplSpec(tmpl)}>
@@ -1406,6 +1449,7 @@ function Dashboard() {
 										density={density}
 										currentUser={getDisplayUser()}
 										workspaceOpenMode={workspaceOpenMode}
+										isAdmin={capabilities.isAdmin}
 										onStop={() => stopWorkspace(ws.id)}
 										onUpgrade={() => upgradeWorkspace(ws.id)}
 										onShowLogs={() => setActiveLogsWs(ws)}
@@ -1438,6 +1482,7 @@ function Dashboard() {
 										density={density}
 										currentUser={getDisplayUser()}
 										workspaceOpenMode={workspaceOpenMode}
+										isAdmin={capabilities.isAdmin}
 										onStop={() => stopWorkspace(ws.id)}
 										onUpgrade={() => upgradeWorkspace(ws.id)}
 										onShowLogs={() => setActiveLogsWs(ws)}
@@ -1559,8 +1604,9 @@ function Dashboard() {
 									namespace,
 									description: desc,
 									tag,
-									podSpec,
+									spec: podSpec,
 									annotations,
+									jwtPayload: activeToken ? decodeJwt(activeToken) : undefined,
 								},
 							});
 
@@ -1723,6 +1769,7 @@ interface WorkspaceCardProps {
 	density: string;
 	currentUser: string;
 	workspaceOpenMode: "tab" | "inline";
+	isAdmin?: boolean;
 	onStop: () => void;
 	onUpgrade: () => void;
 	onShowLogs: () => void;
@@ -1758,6 +1805,7 @@ function WorkspaceCard({
 	onShowEvents,
 	onOpenDetails,
 	onShowPreview,
+	isAdmin = false,
 }: WorkspaceCardProps) {
 	const pathPart = ws.workspacePath || ws.previewPath || "/";
 	const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
@@ -2011,7 +2059,7 @@ function WorkspaceCard({
 							</button>
 						)}
 
-						{isOwner && ws.isOutdated && (
+						{(isOwner || isAdmin) && ws.isOutdated && (
 							<button 
 								className="btn btn-ghost text-amber-600 hover:bg-amber-500/10 px-2 py-1 text-[10px] font-bold flex items-center gap-1" 
 								onClick={onUpgrade}
@@ -2023,7 +2071,7 @@ function WorkspaceCard({
 					</div>
 
 					<div className="flex">
-						{isOwner && ws.status === "Running" && (
+						{(isOwner || isAdmin) && ws.status === "Running" && (
 							<button 
 								className="btn btn-ghost text-red-500 hover:bg-red-500/10 px-2.5 py-1 text-[11px] font-bold flex items-center gap-1" 
 								onClick={onStop}

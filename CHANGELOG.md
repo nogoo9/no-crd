@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-06-12
+
+### Added
+
+- **Fine-Grained Permissions & Scope Checks** ([ADR-020](docs/decisions/ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md)): Refactored the authorization engine to support granular permissions checking. Promoted standard Readers (`viewer` role) to allow starting and stopping their own sandboxes, while Writers (`user` role) can additionally create and edit templates. Bypassed scope validation for credentials that completely lack a scope claim.
+- **Template Creator Tracking & Immutability** ([ADR-020](docs/decisions/ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md)): Stamped all dynamic ConfigMap templates with the creator's user subject (`nogoo9/user-sub`). Standard users can only update or delete templates created by them, while local filesystem-loaded templates are made fully immutable and protected against updates or deletions.
+- **Workspace API Routing & Visibility Annotations** ([ADR-021](docs/decisions/ADR-021-workspace-api-annotations-and-visibility-controls.md)): Created a dedicated specification for dynamic workspace sub-API annotations. Added support for `scope:<scope_name>` and `role:<role_name>` visibility checks, allowing developers to restrict access to subpaths to callers possessing specific OIDC scopes or roles.
+- **UI Workspace & Template Permissions Adaptation** ([ADR-020](docs/decisions/ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md)): Enhanced the React dashboard to display creator metadata, conditionally enable template deletion (trash icon) and workspace stop/upgrade actions according to the authenticated user's permissions and roles.
+
+### Fixed
+
+- **Admin Visibility Check Fix**: Fixed a bug where the `allowed` status was not assigned in the proxy authentication handler (`auth.ts`) and WebSocket upgrade proxy (`ws-proxy.ts`) when API visibility was set to `"admin"`, resolving access issues for administrator accounts on restricted endpoints (such as `stats` or `last_activity`).
+
 ## [0.9.0] — 2026-06-11
 
 ### Added

@@ -53,6 +53,8 @@ export const ListTemplatesOutputSchema = z.object({
 			workspacePath: z.string().optional(),
 			workspaceType: z.string().optional(),
 			apis: z.array(WorkspaceApiSchema).optional(),
+			isLocal: z.boolean().optional(),
+			userSub: z.string().optional(),
 		}),
 	),
 });
@@ -121,6 +123,8 @@ function localTemplateToMeta(
 	workspacePath: string;
 	workspaceType: string;
 	apis: ReturnType<typeof parseWorkspaceApis>;
+	isLocal: boolean;
+	userSub: string;
 } {
 	const a = tmpl.annotations;
 	const reqRaw = a["nogoo9/required-context"];
@@ -141,6 +145,8 @@ function localTemplateToMeta(
 		workspaceType:
 			a["nogoo9/workspace-type"] ?? a["nogoo9/preview-type"] ?? "html",
 		apis: parseWorkspaceApis(a),
+		isLocal: true,
+		userSub: "",
 	};
 }
 
@@ -399,6 +405,10 @@ export function registerTemplateResources(
 						const tmplName = cm.metadata?.name ?? "";
 						const version =
 							annotations[ANNOTATION_KEYS.TEMPLATE_VERSION] || "1.0.0";
+						const creatorSub =
+							cm.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB] ??
+							cm.metadata?.annotations?.[ANNOTATION_KEYS.USER_SUB] ??
+							"";
 						seenNames.add(tmplName);
 						return {
 							name: tmplName,
@@ -410,6 +420,8 @@ export function registerTemplateResources(
 							workspacePath,
 							workspaceType,
 							apis: parseWorkspaceApis(annotations),
+							isLocal: false,
+							userSub: creatorSub,
 						};
 					});
 
@@ -685,6 +697,7 @@ export function registerTemplateResources(
 				const authEnabled = config.auth.enabled;
 				const store = requestContextStore.getStore();
 				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+				let userSub = "";
 				if (authEnabled) {
 					if (!activeJwtPayload) {
 						return errorResult(
@@ -694,7 +707,11 @@ export function registerTemplateResources(
 						);
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "template:create");
+						userSub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
 					}
@@ -712,10 +729,16 @@ export function registerTemplateResources(
 					};
 					if (description) annotations[DESCRIPTION_ANNOTATION] = description;
 					if (tag) annotations[TAG_ANNOTATION] = tag;
+					if (authEnabled && userSub) {
+						annotations[ANNOTATION_KEYS.USER_SUB] = userSub;
+					}
 					const labels: Record<string, string> = {
 						[TEMPLATE_LABEL_KEY]: "true",
 						...(passedLabels ?? {}),
 					};
+					if (authEnabled && userSub) {
+						labels[ANNOTATION_KEYS.USER_SUB] = userSub;
+					}
 					const cm: k8s.V1ConfigMap = {
 						apiVersion: "v1",
 						kind: "ConfigMap",
@@ -802,6 +825,17 @@ export function registerTemplateResources(
 				const authEnabled = config.auth.enabled;
 				const store = requestContextStore.getStore();
 				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+
+				if (findLocalTemplate(name)) {
+					return errorResult(
+						k8sContext.kc,
+						new Error(`Forbidden: Local template "${name}" is immutable`),
+						{ name: "", namespace: "" },
+					);
+				}
+
+				let userSub = "";
+				let isAdmin = false;
 				if (authEnabled) {
 					if (!activeJwtPayload) {
 						return errorResult(
@@ -811,7 +845,17 @@ export function registerTemplateResources(
 						);
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "template:write");
+						userSub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
 					}
@@ -825,6 +869,22 @@ export function registerTemplateResources(
 				);
 				try {
 					const existing = await readTemplateMap(k8sContext.coreApi, ns, name);
+					if (authEnabled && !isAdmin) {
+						const creatorSub =
+							existing.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB] ??
+							existing.metadata?.annotations?.[ANNOTATION_KEYS.USER_SUB];
+						if (!creatorSub) {
+							throw new Error(
+								`Forbidden: Legacy template "${name}" is admin-only`,
+							);
+						}
+						if (creatorSub !== userSub) {
+							throw new Error(
+								`Forbidden: You are not the creator of template "${name}"`,
+							);
+						}
+					}
+
 					const annotations = {
 						...(existing.metadata?.annotations ?? {}),
 						...(passedAnnotations ?? {}),
@@ -904,6 +964,17 @@ export function registerTemplateResources(
 				const authEnabled = config.auth.enabled;
 				const store = requestContextStore.getStore();
 				const activeJwtPayload = jwtPayload || store?.jwtPayload;
+
+				if (findLocalTemplate(name)) {
+					return errorResult(
+						k8sContext.kc,
+						new Error(`Forbidden: Local template "${name}" is immutable`),
+						{ name: "", namespace: "" },
+					);
+				}
+
+				let userSub = "";
+				let isAdmin = false;
 				if (authEnabled) {
 					if (!activeJwtPayload) {
 						return errorResult(
@@ -913,7 +984,17 @@ export function registerTemplateResources(
 						);
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "template:write");
+						userSub = extractUserIdentity(
+							activeJwtPayload,
+							config.auth.subJsonPath,
+						);
+						try {
+							verifyAccessOrThrow(activeJwtPayload, "admin");
+							isAdmin = true;
+						} catch (_) {
+							isAdmin = false;
+						}
 					} catch (err) {
 						return errorResult(k8sContext.kc, err, { name: "", namespace: "" });
 					}
@@ -926,6 +1007,26 @@ export function registerTemplateResources(
 					},
 				);
 				try {
+					if (authEnabled && !isAdmin) {
+						const existing = await readTemplateMap(
+							k8sContext.coreApi,
+							ns,
+							name,
+						);
+						const creatorSub =
+							existing.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB] ??
+							existing.metadata?.annotations?.[ANNOTATION_KEYS.USER_SUB];
+						if (!creatorSub) {
+							throw new Error(
+								`Forbidden: Legacy template "${name}" is admin-only`,
+							);
+						}
+						if (creatorSub !== userSub) {
+							throw new Error(
+								`Forbidden: You are not the creator of template "${name}"`,
+							);
+						}
+					}
 					await k8sContext.coreApi.deleteNamespacedConfigMap({
 						name,
 						namespace: ns,

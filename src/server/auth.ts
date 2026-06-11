@@ -539,6 +539,63 @@ export function registerAuthHooks(
 			);
 		}
 
+		// Match subpath to APIs early
+		const apis = parseWorkspaceApis(annotations);
+		let matchedApi: any = null;
+		const targetPortAnnotation = annotations["nogoo9/workspace-port"];
+		let port =
+			targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000";
+		let rewrittenUrl: string | null = null;
+
+		const routePathIndex = request.url.indexOf(`/route/${workspaceId}`);
+		if (routePathIndex !== -1) {
+			const routePrefix = request.url.substring(
+				0,
+				routePathIndex + `/route/${workspaceId}`.length,
+			);
+			const subpath = request.url.substring(routePrefix.length) || "/";
+			const qIndex = subpath.indexOf("?");
+			const pathOnly = qIndex !== -1 ? subpath.substring(0, qIndex) : subpath;
+			const queryOnly = qIndex !== -1 ? subpath.substring(qIndex) : "";
+
+			// Sort by path length descending (most specific match wins)
+			const sortedApis = [...apis].sort(
+				(a, b) => b.path.length - a.path.length,
+			);
+			for (const api of sortedApis) {
+				const apiPathNoTrailingSlash = api.path.replace(/\/$/, "");
+				if (apiPathNoTrailingSlash !== "") {
+					const pathMatches =
+						pathOnly === apiPathNoTrailingSlash ||
+						pathOnly.startsWith(`${apiPathNoTrailingSlash}/`);
+
+					// Check method matches
+					const allowedMethods = api.method
+						? api.method.split(",").map((m) => m.trim().toUpperCase())
+						: [];
+					const methodMatches =
+						allowedMethods.length === 0 ||
+						allowedMethods.includes("*") ||
+						allowedMethods.includes(request.method);
+
+					if (pathMatches && methodMatches) {
+						matchedApi = api;
+						port = api.port;
+
+						const workspacePort = String(
+							targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000",
+						);
+						if (String(port) !== workspacePort) {
+							const cleanRest =
+								pathOnly.substring(apiPathNoTrailingSlash.length) || "/";
+							rewrittenUrl = routePrefix + cleanRest + queryOnly;
+						}
+						break;
+					}
+				}
+			}
+		}
+
 		if (!isNoAuth) {
 			await requireRouteAuth(request, reply);
 			if (reply.sent) return;
@@ -564,15 +621,70 @@ export function registerAuthHooks(
 
 			const podSub = pod.metadata?.labels?.["nogoo9/user-sub"];
 
-			if (config.auth.enabled && podSub !== userSub) {
-				return sendErrorResponse(
-					request,
-					reply,
-					403,
-					"Forbidden",
-					`You do not own this workspace. Workspace owner identity is "${podSub || "none"}", but your authenticated identity is "${userSub}".`,
-					basePrefix,
-				);
+			if (config.auth.enabled) {
+				let allowed = false;
+				const visibility = matchedApi?.visibility ?? "private";
+
+				if (visibility === "internal") {
+					allowed = true;
+				} else if (visibility === "admin") {
+					const _isOwner = userSub === podSub;
+					let _hasAdminScope = false;
+					try {
+						const adminScope = config.auth.requiredAdminScope;
+						_hasAdminScope =
+							!adminScope ||
+							hasRequiredScope(
+								(request as any).jwtPayload,
+								adminScope,
+								config.auth.scopeJsonPath,
+							);
+					} catch (_) {}
+					let _hasAdminRole = false;
+					try {
+						const adminRole = config.auth.adminRole;
+						_hasAdminRole =
+							!adminRole ||
+							hasRequiredRole(
+								(request as any).jwtPayload,
+								adminRole,
+								config.auth.rolesJsonPath,
+							);
+					} catch (_) {}
+					allowed = _isOwner || (_hasAdminScope && _hasAdminRole);
+				} else if (visibility.startsWith("scope:")) {
+					const requiredScope = visibility.substring(6).trim();
+					allowed = hasRequiredScope(
+						(request as any).jwtPayload,
+						requiredScope,
+						config.auth.scopeJsonPath,
+						true,
+					);
+				} else if (visibility.startsWith("role:")) {
+					const requiredRole = visibility.substring(5).trim();
+					allowed = hasRequiredRole(
+						(request as any).jwtPayload,
+						requiredRole,
+						config.auth.rolesJsonPath,
+					);
+				} else if (visibility === "private") {
+					allowed = userSub === podSub;
+				} else {
+					const isOwner = userSub === podSub;
+					const subjects = visibility.split(",").map((s: string) => s.trim());
+					allowed = isOwner || subjects.includes(userSub);
+				}
+
+				if (!allowed) {
+					return sendErrorResponse(
+						request,
+						reply,
+						403,
+						"Forbidden",
+						`Access Denied: Visibility mode is "${visibility}". Owner: "${podSub || "none"}", Caller: "${userSub}".`,
+						basePrefix,
+					);
+				}
 			}
 		}
 
@@ -600,80 +712,27 @@ export function registerAuthHooks(
 				);
 			}
 
-			const targetPortAnnotation =
-				pod.metadata?.annotations?.["nogoo9/workspace-port"];
-			let port =
-				targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000";
-
-			// Dynamic API routing and path prefix stripping rewrite
-			const apis = parseWorkspaceApis(pod.metadata?.annotations);
-			const routePathIndex = request.url.indexOf(`/route/${workspaceId}`);
-			if (routePathIndex !== -1) {
-				const routePrefix = request.url.substring(
-					0,
-					routePathIndex + `/route/${workspaceId}`.length,
+			if (rewrittenUrl && request.raw) {
+				request.raw.url = rewrittenUrl;
+				logger.debug(
+					"Matched API {apiName} (port {apiPort}) for workspace {workspaceId}. Rewrote request URL to {newUrl}",
+					{
+						apiName: matchedApi.name,
+						apiPort: port,
+						workspaceId,
+						newUrl: rewrittenUrl,
+					},
 				);
-				const subpath = request.url.substring(routePrefix.length) || "/";
-				const qIndex = subpath.indexOf("?");
-				const pathOnly = qIndex !== -1 ? subpath.substring(0, qIndex) : subpath;
-				const queryOnly = qIndex !== -1 ? subpath.substring(qIndex) : "";
-
-				// Sort by path length descending (most specific match wins)
-				const sortedApis = [...apis].sort(
-					(a, b) => b.path.length - a.path.length,
+			} else if (matchedApi) {
+				logger.debug(
+					"Matched API {apiName} (port {apiPort}) for workspace {workspaceId}. Port matches workspace port; preserving path prefix: {url}",
+					{
+						apiName: matchedApi.name,
+						apiPort: port,
+						workspaceId,
+						url: request.url,
+					},
 				);
-				for (const api of sortedApis) {
-					const apiPathNoTrailingSlash = api.path.replace(/\/$/, "");
-					if (apiPathNoTrailingSlash !== "") {
-						const pathMatches =
-							pathOnly === apiPathNoTrailingSlash ||
-							pathOnly.startsWith(`${apiPathNoTrailingSlash}/`);
-
-						// Check method matches
-						const allowedMethods = api.method
-							? api.method.split(",").map((m) => m.trim().toUpperCase())
-							: [];
-						const methodMatches =
-							allowedMethods.length === 0 ||
-							allowedMethods.includes("*") ||
-							allowedMethods.includes(request.method);
-
-						if (pathMatches && methodMatches) {
-							port = api.port;
-							// Only rewrite URL to strip the API path prefix if the API target port
-							// is different from the main workspace port. If it is the same port,
-							// we assume it is a sub-route on the same application web server.
-							const workspacePort = String(
-								targetPortAnnotation ||
-									config.k8s.defaultWorkspacePort ||
-									"3000",
-							);
-							if (String(port) !== workspacePort) {
-								const cleanRest =
-									pathOnly.substring(apiPathNoTrailingSlash.length) || "/";
-								const newUrl = routePrefix + cleanRest + queryOnly;
-								if (request.raw) {
-									request.raw.url = newUrl;
-								}
-								logger.debug(
-									"Matched API {apiName} (port {apiPort}) for workspace {workspaceId}. Rewrote request URL to {newUrl}",
-									{ apiName: api.name, apiPort: port, workspaceId, newUrl },
-								);
-							} else {
-								logger.debug(
-									"Matched API {apiName} (port {apiPort}) for workspace {workspaceId}. Port matches workspace port; preserving path prefix: {url}",
-									{
-										apiName: api.name,
-										apiPort: port,
-										workspaceId,
-										url: request.url,
-									},
-								);
-							}
-							break;
-						}
-					}
-				}
 			}
 
 			// Check if pod uses SUBFOLDER prefix (e.g. for KasmVNC / Obsidian GUI workspaces).

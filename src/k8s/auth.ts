@@ -486,6 +486,7 @@ export function hasRequiredScope(
 	jwtPayload: unknown,
 	requiredScope?: string,
 	jsonPathExpr = "$.scope",
+	strict = false,
 ): boolean {
 	if (!requiredScope) {
 		return true;
@@ -524,23 +525,31 @@ export function hasRequiredScope(
 			(Array.isArray(scopesVal) && scopesVal.length === 0) ||
 			(typeof scopesVal === "string" && scopesVal.trim() === "")
 		) {
+			return !strict;
+		}
+
+		const userScopes: string[] = Array.isArray(scopesVal)
+			? scopesVal.map((s) => String(s))
+			: typeof scopesVal === "string"
+				? scopesVal.split(/\s+/)
+				: [];
+
+		if (userScopes.includes(requiredScope)) {
 			return true;
 		}
 
 		const adminScope = config.auth.requiredAdminScope;
-		if (Array.isArray(scopesVal)) {
-			return (
-				scopesVal.some((s) => String(s) === requiredScope) ||
-				(adminScope ? scopesVal.some((s) => String(s) === adminScope) : false)
-			);
+		if (adminScope && userScopes.includes(adminScope)) {
+			return true;
 		}
-		if (typeof scopesVal === "string") {
-			const parts = scopesVal.split(/\s+/);
-			return (
-				parts.includes(requiredScope) ||
-				(adminScope ? parts.includes(adminScope) : false)
-			);
+
+		if (
+			requiredScope === "nogoo9:read" &&
+			userScopes.includes("nogoo9:write")
+		) {
+			return true;
 		}
+
 		return false;
 	} catch (err) {
 		logger.warn("Failed to extract scope using JSONPath: {error}", {
@@ -669,7 +678,13 @@ export function verifyRoleOrThrow(
  */
 export function verifyAccessOrThrow(
 	jwtPayload: unknown,
-	action: "read" | "write" | "admin",
+	action:
+		| "read"
+		| "write"
+		| "workspace:write"
+		| "template:create"
+		| "template:write"
+		| "admin",
 ): void {
 	// 1. Verify Scope
 	const requiredScope =
@@ -687,17 +702,46 @@ export function verifyAccessOrThrow(
 	}
 
 	// 2. Verify Role
-	const requiredRole =
-		action === "admin"
-			? config.auth.adminRole
-			: action === "read"
-				? config.auth.requiredReadRole
-				: config.auth.requiredWriteRole;
+	const adminRole = config.auth.adminRole;
+	const writeRole = config.auth.requiredWriteRole;
+	const readRole = config.auth.requiredReadRole;
 	const rolesJsonPath = config.auth.rolesJsonPath;
-	if (
-		requiredRole &&
-		!hasRequiredRole(jwtPayload, requiredRole, rolesJsonPath)
-	) {
-		throw new Error(`Forbidden: Missing required role: ${requiredRole}`);
+
+	let allowedRoles: (string | undefined)[] = [];
+	if (action === "admin") {
+		allowedRoles = [adminRole];
+	} else if (action === "template:create" || action === "template:write") {
+		allowedRoles = [adminRole, writeRole];
+	} else {
+		allowedRoles = [adminRole, writeRole, readRole];
+	}
+
+	const primaryRole =
+		action === "admin"
+			? adminRole
+			: action === "template:create" || action === "template:write"
+				? writeRole
+				: readRole;
+
+	let hasRole = false;
+	if (!primaryRole) {
+		hasRole = true;
+	} else {
+		for (const role of allowedRoles) {
+			if (role && hasRequiredRole(jwtPayload, role, rolesJsonPath)) {
+				hasRole = true;
+				break;
+			}
+		}
+	}
+
+	if (!hasRole) {
+		const displayRole =
+			action === "admin"
+				? adminRole
+				: action === "template:create" || action === "template:write"
+					? writeRole
+					: readRole;
+		throw new Error(`Forbidden: Missing required role: ${displayRole}`);
 	}
 }

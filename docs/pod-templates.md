@@ -76,6 +76,7 @@ You can define spawner-specific annotations on the template `ConfigMap` to injec
 | `nogoo9/preview-path` | Annotation (String) | The default folder or file subpath to render in the UI files preview tab. |
 | `nogoo9/preview-type` | Annotation (String) | Fallback preview rendering mode for the preview tab (e.g. `markdown`, `html`). |
 | `nogoo9/api.<api-name>.port` | Annotation (Number) | Defines an additional HTTP service port exposed by the workspace. |
+| `nogoo9/api.<api-name>.visibility` | Annotation (String) | Specifies access visibility for the custom API endpoint. Supported values: 'private' (accessible only by the workspace owner), 'internal' (accessible by any logged-in user), 'admin' (accessible by the owner or users with the admin scope), or a comma-separated list of allowed user subjects. |
 | `nogoo9/api.<api-name>.path` | Annotation (String) | Defines the subpath routing prefix for this specific API (e.g. `/terminal`). |
 | `nogoo9/api.<api-name>.desc` | Annotation (String) | A short description of this additional API, shown in the UI interface. |
 | `nogoo9/api.<api-name>.method` | Annotation (String) | Comma-separated list of supported HTTP methods (e.g. `GET,POST`, `*`, defaults to any method). |

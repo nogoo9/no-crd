@@ -94,6 +94,36 @@ export function registerUpgradeHandler(
 			.map((m: string) => m.trim().toLowerCase());
 		const isNoAuth = modes.includes("no-auth");
 
+		// Match subpath to APIs early
+		const apis = parseWorkspaceApis(annotations);
+		let matchedApi: any = null;
+		const targetPortAnnotation = annotations[ANNOTATION_KEYS.WORKSPACE_PORT];
+		port = targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000";
+		let rewrittenPath = subpath;
+
+		const workspacePort = String(
+			targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000",
+		);
+
+		const sortedApis = [...apis].sort((a, b) => b.path.length - a.path.length);
+		for (const api of sortedApis) {
+			const apiPathNoTrailingSlash = api.path.replace(/\/$/, "");
+			if (apiPathNoTrailingSlash !== "") {
+				const pathMatches =
+					subpath === apiPathNoTrailingSlash ||
+					subpath.startsWith(`${apiPathNoTrailingSlash}/`);
+				if (pathMatches) {
+					matchedApi = api;
+					port = api.port;
+					if (String(port) !== workspacePort) {
+						rewrittenPath =
+							subpath.substring(apiPathNoTrailingSlash.length) || "/";
+					}
+					break;
+				}
+			}
+		}
+
 		// 2. Authentication Check (only if NOT no-auth)
 		let userSub = "anonymous";
 		let jwtPayload: any = null;
@@ -192,11 +222,69 @@ export function registerUpgradeHandler(
 			// 3. Status and Ownership Checks
 			const podSub = pod.metadata?.labels?.[ANNOTATION_KEYS.USER_SUB];
 
-			if (config.auth.enabled && !isNoAuth && podSub !== userSub) {
-				logger.warn("WebSocket upgrade failed: Forbidden owner mismatch");
-				socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
-				socket.destroy();
-				return;
+			if (config.auth.enabled && !isNoAuth) {
+				let allowed = false;
+				const visibility = matchedApi?.visibility ?? "private";
+
+				if (visibility === "internal") {
+					allowed = true;
+				} else if (visibility === "admin") {
+					const _isOwner = userSub === podSub;
+					let _hasAdminScope = false;
+					try {
+						const adminScope = config.auth.requiredAdminScope;
+						_hasAdminScope =
+							!adminScope ||
+							hasRequiredScope(
+								jwtPayload,
+								adminScope,
+								config.auth.scopeJsonPath,
+							);
+					} catch (_) {}
+					let _hasAdminRole = false;
+					try {
+						const adminRole = config.auth.adminRole;
+						_hasAdminRole =
+							!adminRole ||
+							hasRequiredRole(jwtPayload, adminRole, config.auth.rolesJsonPath);
+					} catch (_) {}
+					allowed = _isOwner || (_hasAdminScope && _hasAdminRole);
+				} else if (visibility.startsWith("scope:")) {
+					const requiredScope = visibility.substring(6).trim();
+					allowed = hasRequiredScope(
+						jwtPayload,
+						requiredScope,
+						config.auth.scopeJsonPath,
+						true,
+					);
+				} else if (visibility.startsWith("role:")) {
+					const requiredRole = visibility.substring(5).trim();
+					allowed = hasRequiredRole(
+						jwtPayload,
+						requiredRole,
+						config.auth.rolesJsonPath,
+					);
+				} else if (visibility === "private") {
+					allowed = userSub === podSub;
+				} else {
+					const isOwner = userSub === podSub;
+					const subjects = visibility.split(",").map((s: string) => s.trim());
+					allowed = isOwner || subjects.includes(userSub);
+				}
+
+				if (!allowed) {
+					logger.warn(
+						"WebSocket upgrade failed: Forbidden owner mismatch or visibility block",
+						{
+							visibility,
+							podSub,
+							userSub,
+						},
+					);
+					socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+					socket.destroy();
+					return;
+				}
 			}
 
 			if (pod.status?.phase !== "Running") {
@@ -220,40 +308,8 @@ export function registerUpgradeHandler(
 				return;
 			}
 			podIP = ip;
-
-			const targetPortAnnotation =
-				pod.metadata?.annotations?.[ANNOTATION_KEYS.WORKSPACE_PORT];
-			port = String(
-				targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000",
-			);
-
-			// Dynamic API routing path match for WebSockets
-			const apis = parseWorkspaceApis(pod.metadata?.annotations);
-			const sortedApis = [...apis].sort(
-				(a, b) => b.path.length - a.path.length,
-			);
-			for (const api of sortedApis) {
-				const apiPathNoTrailingSlash = api.path.replace(/\/$/, "");
-				if (apiPathNoTrailingSlash !== "") {
-					const pathMatches =
-						subpath === apiPathNoTrailingSlash ||
-						subpath.startsWith(`${apiPathNoTrailingSlash}/`);
-					if (pathMatches) {
-						port = String(api.port);
-						// Only rewrite upstreamPath to strip the API path prefix if the API target port
-						// is different from the main workspace port. If it is the same port,
-						// we assume it is a sub-route on the same application web server.
-						const workspacePort = String(
-							targetPortAnnotation || config.k8s.defaultWorkspacePort || "3000",
-						);
-						if (port !== workspacePort) {
-							upstreamPath =
-								subpath.substring(apiPathNoTrailingSlash.length) || "/";
-						}
-						break;
-					}
-				}
-			}
+			port = String(port);
+			upstreamPath = rewrittenPath;
 
 			// Check if pod uses SUBFOLDER prefix (e.g. for KasmVNC / Obsidian GUI workspaces).
 			const envs = pod.spec?.containers?.[0]?.env || [];

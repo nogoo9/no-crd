@@ -28,6 +28,8 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-017](./ADR-017-unauthenticated-workspace-redirection-recovery.md) | Unauthenticated Workspace Redirection Recovery | Accepted |
 | [ADR-018](./ADR-018-workspace-ownership-and-version-metadata.md) | Workspace Owner Association and Server Metadata Reporting | Accepted |
 | [ADR-019](./ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md) | Split-Network OIDC Issuer Alignment and Path-Scoped Cookie Routing | Accepted |
+| [ADR-020](./ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md) | Fine-Grained Role Permissions, Template Creator Tracking, and Workspace API Visibility | Proposed |
+| [ADR-021](./ADR-021-workspace-api-annotations-and-visibility-controls.md) | Workspace API Annotations and Routing Proxy Visibility Controls | Proposed |
 
 ## How to Read ADRs
 
@@ -63,6 +65,9 @@ graph LR
     ADR013 --> ADR017["ADR-017: Unauthenticated Workspace Redirection Recovery"]
     ADR015 --> ADR018["ADR-018: Workspace Ownership & Version Metadata"]
     ADR017 --> ADR019["ADR-019: Split-Network OIDC Issuer & Cookie Pathing"]
+    ADR018 --> ADR020["ADR-020: Fine-Grained Permissions & API Visibility"]
+    ADR014 --> ADR020
+    ADR020 --> ADR021["ADR-021: API Annotations & Visibility"]
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -82,6 +87,8 @@ graph LR
     style ADR017 fill:#4a9eff,color:#fff
     style ADR018 fill:#f59e0b,color:#fff
     style ADR019 fill:#4a9eff,color:#fff
+    style ADR020 fill:#f59e0b,color:#fff
+    style ADR021 fill:#f59e0b,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain

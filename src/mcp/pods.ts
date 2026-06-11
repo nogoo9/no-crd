@@ -402,7 +402,7 @@ export function registerPodTools(
 						);
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "workspace:write");
 						sub = extractUserIdentity(
 							activeJwtPayload,
 							config.auth.subJsonPath,
@@ -502,7 +502,7 @@ export function registerPodTools(
 						);
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "workspace:write");
 						sub = extractUserIdentity(
 							activeJwtPayload,
 							config.auth.subJsonPath,
@@ -615,7 +615,7 @@ export function registerPodTools(
 						);
 					}
 					try {
-						verifyAccessOrThrow(activeJwtPayload, "write");
+						verifyAccessOrThrow(activeJwtPayload, "workspace:write");
 						sub = extractUserIdentity(
 							activeJwtPayload,
 							config.auth.subJsonPath,
