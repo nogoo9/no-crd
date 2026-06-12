@@ -1,7 +1,7 @@
 # ADR-020: Fine-Grained Role Permissions, Template Creator Tracking, and Workspace API Visibility
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-06-11
@@ -123,3 +123,9 @@ The final decision is derived from both the **Scope** (client authorization) and
 - **Template Multi-Tenancy**: Template naming conflicts and accidental deletions by standard users are resolved.
 - **Safe Local Defaults**: Local templates are guaranteed to remain unchanged.
 - **Granular API Sharing**: Owners can selectively share APIs with custom user list permissions.
+
+## Amendments
+
+| Date | Change |
+|------|--------|
+| 2026-06-13 | Promoted from `Proposed` to `Accepted`. All decisions verified as implemented: granular action taxonomy (`workspace:write`, `template:create`, `template:write`) in `verifyAccessOrThrow`, scope hierarchy (`nogoo9:admin` → `nogoo9:write` → `nogoo9:read`), template creator tracking via `nogoo9/user-sub` label/annotation on ConfigMaps, local template immutability checks in `update_template`/`delete_template`, and reader workspace self-service. |

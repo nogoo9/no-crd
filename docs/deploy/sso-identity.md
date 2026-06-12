@@ -171,15 +171,173 @@ To keep sessions resilient and survive short access token lifetimes:
 
 ## 🖥️ Workspace Application Authentication Integration
 
-Workspace applications (such as custom React single-page apps or web IDE tools running inside the pods) can choose from **four authorization modes** defined in their templates:
+Workspace applications (such as custom React single-page apps or web IDE tools running inside the pods) can choose from **four authorization modes** defined in their template annotations. These modes control how the gateway delivers identity information to your container.
 
-### 1. Supported Auth Modes (`nogoo9/workspace-auth-mode`)
-* **`inject-headers` (Default)**: The gateway validates the cookies, and then forwards the request to the pod, injecting headers representing the authenticated identity:
-  - `x-user-sub`: The owner's OIDC subject ID.
-  - `Authorization: Bearer <token>`: The active JWT access token.
-* **`token-api`**: The gateway exposes endpoints `/route/<id>/_auth/token` and `/route/<id>/_auth/authorize` to the workspace container. SPA web apps running inside the container can query these local endpoints to fetch the active user's credentials and handle OIDC flows.
-* **`no-auth`**: Bypasses all auth/owner checks for public workspaces, forwarding raw traffic directly to the container.
-* **`same-origin`**: Routes workspaces to local token-api for same-origin authentication.
+### Auth Mode Annotation
+
+Set the annotation on your template ConfigMap:
+
+```yaml
+annotations:
+  nogoo9/workspace-auth-mode: "inject-headers,token-api"  # Comma-separated list
+```
+
+### 1. `inject-headers` (Default when `AUTH_ENABLED=true`)
+
+The gateway validates the user's cookies/token, then **rewrites request headers** before forwarding to your container. Your application reads identity from standard HTTP headers — no OIDC integration needed in your app.
+
+**Injected Headers:**
+
+| Header | Value | Always Present |
+|---|---|---|
+| `x-user-sub` | User's OIDC `sub` claim (e.g. `alice@company.com`) | Yes (if JWT has `sub`) |
+| `x-user-roles` | Comma-separated roles (e.g. `user,admin`) | If roles claim exists |
+| `authorization` | `Bearer <JWT access token>` | If raw token is available |
+| `x-workspace-jwt` | Raw JWT access token (same as Bearer) | If `INJECT_WORKSPACE_JWT=true` |
+
+**Example: Node.js/Express reading injected headers**
+
+```javascript
+app.get('/api/whoami', (req, res) => {
+  const userSub = req.headers['x-user-sub'] || 'anonymous';
+  const roles = (req.headers['x-user-roles'] || '').split(',');
+  const isAdmin = roles.includes('admin');
+
+  res.json({ user: userSub, roles, isAdmin });
+});
+```
+
+No client-side JavaScript is needed — the browser sends cookies automatically, and the gateway handles authentication before the request reaches your container.
+
+### 2. `token-api` — Client-Side Token Retrieval
+
+Exposes local endpoints that your workspace SPA can query to obtain the authenticated user's credentials. Use this when your frontend needs to make authenticated API calls to external services.
+
+#### `GET /route/<workspace-id>/_auth/token`
+
+Returns the current session and (if available) raw JWT token:
+
+```javascript
+// In your workspace SPA (running inside the container)
+const resp = await fetch('/_auth/token', { credentials: 'include' });
+const data = await resp.json();
+
+// Response format:
+// {
+//   "token": "eyJhbGciOiJSUzI1NiIs...",  // Raw JWT (or null if only session cookie)
+//   "session": {
+//     "sub": "alice@company.com",
+//     "roles": ["user", "admin"],
+//     "iat": 1718234567,
+//     "exp": 1718236367
+//   }
+// }
+
+// Use the token for external API calls
+const apiResp = await fetch('https://api.company.com/data', {
+  headers: { 'Authorization': `Bearer ${data.token}` }
+});
+```
+
+> [!NOTE]
+> The `/_auth/token` path is relative to your workspace route. From inside the container (where the browser is rendering your SPA), you request `/_auth/token` and the gateway intercepts it before it reaches your container.
+
+#### `GET /route/<workspace-id>/_auth/authorize`
+
+Redirect-based OIDC flow for workspace SPAs. Redirects the browser to the workspace route with the token appended:
+
+```javascript
+// Redirect the user to get a fresh token
+const callbackUrl = encodeURIComponent(window.location.href);
+window.location.href = `/_auth/authorize?redirect_uri=${callbackUrl}&response_mode=fragment`;
+
+// After redirect, your SPA reads the token from the URL fragment:
+// https://gateway/route/ws-1/app#token=eyJhbGci...
+const hash = new URLSearchParams(window.location.hash.substring(1));
+const token = hash.get('token');
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `redirect_uri` | **Yes** | Same-origin URL to redirect back to (open-redirect protection enforced) |
+| `response_mode` | No | `fragment` (default) appends `#token=...`, `query` appends `?token=...` |
+
+#### `POST /route/<workspace-id>/_auth/refresh`
+
+Silently refreshes an expired access token using the encrypted refresh cookie (`nocr_refresh`). This enables long-running workspace sessions without user interaction:
+
+```javascript
+// When the token expires, call refresh
+async function refreshToken() {
+  const resp = await fetch('/_auth/refresh', {
+    method: 'POST',
+    credentials: 'include'  // Sends the nocr_refresh HttpOnly cookie
+  });
+
+  if (resp.ok) {
+    const { token } = await resp.json();
+    // The gateway also updates nocr_sess and nocr_refresh cookies automatically
+    return token;
+  }
+
+  // If refresh fails (e.g. refresh token expired), redirect to login
+  window.location.href = '/_auth/authorize?redirect_uri=' +
+    encodeURIComponent(window.location.href);
+}
+```
+
+**How the refresh flow works:**
+1. Your SPA calls `POST /_auth/refresh` with cookies
+2. The gateway decrypts the `nocr_refresh` cookie using AES-256-GCM
+3. It exchanges the refresh token with the Identity Provider for a new access token
+4. It verifies the refreshed user still owns the workspace pod
+5. It updates all three cookies (`nocr_sess`, `nocr_refresh`, `nocr_token`) and returns the new token
+
+### 3. `no-auth` — Public Workspaces
+
+Bypasses all authentication and ownership checks. Traffic is forwarded directly to the container without any auth validation.
+
+```yaml
+annotations:
+  nogoo9/workspace-auth-mode: "no-auth"
+```
+
+**Behavior:**
+- No `x-user-sub` or `authorization` headers are injected
+- No ownership verification — any user (or anonymous request) can access the workspace
+- `_auth/token` and `_auth/authorize` endpoints return 403 (not applicable)
+
+> [!WARNING]
+> Only use `no-auth` for genuinely public workspaces (e.g. demo environments, documentation sites). Any data in the workspace container is accessible to anyone who knows the workspace URL.
+
+### 4. Combining Modes
+
+Modes are comma-separated and can be combined:
+
+```yaml
+# Enable both header injection AND token API endpoints
+nogoo9/workspace-auth-mode: "inject-headers,token-api"
+```
+
+This is the most common configuration for SPAs that need both:
+- Server-side identity via headers (for backend API calls from the container)
+- Client-side token retrieval (for the SPA frontend to call external services)
+
+### 5. Requiring Raw Tokens (`nogoo9/auth-require-token`)
+
+Some workspace applications require a raw OIDC access token (not just session cookie authentication). Set this annotation to force re-authentication:
+
+```yaml
+annotations:
+  nogoo9/workspace-auth-mode: "token-api"
+  nogoo9/auth-require-token: "true"
+```
+
+When `auth-require-token` is `true`:
+- If the user only has a session cookie but no raw JWT, they are redirected to the dashboard login page
+- This ensures the workspace always has a fresh, verifiable token available at `_auth/token`
 
 ---
 

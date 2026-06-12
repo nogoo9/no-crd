@@ -28,8 +28,8 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-017](./ADR-017-unauthenticated-workspace-redirection-recovery.md) | Unauthenticated Workspace Redirection Recovery | Accepted |
 | [ADR-018](./ADR-018-workspace-ownership-and-version-metadata.md) | Workspace Owner Association and Server Metadata Reporting | Accepted |
 | [ADR-019](./ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md) | Split-Network OIDC Issuer Alignment and Path-Scoped Cookie Routing | Accepted |
-| [ADR-020](./ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md) | Fine-Grained Role Permissions, Template Creator Tracking, and Workspace API Visibility | Proposed |
-| [ADR-021](./ADR-021-workspace-api-annotations-and-visibility-controls.md) | Workspace API Annotations and Routing Proxy Visibility Controls | Proposed |
+| [ADR-020](./ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md) | Fine-Grained Role Permissions, Template Creator Tracking, and Workspace API Visibility | Accepted |
+| [ADR-021](./ADR-021-workspace-api-annotations-and-visibility-controls.md) | Workspace API Annotations and Routing Proxy Visibility Controls | Accepted |
 | [ADR-022](./ADR-022-session-key-health-readiness.md) | Session Key Dependent Health Check Readiness | Accepted |
 
 ## How to Read ADRs

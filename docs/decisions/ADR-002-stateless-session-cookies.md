@@ -27,12 +27,11 @@ Issue a **stateless, HMAC-signed session cookie** (`nocr_sess`) containing a min
 - **O(1) per-request cost** — HMAC verify is constant time
 - **Horizontally scalable** — replicas just need the same signing key
 
-### Signing key resolution (5-step cascade)
-1. `PROXY_SESSION_SECRET` env var (explicit, recommended for production)
-2. `JWT_SECRET` env var (fallback)
-3. Best-effort k8s Secret (`nogoo9-session-key`)
-4. Peer discovery — query sibling pods via internal endpoint
-5. In-memory random key (fallback for first/solo pod)
+### Signing key resolution (4-step cascade)
+1. `PROXY_SESSION_SECRET` or `JWT_SECRET` env var (resolved as a single config field `config.auth.sessionSecret`; explicit, recommended for production)
+2. Best-effort k8s Secret (`nogoo9-session-key`) — attempts read, then create with 409-conflict retry for race safety
+3. Peer discovery — deterministic leader election among sibling pods via internal endpoint (see [ADR-003](./ADR-003-peer-discovery-session-key.md))
+4. In-memory random key (fallback for first/solo pod)
 
 ### Cookie lifecycle
 - **Mint**: On first proxy request with valid JWT → extract claims → HMAC-sign → set `nocr_sess` cookie
@@ -60,7 +59,13 @@ Issue a **stateless, HMAC-signed session cookie** (`nocr_sess`) containing a min
 ## Consequences
 - Proxy auth has two paths: signed session cookie (fast, preferred) → JWT validation (fallback)
 - Cookie size is small (~200 bytes) since we only include minimal claims
-- All replicas need the same signing key — resolved automatically via the 5-step cascade
+- All replicas need the same signing key — resolved automatically via the 4-step cascade
 - WebSocket upgrades use `nocr_sess` cookie instead of raw JWT
 - Existing `nocr_token` cookie is still set for backward compatibility
 - Session invalidation on deploy (all pods restart → new key) is acceptable behavior
+
+## Amendments
+
+| Date | Change |
+|------|--------|
+| 2026-06-13 | Corrected "5-step cascade" to "4-step cascade". `PROXY_SESSION_SECRET` and `JWT_SECRET` are merged into a single `config.auth.sessionSecret` field in the implementation, making them one resolution step. Added k8s Secret 409-conflict retry detail and cross-reference to ADR-003 for peer discovery. |

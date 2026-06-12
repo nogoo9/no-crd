@@ -53,12 +53,16 @@ export default withMermaid(
 					collapsed: false,
 					items: [
 						{
-							text: "Architecture & Multi-Tenancy",
+							text: "Architecture & System Design",
 							link: "/deploy/architecture",
 						},
 						{
 							text: "Cluster RBAC & Permissions",
 							link: "/deploy/rbac-permissions",
+						},
+						{
+							text: "Configuration & Env Variables",
+							link: "/deploy/configuration",
 						},
 						{ text: "SSO & OIDC Integration", link: "/deploy/sso-identity" },
 						{

@@ -82,7 +82,7 @@ The core mechanism for handling short-lived access tokens. The gateway acts as a
 
 #### A. Encrypted Refresh Cookie (`nocr_refresh`)
 On initial OIDC login, the dashboard UI sends the refresh token to the gateway via `POST /auth/set-refresh`. The gateway:
-1. Encrypts the refresh token using **AES-256-GCM** with a key derived via **HKDF-SHA256** from the session secret (same key cascade as ADR-002) with info label `"nocr_refresh"` to avoid key reuse with the HMAC-signed `nocr_sess`.
+1. Encrypts the refresh token using **AES-256-GCM** with a key derived via **HMAC-SHA256** from the session secret (same key cascade as ADR-002) with domain separation label `"nocr_refresh_encryption"` to avoid key reuse with the HMAC-signed `nocr_sess`.
 2. Stores it as an HttpOnly cookie: `nocr_refresh=<encrypted>; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`.
 
 The refresh token **never touches `localStorage`** or any JavaScript-accessible storage.
@@ -156,3 +156,9 @@ The system degrades gracefully across multiple failure modes:
 - Refresh tokens are encrypted at rest in cookies — never stored in localStorage, server memory, or databases.
 - The `offline_access` scope must be requested during OIDC authorization to receive refresh tokens.
 - Logout clears all three cookies (`nocr_token`, `nocr_sess`, `nocr_refresh`).
+
+## Amendments
+
+| Date | Change |
+|------|--------|
+| 2026-06-13 | Corrected §3A: refresh token encryption key derivation uses **HMAC-SHA256** (not HKDF-SHA256). Updated domain separation label from `"nocr_refresh"` to `"nocr_refresh_encryption"` to match the implementation in `src/k8s/session.ts`. |
