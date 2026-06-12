@@ -1,9 +1,12 @@
-# Kubernetes RBAC Permissions Mapping
-*(Updated for v0.2.0)*
+# Cluster RBAC & Permissions
 
 This page documents the mapping between the Model Context Protocol (MCP) tools exposed by `@nogoo9/no-crd` and the corresponding Kubernetes RBAC permissions they require.
 
 The server dynamically checks these permissions at startup (unless disabled via `DISABLE_PERMISSION_CHECKS=true`) and only enables tools for which the active service account has sufficient RBAC access.
+
+---
+
+## Tool-to-Permission Mapping
 
 <!-- PERMISSIONS_TABLE_START -->
 
@@ -46,6 +49,8 @@ The server dynamically checks these permissions at startup (unless disabled via 
 
 
 <!-- PERMISSIONS_TABLE_END -->
+
+---
 
 ## RBAC YAML Examples
 
@@ -158,4 +163,3 @@ roleRef:
   name: nogoo-mcp-namespaced-role
   apiGroup: rbac.authorization.k8s.io
 ```
-

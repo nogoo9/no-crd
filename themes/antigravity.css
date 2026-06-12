@@ -1,46 +1,30 @@
 /* Name: Antigravity */
 :root {
-  --bg-color: #f8fafc;
-  --text-color: #334155;
-  --text-title: #0f172a;
-  --text-muted: #64748b;
-  --panel-bg: #ffffff;
-  --panel-border: #cbd5e1;
-  --item-border: #cbd5e1;
-  --modal-bg: #ffffff;
-  --input-bg: #f1f5f9;
-  --input-border: #cbd5e1;
-  --input-text: #0f172a;
-  --badge-bg: #f1f5f9;
-  --badge-text: #64748b;
-  --accent-color: #1a73e8;
-  --accent-active: #1557b0;
-  --success-color: #10b981;
-  --error-color: #ef4444;
-  --warning-color: #f59e0b;
-  --panel-hover-bg: #f1f5f9;
-  --accent-amber: #f59e0b;
+  --paper: #f8fafc;
+  --surface: #f1f5f9;
+  --sunken: #f1f5f9;
+  --card: #ffffff;
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --ink-3: #64748b;
+  --line: #cbd5e1;
+  --line-2: #cbd5e1;
+  --accent: #1a73e8;
+  --accent-press: #1557b0;
+  --accent-soft: rgba(26, 115, 232, 0.12);
 }
 
 :root.dark {
-  --bg-color: #0b0c10;
-  --text-color: #cbd5e1;
-  --text-title: #f8fafc;
-  --text-muted: #94a3b8;
-  --panel-bg: #151720;
-  --panel-border: #1e293b;
-  --item-border: #1e293b;
-  --modal-bg: #151720;
-  --input-bg: #0b0c10;
-  --input-border: #1e293b;
-  --input-text: #f8fafc;
-  --badge-bg: #1e293b;
-  --badge-text: #94a3b8;
-  --accent-color: #1a73e8;
-  --accent-active: #1557b0;
-  --success-color: #10b981;
-  --error-color: #ef4444;
-  --warning-color: #f59e0b;
-  --panel-hover-bg: #1e293b;
-  --accent-amber: #f59e0b;
+  --paper: #0b0c10;
+  --surface: #1e293b;
+  --sunken: #1e293b;
+  --card: #151720;
+  --ink: #f8fafc;
+  --ink-2: #cbd5e1;
+  --ink-3: #94a3b8;
+  --line: #1e293b;
+  --line-2: #1e293b;
+  --accent: #1a73e8;
+  --accent-press: #1557b0;
+  --accent-soft: rgba(26, 115, 232, 0.2);
 }

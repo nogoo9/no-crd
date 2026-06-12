@@ -29,56 +29,69 @@ export default withMermaid(
 			],
 			sidebar: [
 				{
-					text: "Introduction",
+					text: "Getting Started",
 					items: [
-						{ text: "Getting Started", link: "/getting-started" },
+						{ text: "What is no-crd?", link: "/getting-started" },
 						{ text: "Setup Cheatsheet", link: "/setup-cheatsheet" },
 						{ text: "What's New", link: "/whats-new" },
 					],
 				},
 				{
-					text: "Core Features & Usage",
+					text: "Track A: AI Agent & MCP Users",
+					collapsed: false,
 					items: [
-						{ text: "Workspace Spawner", link: "/spawner-guide" },
-						{ text: "Pod Templates", link: "/pod-templates" },
-						{ text: "MCP Tools Reference", link: "/mcp-tools" },
-						{ text: "Programmatic SDK", link: "/sdk-guide" },
+						{ text: "MCP Client Setup", link: "/mcp/guide" },
+						{ text: "MCP Tools Reference", link: "/mcp/tools" },
+						{
+							text: "System Prompts & Agent Rules",
+							link: "/mcp/agent-instructions",
+						},
 					],
 				},
 				{
-					text: "Security, Auth & Identity",
+					text: "Track B: Platform & Service Deployers",
+					collapsed: false,
 					items: [
 						{
-							text: "Authentication & Authorization Overview",
-							link: "/auth-overview",
+							text: "Architecture & Multi-Tenancy",
+							link: "/deploy/architecture",
 						},
-						{ text: "Auth Setup Cheatsheet", link: "/auth-cheatsheet" },
 						{
-							text: "Workspace App Integration & Sessions",
-							link: "/workspace-app-integration",
+							text: "Cluster RBAC & Permissions",
+							link: "/deploy/rbac-permissions",
 						},
-						{ text: "SSO Provider Integration", link: "/sso-integration" },
-						{ text: "Advanced Auth: RBAC & ABAC", link: "/advanced-auth" },
-					],
-				},
-				{
-					text: "Local Development & Testing",
-					items: [
-						{ text: "k3d Local Sandbox", link: "/k3d-sandbox" },
-						{ text: "Keycloak Integration", link: "/keycloak-integration" },
-						{ text: "Dashboard UI Guide", link: "/ui-guide" },
+						{ text: "SSO & OIDC Integration", link: "/deploy/sso-identity" },
+						{
+							text: "Templates & Workspace Customization",
+							link: "/deploy/workspace-customization",
+						},
+						{
+							text: "Dashboard Themes & Branding",
+							link: "/deploy/themes-branding",
+						},
 						{ text: "CI/CD & Security Scanning", link: "/gha-security" },
 					],
 				},
 				{
-					text: "Reference Documentation",
+					text: "Track C: SDK & Code Contributors",
+					collapsed: false,
 					items: [
-						{ text: "Kubernetes RBAC Mapping", link: "/permissions" },
 						{
-							text: "Bun WebSocket Proxy Design",
-							link: "/bun-websocket-proxy",
+							text: "Programmatic TypeScript SDK",
+							link: "/developer/programmatic-sdk",
 						},
-						{ text: "API Reference (TypeDoc)", link: "/api/" },
+						{
+							text: "Local Sandbox (k3d & Keycloak)",
+							link: "/developer/local-sandbox",
+						},
+						{
+							text: "Isomorphic Cross-Runtime Design",
+							link: "/developer/cross-runtime-design",
+						},
+						{
+							text: "Contributing & TDD Workflow",
+							link: "/developer/contributing",
+						},
 					],
 				},
 				{
