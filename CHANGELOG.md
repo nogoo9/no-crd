@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-06-12
+
+### Added
+
+- **Health Check Dependent on Session Key Resolution** ([ADR-022](docs/decisions/ADR-022-session-key-health-readiness.md)): Blocked gateway healthcheck readiness endpoints (`/healthz` and `/mcp/healthz`) until the shared session signing key is successfully negotiated and available in the pod. Unresolved keys return a `503 Service Unavailable` error, preventing traffic routing by Kubernetes to uninitialized replicas.
+- **Proxy Keep-Alive Configuration**: Added a runtime config variable `PROXY_KEEP_ALIVE` (defaults to `true`) and attached a keep-alive `http.Agent` to the routing proxy when active to reduce TCP handshake overhead for downstream workspace resources.
+- **Peer Discovery Integration & Verification Script**: Created an E2E validation script (`scripts/e2e-peer-discovery.sh`) to test multi-replica leader/follower negotiation, validating that replicas simultaneously negotiate and share the exact same session key.
+
+### Changed
+
+- **Startup Sequence Documentation**: Updated user guides and getting-started tutorials with a comprehensive Mermaid sequence diagram mapping the pod's boot, leader selection, fallback file negotiation, and readiness health-check validation.
+
 ## [0.10.0] — 2026-06-12
 
 ### Added

@@ -2,8 +2,15 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+## What's New in v0.11.0
+
+- **Health Check Dependent on Session Key Resolution** ([ADR-022](/decisions/ADR-022-session-key-health-readiness.md)): Implemented dependency checks for `/healthz` and `/mcp/healthz` health check endpoints. The gateway will now fail with `503 Service Unavailable` if the session signing key is not yet resolved. This prevents traffic from being routed to uninitialized replicas during multi-replica deployments.
+- **Proxy Keep-Alive Configuration**: Added a runtime config option `PROXY_KEEP_ALIVE` (defaults to `true`) and attached a keep-alive `http.Agent` to the routing proxy when active, reducing TCP handshake overhead for downstream workspace resources.
+- **Startup Sequence Flowchart**: Documented the service startup sequence with a detailed Mermaid flowchart showing the handshake, leader election, and readiness verification flow.
+- **E2E Peer Discovery Script**: Added an automated peer discovery verification script (`scripts/e2e-peer-discovery.sh`) to test multi-replica leader/follower negotiation under concurrent boot.
 
 ## What's New in v0.10.0
+
 
 - **Fine-Grained Permissions & Scope Checks** ([ADR-020](/decisions/ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md)): Refactored the authorization engine to support granular permissions checking. Promoted standard Readers (`viewer` role) to allow starting and stopping their own sandboxes, while Writers (`user` role) can additionally create and edit templates. Bypassed scope validation for credentials that completely lack a scope claim.
 - **Template Creator Tracking & Immutability** ([ADR-020](/decisions/ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md)): Stamped all dynamic ConfigMap templates with the creator's user subject (`nogoo9/user-sub`). Standard users can only update or delete templates created by them, while local filesystem-loaded templates are made fully immutable and protected against updates or deletions.
