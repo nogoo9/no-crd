@@ -4,14 +4,14 @@ metadata:
   name: nogoo-mcp
   namespace: nogoo9
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
-      app: nogoo-mcp
+      app: nogoo9-mcp
   template:
     metadata:
       labels:
-        app: nogoo-mcp
+        app: nogoo9-mcp
     spec:
       serviceAccountName: nogoo-mcp
       containers:

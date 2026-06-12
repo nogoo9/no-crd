@@ -105,6 +105,32 @@ export const serverSchema = {
 			return val ? Number(val) : this.defaultVal;
 		},
 	} satisfies SchemaItem<number>,
+
+	proxyTimeout: {
+		cli: "--proxy-timeout",
+		env: "PROXY_TIMEOUT",
+		defaultVal: 120000,
+		allowed: "Number",
+		description:
+			"Timeout in milliseconds for the routing proxy upstream requests.",
+		get value(): number {
+			const val = getEnv(this.env);
+			return val ? Number(val) : this.defaultVal;
+		},
+	} satisfies SchemaItem<number>,
+
+	proxyKeepAlive: {
+		cli: "--proxy-keep-alive",
+		env: "PROXY_KEEP_ALIVE",
+		defaultVal: true,
+		allowed: ["true", "false"],
+		description:
+			"Enable TCP keep-alive for the routing proxy upstream requests.",
+		get value(): boolean {
+			const val = getEnv(this.env);
+			return val !== undefined ? val === "true" : this.defaultVal;
+		},
+	} satisfies SchemaItem<boolean>,
 };
 
 export const serverConfig = parseConfig(serverSchema);

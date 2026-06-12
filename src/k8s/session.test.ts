@@ -185,6 +185,196 @@ describe("resolveSessionSecret", () => {
 		const key2 = await resolveSessionSecret(null, "default");
 		expect(key1).toBe(key2);
 	});
+
+	describe("peer discovery logic", () => {
+		let mockFetch: any = null;
+		const originalFetch = globalThis.fetch;
+
+		beforeEach(() => {
+			_resetSessionKeyForTesting();
+			mockFetch = null;
+			globalThis.fetch = (async (
+				input: RequestInfo | URL,
+				init?: RequestInit,
+			) => {
+				if (mockFetch) {
+					return mockFetch(input, init);
+				}
+				return originalFetch(input, init);
+			}) as any;
+		});
+
+		afterEach(() => {
+			_resetSessionKeyForTesting();
+			delete process.env.PROXY_SESSION_SECRET;
+			delete process.env.JWT_SECRET;
+			delete process.env.HOSTNAME;
+			globalThis.fetch = originalFetch;
+		});
+
+		test("peer discovery: leader generates key immediately", async () => {
+			process.env.HOSTNAME = "pod-1";
+			const coreApiMock = {
+				listNamespacedPod: async () => ({
+					items: [
+						{
+							metadata: {
+								name: "pod-1",
+								creationTimestamp: "2026-06-12T12:00:00Z",
+							},
+							status: { phase: "Running", podIP: "10.0.0.1" },
+						},
+						{
+							metadata: {
+								name: "pod-2",
+								creationTimestamp: "2026-06-12T12:00:05Z",
+							},
+							status: { phase: "Running", podIP: "10.0.0.2" },
+						},
+					],
+				}),
+			} as any;
+
+			let fetchCalled = false;
+			mockFetch = async () => {
+				fetchCalled = true;
+				return new Response(JSON.stringify({ key: "peer-key" }));
+			};
+
+			const key = await resolveSessionSecret(coreApiMock, "default");
+			expect(key).toBeTruthy();
+			expect(key).not.toBe("peer-key");
+			expect(fetchCalled).toBe(false);
+		});
+
+		test("peer discovery: follower adopts key from leader immediately", async () => {
+			process.env.HOSTNAME = "pod-2";
+			const coreApiMock = {
+				listNamespacedPod: async () => ({
+					items: [
+						{
+							metadata: {
+								name: "pod-1",
+								creationTimestamp: "2026-06-12T12:00:00Z",
+							},
+							status: { phase: "Running", podIP: "10.0.0.1" },
+						},
+						{
+							metadata: {
+								name: "pod-2",
+								creationTimestamp: "2026-06-12T12:00:05Z",
+							},
+							status: { phase: "Running", podIP: "10.0.0.2" },
+						},
+					],
+				}),
+			} as any;
+
+			mockFetch = async (url: string) => {
+				if (url.includes("10.0.0.1")) {
+					return new Response(JSON.stringify({ key: "leader-key" }));
+				}
+				return new Response(null, { status: 404 });
+			};
+
+			const key = await resolveSessionSecret(coreApiMock, "default");
+			expect(key).toBe("leader-key");
+		});
+
+		test("peer discovery: follower retries and then adopts key when leader becomes ready", async () => {
+			process.env.HOSTNAME = "pod-2";
+			let listCount = 0;
+			const coreApiMock = {
+				listNamespacedPod: async () => {
+					listCount++;
+					if (listCount === 1) {
+						// First call: leader has no IP yet
+						return {
+							items: [
+								{
+									metadata: {
+										name: "pod-1",
+										creationTimestamp: "2026-06-12T12:00:00Z",
+									},
+									status: { phase: "Pending" },
+								},
+								{
+									metadata: {
+										name: "pod-2",
+										creationTimestamp: "2026-06-12T12:00:05Z",
+									},
+									status: { phase: "Running", podIP: "10.0.0.2" },
+								},
+							],
+						};
+					} else {
+						// Second call: leader is running and has IP
+						return {
+							items: [
+								{
+									metadata: {
+										name: "pod-1",
+										creationTimestamp: "2026-06-12T12:00:00Z",
+									},
+									status: { phase: "Running", podIP: "10.0.0.1" },
+								},
+								{
+									metadata: {
+										name: "pod-2",
+										creationTimestamp: "2026-06-12T12:00:05Z",
+									},
+									status: { phase: "Running", podIP: "10.0.0.2" },
+								},
+							],
+						};
+					}
+				},
+			} as any;
+
+			mockFetch = async (url: string) => {
+				if (url.includes("10.0.0.1")) {
+					return new Response(JSON.stringify({ key: "leader-key" }));
+				}
+				throw new Error("Connection refused");
+			};
+
+			const key = await resolveSessionSecret(coreApiMock, "default");
+			expect(key).toBe("leader-key");
+			expect(listCount).toBeGreaterThan(1);
+		});
+
+		test("peer discovery: follower falls back to random key if leader fails to respond", async () => {
+			process.env.HOSTNAME = "pod-2";
+			const coreApiMock = {
+				listNamespacedPod: async () => ({
+					items: [
+						{
+							metadata: {
+								name: "pod-1",
+								creationTimestamp: "2026-06-12T12:00:00Z",
+							},
+							status: { phase: "Running", podIP: "10.0.0.1" },
+						},
+						{
+							metadata: {
+								name: "pod-2",
+								creationTimestamp: "2026-06-12T12:00:05Z",
+							},
+							status: { phase: "Running", podIP: "10.0.0.2" },
+						},
+					],
+				}),
+			} as any;
+
+			mockFetch = async () => {
+				throw new Error("Timeout / Network error");
+			};
+
+			const key = await resolveSessionSecret(coreApiMock, "default");
+			expect(key).toBeTruthy();
+			expect(key.length).toBe(64);
+		});
+	});
 });
 
 describe("encryptRefreshToken & decryptRefreshToken", () => {

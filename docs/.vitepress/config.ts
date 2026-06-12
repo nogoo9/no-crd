@@ -141,6 +141,38 @@ export default withMermaid(
 							text: "ADR-014: Admin Hardening",
 							link: "/decisions/ADR-014-admin-access-hardening-and-role-mapping",
 						},
+						{
+							text: "ADR-015: Workspace Consolidation",
+							link: "/decisions/ADR-015-workspace-view-consolidation-and-template-upgrades",
+						},
+						{
+							text: "ADR-016: Custom JSONPaths",
+							link: "/decisions/ADR-016-session-cookie-custom-jsonpath-compatibility",
+						},
+						{
+							text: "ADR-017: Redirection Recovery",
+							link: "/decisions/ADR-017-unauthenticated-workspace-redirection-recovery",
+						},
+						{
+							text: "ADR-018: Workspace Ownership",
+							link: "/decisions/ADR-018-workspace-ownership-and-version-metadata",
+						},
+						{
+							text: "ADR-019: Split-Network OIDC Issuer",
+							link: "/decisions/ADR-019-split-network-oidc-issuer-and-cookie-path-alignment",
+						},
+						{
+							text: "ADR-020: Fine-Grained Roles",
+							link: "/decisions/ADR-020-fine-grained-roles-template-ownership-and-api-visibility",
+						},
+						{
+							text: "ADR-021: API Annotations",
+							link: "/decisions/ADR-021-workspace-api-annotations-and-visibility-controls",
+						},
+						{
+							text: "ADR-022: Session Key Dependent Health",
+							link: "/decisions/ADR-022-session-key-health-readiness",
+						},
 					],
 				},
 			],

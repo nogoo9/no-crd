@@ -72,6 +72,7 @@ export {
 	Volume,
 } from "./schemas.js";
 export {
+	_resetSessionKeyForTesting,
 	createSessionCookie,
 	decryptRefreshToken,
 	encryptRefreshToken,

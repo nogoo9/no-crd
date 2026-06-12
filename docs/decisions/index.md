@@ -30,6 +30,7 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-019](./ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md) | Split-Network OIDC Issuer Alignment and Path-Scoped Cookie Routing | Accepted |
 | [ADR-020](./ADR-020-fine-grained-roles-template-ownership-and-api-visibility.md) | Fine-Grained Role Permissions, Template Creator Tracking, and Workspace API Visibility | Proposed |
 | [ADR-021](./ADR-021-workspace-api-annotations-and-visibility-controls.md) | Workspace API Annotations and Routing Proxy Visibility Controls | Proposed |
+| [ADR-022](./ADR-022-session-key-health-readiness.md) | Session Key Dependent Health Check Readiness | Accepted |
 
 ## How to Read ADRs
 
@@ -68,6 +69,8 @@ graph LR
     ADR018 --> ADR020["ADR-020: Fine-Grained Permissions & API Visibility"]
     ADR014 --> ADR020
     ADR020 --> ADR021["ADR-021: API Annotations & Visibility"]
+    ADR003 --> ADR022["ADR-022: Session Key Dependent Health Readiness"]
+    ADR009 --> ADR022
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -89,6 +92,7 @@ graph LR
     style ADR019 fill:#4a9eff,color:#fff
     style ADR020 fill:#f59e0b,color:#fff
     style ADR021 fill:#f59e0b,color:#fff
+    style ADR022 fill:#4a9eff,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain

@@ -275,6 +275,8 @@ The server and command-line utility are configurable using CLI options or enviro
 | - | `LOG_FILE` | `nogoo9-mcp.log` | String | Output file path for file logging. |
 | - | `RATE_LIMIT_MAX` | `100` | Number | Maximum requests allowed per window for rate limited routes. |
 | - | `RATE_LIMIT_WINDOW` | `60000` | Number | Time window in milliseconds for rate limited routes. |
+| `--proxy-timeout` | `PROXY_TIMEOUT` | `120000` | Number | Timeout in milliseconds for the routing proxy upstream requests. |
+| `--proxy-keep-alive` | `PROXY_KEEP_ALIVE` | `true` | `true`, `false` | Enable TCP keep-alive for the routing proxy upstream requests. |
 
 ### 🔒 TLS Configuration
 
