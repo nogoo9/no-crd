@@ -46,6 +46,27 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 		reply: FastifyReply,
 	) => {
 		setCorsHeaders(reply);
+		try {
+			const { getSessionKey } = await import("~/k8s/index.js");
+			const key = getSessionKey();
+			if (!key) {
+				reply.status(503);
+				return reply.send({
+					status: "error",
+					message: "Session key not resolved yet",
+				});
+			}
+		} catch (err) {
+			logger.warn("Failed to verify session key for health check: {error}", {
+				error: err,
+			});
+			reply.status(503);
+			return reply.send({
+				status: "error",
+				message: "Session key resolution check failed",
+			});
+		}
+
 		return {
 			status: "ok",
 			version: APP_VERSION,

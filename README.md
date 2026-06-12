@@ -24,6 +24,19 @@ It provides JupyterHub-like dynamic pod lifecycle management but is completely a
 
 ---
 
+## 🗺️ Choose Your Path
+
+To get started with `@nogoo9/no-crd`, select the track that matches your goals:
+
+*   **Track A: AI Agent & MCP Users** $\rightarrow$ [MCP Client Setup Guide](https://nogoo9.github.io/no-crd/mcp/guide.html)
+    *   *Best for:* Connecting `no-crd` to **Cursor**, **Claude Desktop**, **Cline**, or **Roo Code** to let your agent manage pods.
+*   **Track B: Platform & Service Deployers** $\rightarrow$ [SSO & Routing Deployment Guide](https://nogoo9.github.io/no-crd/deploy/architecture.html)
+    *   *Best for:* Deploying a multi-tenant sandbox service in your Kubernetes cluster with **Keycloak OIDC**, **stateless cookies**, and **reverse proxy routing**.
+*   **Track C: SDK & Code Contributors** $\rightarrow$ [SDK & Contributor Guide](https://nogoo9.github.io/no-crd/developer/contributing.html)
+    *   *Best for:* Programmatically controlling pods via the **TypeScript SDK** or contributing to the core runtime codebase.
+
+---
+
 ## 🚀 Key Features
 
 - **No CRDs Required:** Runs directly against core Kubernetes resources (Pods, ConfigMaps, ServiceAccounts). Highly portable, secure, and compatible with restricted/managed environments (EKS, GKE, K3s).
@@ -37,45 +50,24 @@ It provides JupyterHub-like dynamic pod lifecycle management but is completely a
 
 ---
 
-## 📦 Installation & Usage
+## ⚡ Quick Start
 
-You can run `@nogoo9/no-crd` directly via `npx`, install it globally, or run it with different JavaScript runtimes.
-
-### Run Directly via NPX (No Installation)
+### Run Standalone via NPX (No Installation)
 ```bash
-# Start SSE (HTTP) server on port 3000
-npx @nogoo9/no-crd
+# Option 1: Start HTTP/SSE server on port 3000
+npx @nogoo9/no-crd --transport http --port 3000
 
-# Run over standard input/output (stdio)
-npx @nogoo9/no-crd --transport stdio
+# Option 2: Run over standard input/output (stdio) for local IDE agents
+npx @nogoo9/no-crd --transport stdio --mode cluster
 ```
 
 ### Install Globally
 ```bash
-# Install package
 npm install -g @nogoo9/no-crd
-
-# Use the nocrd9 command-line binary
 nocrd9 --transport stdio --mode cluster
 ```
 
-### Run with Bun, Deno, or Node
-The CLI dynamically supports routing execution through Deno, Bun, or Node.js runtimes:
-```bash
-# Run using Deno
-nocrd9 --runtime deno --transport http --port 3050
-
-# Run using Node
-nocrd9 --runtime node --transport stdio
-
-# Run with HTTPS / custom TLS certificates
-bun run src/server-entry.ts --tls-cert cert.pem --tls-key key.pem
-```
-
 ### Run via Docker
-
-The official container image is published to GitHub Container Registry (GHCR) as [`ghcr.io/nogoo9/no-crd`](https://github.com/nogoo9/no-crd/pkgs/container/no-crd). You can run the MCP server in a container by mounting your local Kubernetes config:
-
 ```bash
 docker run -d -p 3000:3000 \
   -v "$HOME/.kube/config:/app/.kube/config:ro" \
@@ -83,183 +75,11 @@ docker run -d -p 3000:3000 \
   ghcr.io/nogoo9/no-crd:latest
 ```
 
-### 🦕 Bun & Deno Kubernetes Certificate Compatibility
-By default, the `@kubernetes/client-node` package uses Node.js's `https.Agent` to attach client certificates and verify server CAs. Because Bun and Deno use native web-standard HTTP engines, they ignore these Node-specific agents, which typically leads to connection failures (`UnknownIssuer`) or authentication errors (`401 Unauthorized`).
-
-`@nogoo9/no-crd` solves this automatically by intercepting outbound requests with a custom isomorphic transport that:
-* **Dynamically Extracts Credentials**: Intercepts the request agent constructed by `@kubernetes/client-node` and extracts the fully-resolved cert, key, and CA certificate data.
-* **Propagates to Bun**: Feeds certificate options directly into the native Bun `fetch` `tls` configurations.
-* **Propagates to Deno**: Instantiates a temporary `Deno.HttpClient` with `caCerts` to securely perform requests (meaning you do not need the `--unsafely-ignore-certificate-errors` flag for Kubernetes connections).
-
-### 🔌 Bun WebSocket Upgrade Compatibility Warning
-
-When running the MCP server or proxy under **Bun** (versions before the fix in [oven-sh/bun#28871](https://github.com/oven-sh/bun/pull/28871) is fully integrated), there is a known issue where WebSocket connection upgrades through Fastify or `node:http` drop data or close immediately.
-
-*   **Symptoms**: WebSocket connections (e.g. term/GUI access to workspace pods) hang, fail, or return `400 Bad Request` followed by immediate termination.
-*   **Root Cause**: Bun's native HTTP parser doesn't switch the socket into raw streaming mode in userland quickly enough when the `upgrade` event handler executes asynchronously. The native C++ HTTP parser keeps expecting subsequent payloads to be HTTP requests and rejects them.
-*   **Mitigation**: Run the production container or daemon using **Node.js** (`node dist/server-entry.js` or `npx tsx src/server-entry.ts`) where the upgrade flow behaves natively.
-
----
-
-## 🛠️ MCP Integration Configs
-
-To let AI coding assistants (like Claude Desktop, Cursor, Cline, or Roo Code) orchestrate Kubernetes workspaces, add `@nogoo9/no-crd` to your MCP configuration. Choose the configuration block below that matches your deployment mode (**Cluster-Wide** vs. **Namespace-Scoped**).
-
-### 1. Claude CLI / Claude Desktop
-Add to your server configurations (usually `~/.config/Claude/config.json` or `~/Library/Application Support/Claude/config.json`):
-
-#### Cluster-Wide Mode
-```json
-{
-  "mcpServers": {
-    "no-crd": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@nogoo9/no-crd",
-        "--transport",
-        "stdio",
-        "--mode",
-        "cluster",
-        "--namespace",
-        "nogoo9"
-      ]
-    }
-  }
-}
-```
-
-#### Namespace-Scoped Mode
-```json
-{
-  "mcpServers": {
-    "no-crd": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@nogoo9/no-crd",
-        "--transport",
-        "stdio",
-        "--mode",
-        "namespaced",
-        "--namespace",
-        "nogoo9"
-      ]
-    }
-  }
-}
-```
-
-### 2. Cursor
-In Cursor Settings:
-1. Go to **Settings** > **Features** > **MCP**.
-2. Click **+ Add New MCP Server**.
-3. Fill in details based on your variant:
-   - **Name**: `no-crd`
-   - **Type**: `stdio`
-   - **Command**:
-     - *Cluster-Wide*: `npx -y @nogoo9/no-crd --transport stdio --mode cluster --namespace nogoo9`
-     - *Namespace-Scoped*: `npx -y @nogoo9/no-crd --transport stdio --mode namespaced --namespace nogoo9`
-
-### 3. Cline / Roo Code
-Add to `mcp_settings.json` (inside VS Code global storage paths):
-
-#### Cluster-Wide Mode
-```json
-{
-  "mcpServers": {
-    "no-crd": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@nogoo9/no-crd",
-        "--transport",
-        "stdio",
-        "--mode",
-        "cluster",
-        "--namespace",
-        "nogoo9"
-      ]
-    }
-  }
-}
-```
-
-#### Namespace-Scoped Mode
-```json
-{
-  "mcpServers": {
-    "no-crd": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@nogoo9/no-crd",
-        "--transport",
-        "stdio",
-        "--mode",
-        "namespaced",
-        "--namespace",
-        "nogoo9"
-      ]
-    }
-  }
-}
-```
-
-### 4. Local Development / Cross-Runtime Configurations
-If you are developing locally or running the server directly from the source repository, you can register the local server with your MCP client using one of the following configurations:
-
-#### Bun (Source execution)
-Recommended for development on Bun:
-```json
-    "nogoo9-no-crd-local-bun": {
-      "command": "bun",
-      "args": ["run", "src/index.ts"],
-      "env": {
-        "TRANSPORT": "stdio",
-        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
-      }
-    }
-```
-
-#### Deno (Source execution)
-Runs the server directly from source using Deno. The flags ensure sloppier Node compatibility imports and ignore self-signed certificate issues with local Kubernetes APIs:
-```json
-    "nogoo9-no-crd-local-deno": {
-      "command": "deno",
-      "args": [
-        "run",
-        "--allow-all",
-        "--unstable-sloppy-imports",
-        "--unsafely-ignore-certificate-errors",
-        "src/index.ts"
-      ],
-      "env": {
-        "TRANSPORT": "stdio",
-        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
-      }
-    }
-```
-
-#### Node.js (Pre-compiled execution)
-Runs the compiled bundle using Node.js:
-```json
-    "nogoo9-no-crd-local-node": {
-      "command": "node",
-      "args": ["dist/index.js"],
-      "env": {
-        "TRANSPORT": "stdio",
-        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
-      }
-    }
-```
-*(Make sure to run `bun run build` first to compile the code into the `dist/` directory).*
-
 ---
 
 ## ⚙️ Configuration & Environment Variables
 
-The server and command-line utility are configurable using CLI options or environment variables.
+The server and command-line utility are configurable using CLI options or environment variables. Below is the quick reference table of all settings:
 <!-- CONFIG_TABLES_START -->
 
 ### 🔌 Server Configuration
@@ -275,6 +95,8 @@ The server and command-line utility are configurable using CLI options or enviro
 | - | `LOG_FILE` | `nogoo9-mcp.log` | String | Output file path for file logging. |
 | - | `RATE_LIMIT_MAX` | `100` | Number | Maximum requests allowed per window for rate limited routes. |
 | - | `RATE_LIMIT_WINDOW` | `60000` | Number | Time window in milliseconds for rate limited routes. |
+| `--proxy-timeout` | `PROXY_TIMEOUT` | `120000` | Number | Timeout in milliseconds for the routing proxy upstream requests. |
+| `--proxy-keep-alive` | `PROXY_KEEP_ALIVE` | `true` | `true`, `false` | Enable TCP keep-alive for the routing proxy upstream requests. |
 
 ### 🔒 TLS Configuration
 
@@ -663,7 +485,7 @@ If `AUTH_ENABLED` is true:
 - **Multi-Port / Custom API Routing**: You can expose and route additional APIs inside the pod (e.g., a web terminal or secondary service) by defining custom annotations in the template (e.g., `nogoo9/api.terminal.port: "7681"`, `nogoo9/api.terminal.path: "/terminal"`). The proxy will dynamically handle subpath routing and method checks.
 - A **stateless signed session cookie** (`nocr_sess`) is minted on first successful JWT validation, enabling workspace traffic to survive short-lived token expiry. *(Available from v0.4.0)* See [ADR-002](docs/decisions/ADR-002-stateless-session-cookies.md) and [ADR-003](docs/decisions/ADR-003-peer-discovery-session-key.md) for design details.
 
-For a detailed breakdown of the redirection lifecycle, Keycloak configuration, and JWT claims, see the [Authentication & Authorization Overview](docs/auth-overview.md).
+For a detailed breakdown of the redirection lifecycle, Keycloak configuration, and JWT claims, see the [SSO & OIDC Integration Guide](docs/deploy/sso-identity.md).
 
 ### 3. OAuth Resource Discovery (RFC 9728)
 
@@ -683,7 +505,7 @@ When the server runs in HTTP/SSE transport mode, the visual **React Pod Manager 
   2. **Custom Local Directory** (`THEMES_DIR` environment variable, defaults to `themes/`).
   3. **Built-In Catalog** (pre-baked styles: Dracula, Nord, Stripe, Slack, Vercel, Apple, Superhuman, Notion, and Antigravity).
 
-Duplicate theme IDs are resolved according to priority: ConfigMap > Local Directory > Built-In Catalog. For detailed customization guidelines and CSS templates, see the [Dashboard UI Guide](docs/ui-guide.md).
+Duplicate theme IDs are resolved according to priority: ConfigMap > Local Directory > Built-In Catalog. For detailed customization guidelines and CSS templates, see the [Dashboard Themes & Branding Guide](docs/deploy/themes-branding.md).
 
 ---
 

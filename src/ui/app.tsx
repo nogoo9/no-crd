@@ -377,6 +377,13 @@ function applyThemeStyles(theme: string, density: string, accent: string) {
 	root.setAttribute("data-theme", theme);
 	root.setAttribute("data-density", density);
 	root.style.setProperty("--accent", accent);
+
+	const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+	if (isDark) {
+		root.classList.add("dark");
+	} else {
+		root.classList.remove("dark");
+	}
 	
 	// Derivations for territorial/press colors
 	if (accent === "#c96442") {
@@ -512,6 +519,10 @@ function Dashboard() {
 	const [density, setDensity] = useState("comfortable");
 	const [theme, setTheme] = useState("light");
 	const [accentColor, setAccentColor] = useState("#c96442");
+	const [customTheme, setCustomTheme] = useState(() => localStorage.getItem("nocr_custom_theme") || "default");
+	const [availableThemes, setAvailableThemes] = useState<Array<{ id: string; name: string }>>([
+		{ id: "default", name: "Claude" },
+	]);
 	const [showTweaks, setShowTweaks] = useState(false);
 	
 	// Modals States
@@ -552,6 +563,41 @@ function Dashboard() {
 
 		applyThemeStyles(localTheme, localDensity, localAccent);
 	}, []);
+
+	// Fetch available custom/built-in themes list
+	useEffect(() => {
+		fetch(`${basePath}/api/themes`)
+			.then((res) => res.json())
+			.then((data) => {
+				if (Array.isArray(data)) {
+					setAvailableThemes(data);
+				}
+			})
+			.catch((err) => console.error("Error fetching themes list:", err));
+	}, []);
+
+	// Inject and apply custom CSS theme stylesheet dynamically
+	useEffect(() => {
+		let styleTag = document.getElementById("nocr-theme-styles");
+		if (!styleTag) {
+			styleTag = document.createElement("style");
+			styleTag.id = "nocr-theme-styles";
+			document.head.appendChild(styleTag);
+		}
+		if (customTheme === "default") {
+			styleTag.innerHTML = "";
+		} else {
+			fetch(`${basePath}/api/themes/${customTheme}`)
+				.then((res) => {
+					if (res.ok) return res.text();
+					throw new Error("Theme load failed");
+				})
+				.then((css) => {
+					styleTag.innerHTML = css;
+				})
+				.catch((err) => console.error("Error loading theme:", err));
+		}
+	}, [customTheme]);
 
 	// Token Setup & Auto Redirect Check
 	useEffect(() => {
@@ -1680,11 +1726,17 @@ function Dashboard() {
 				theme={theme}
 				density={density}
 				accent={accentColor}
+				customTheme={customTheme}
+				availableThemes={availableThemes}
 				open={showTweaks}
 				onThemeChange={(t) => {
 					setTheme(t);
 					localStorage.setItem("nocr_theme", t);
 					applyThemeStyles(t, density, accentColor);
+				}}
+				onCustomThemeChange={(ct) => {
+					setCustomTheme(ct);
+					localStorage.setItem("nocr_custom_theme", ct);
 				}}
 				onDensityChange={(d) => {
 					setDensity(d);
@@ -3462,8 +3514,11 @@ interface TweaksWidgetPanelProps {
 	theme: string;
 	density: string;
 	accent: string;
+	customTheme: string;
+	availableThemes: Array<{ id: string; name: string }>;
 	open: boolean;
 	onThemeChange: (t: string) => void;
+	onCustomThemeChange: (ct: string) => void;
 	onDensityChange: (d: string) => void;
 	onAccentChange: (a: string) => void;
 	onClose: () => void;
@@ -3473,8 +3528,11 @@ function TweaksWidgetPanel({
 	theme,
 	density,
 	accent,
+	customTheme,
+	availableThemes,
 	open,
 	onThemeChange,
+	onCustomThemeChange,
 	onDensityChange,
 	onAccentChange,
 	onClose,
@@ -3497,21 +3555,37 @@ function TweaksWidgetPanel({
 				</button>
 			</div>
 
-			{/* Theme selection toggler */}
+			{/* Theme selection dropdown (Color Palette) */}
 			<div className="space-y-1 text-left">
-				<label className="text-[10px] font-bold text-[var(--ink-3)] uppercase tracking-wider">Color Theme</label>
+				<label className="text-[10px] font-bold text-[var(--ink-3)] uppercase tracking-wider">Color Palette</label>
+				<select
+					value={customTheme}
+					onChange={(e) => onCustomThemeChange(e.target.value)}
+					className="w-full theme-text-input text-xs px-3 py-2 cursor-pointer outline-none rounded-lg font-bold border border-[var(--line)] h-9 shadow-sm bg-[var(--surface)]"
+				>
+					{availableThemes.map((t) => (
+						<option key={t.id} value={t.id}>
+							{t.name}
+						</option>
+					))}
+				</select>
+			</div>
+
+			{/* Appearance mode toggler */}
+			<div className="space-y-1 text-left">
+				<label className="text-[10px] font-bold text-[var(--ink-3)] uppercase tracking-wider">Appearance Mode</label>
 				<div className="flex gap-2 bg-[var(--surface)] p-1 rounded-lg">
 					<button
 						onClick={() => onThemeChange("light")}
 						className={`flex-1 py-1.5 text-xs font-bold rounded-md cursor-pointer text-center transition-colors ${theme === "light" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-2)]"}`}
 					>
-						Light Warm
+						Light Mode
 					</button>
 					<button
 						onClick={() => onThemeChange("dark")}
 						className={`flex-1 py-1.5 text-xs font-bold rounded-md cursor-pointer text-center transition-colors ${theme === "dark" ? "bg-[var(--card)] text-[var(--ink)]" : "text-[var(--ink-2)]"}`}
 					>
-						Dark Slate
+						Dark Mode
 					</button>
 				</div>
 			</div>

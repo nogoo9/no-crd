@@ -213,6 +213,35 @@ export async function createFastifyApp(options?: {
 		(app.server as any).closeIdleConnections = () => {};
 	}
 
+	// Internal peer session-key sharing endpoint (ADR-003)
+	app.get("/internal/session-key", async (request, reply) => {
+		const internalHeader = request.headers["x-nogoo9-internal"];
+		const { resolveNamespace, DEFAULT_NAMESPACE, MODE } = await import(
+			"~/k8s/index.js"
+		);
+		const ns = resolveNamespace(undefined, MODE, DEFAULT_NAMESPACE);
+
+		if (!internalHeader || internalHeader !== ns) {
+			reply.status(403);
+			return reply.send({
+				error: "Forbidden",
+				message: "Unauthorized peer request",
+			});
+		}
+
+		const { getSessionKey } = await import("~/k8s/index.js");
+		const key = getSessionKey();
+		if (!key) {
+			reply.status(500);
+			return reply.send({
+				error: "Internal Server Error",
+				message: "Session key not resolved yet",
+			});
+		}
+
+		return { key };
+	});
+
 	// Resolve session secret key for cookie signing/encryption
 	try {
 		const { resolveSessionSecret } = await import("~/k8s/index.js");

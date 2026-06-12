@@ -1,72 +1,12 @@
-# Getting Started
+# Configuration & Environment Variables
 
-`nogoo9` is a platform for agent-driven, on-demand pod orchestration in Kubernetes (k8s/k3s) **without Custom Resource Definitions (CRDs)**. It allows developers and AI agents to dynamically spin up, route to, and manage ephemeral workloads.
+The `@nogoo9/no-crd` server and CLI utility are configurable using standard command-line flags or environment variables. This guide covers the boot verification process and details all configurable parameters.
 
-![no-crd Dashboard Screenshot](/dashboard_screenshot.png)
+---
 
+## 🚦 Service Startup Sequence
 
-## Architecture Topology
-
-<!-- 
-PROMPT FOR FUTURE AGENTS:
-This image is a professional software architecture diagram for 'nogoo9-no-crd'.
-Prompt used for generation:
-"A professional and modern software architecture diagram for a system called 'nogoo9-no-crd'. The diagram is laid out horizontally in a sleek dark theme with three clean columns or spaces: 1. Client Space (left): showing boxes for 'AI Agent / MCP Client' and 'Pod Manager UI Dashboard'. 2. MCP Server Gateway (middle): showing boxes for 'MCP Server Entrypoint', 'HTTP Routing Proxy', and 'Auth Engine: RBAC & ABAC'. 3. Kubernetes Cluster (right): showing 'Kubernetes API Server', 'Tenant A Workspace Pod', and 'Tenant B Workspace Pod'. Clear, glow-effect arrows connect them: Agent connects to MCP Entrypoint; UI connects to Routing Proxy; both query the Auth Engine; MCP Entrypoint sends commands to Kubernetes API; Routing Proxy forwards traffic directly to Tenant Pods; Kubernetes API Server orchestrates the Tenant Pods. Premium design with soft gradient glows, clean sans-serif typography, and subtle tech aesthetics."
-To regenerate or refine, use the generate_image tool with this prompt.
--->
-![Architecture Topology](/architecture_diagram.png)
-
-## Installation
-
-The package is published and available on npm: [@nogoo9/no-crd](https://www.npmjs.com/package/@nogoo9/no-crd).
-
-Add the package to your project or install globally:
-
-```bash
-bun install @nogoo9/no-crd
-```
-
-## Running the MCP Server
-
-You can run the server using Bun, Deno, or Node.js from the source file `src/server-entry.ts`, run via Docker, or by using the global CLI.
-
-### Using Docker
-
-The official container image is published on GitHub Container Registry (GHCR) as [`ghcr.io/nogoo9/no-crd`](https://github.com/nogoo9/no-crd/pkgs/container/no-crd). You can run the server in a container by mounting your local Kubernetes configuration:
-
-```bash
-docker run -d -p 3000:3000 \
-  -v "$HOME/.kube/config:/app/.kube/config:ro" \
-  -e KUBECONFIG=/app/.kube/config \
-  ghcr.io/nogoo9/no-crd:latest
-```
-
-### Using Bun (Recommended)
-
-```bash
-bun run src/server-entry.ts
-```
-
-> [!WARNING]
-> **WebSocket Proxy Limitation in Bun**:
-> When running the HTTP server under **Bun**, WebSocket connections (used for terminal/GUI access to workspace pods) will fail or hang due to an open regression in Bun's Node compatibility layer (`socket.write()` drops data on upgraded connections).
-> If your workspaces rely on WebSocket proxying (e.g. terminals, Obsidian, VNC), you **must** run the server using **Node.js** (e.g., `npx tsx src/server-entry.ts` or `node dist/server-entry.js`). See [oven-sh/bun#28871](https://github.com/oven-sh/bun/pull/28871) for details.
-
-### Using Node.js
-
-```bash
-npx tsx src/server-entry.ts
-```
-
-### Using Deno
-
-```bash
-deno run --allow-all src/server-entry.ts
-```
-
-## Service Startup Sequence
-
-When you boot the `nogoo9-no-crd` server (in HTTP or both transports), the service undergoes a sequential startup validation process to fail fast on configuration errors and prevent unhealthy routing:
+When you boot the `nogoo9-no-crd` server, the service executes a startup verification flow to validate configuration parameters and block bad traffic before reporting health status:
 
 ```mermaid
 graph TD
@@ -97,9 +37,7 @@ graph TD
 
 ---
 
-## Configuration
-
-The server can be configured via environment variables or CLI flags:
+## ⚙️ Configuration Variables
 
 <!-- CONFIG_TABLES_START -->
 
@@ -146,10 +84,10 @@ The server can be configured via environment variables or CLI flags:
 | `-m, --mode` | `MODE` | `cluster` | `cluster`, `namespaced` | Kubernetes access scope. `namespaced` locks operations to a single namespace. |
 | `-n, --namespace` | `NAMESPACE`, `DEFAULT_NAMESPACE` | `nogoo9` | String | Default Kubernetes namespace for operations. |
 | `--disable-permission-checks` | `DISABLE_PERMISSION_CHECKS` | `false` | `true`, `false` | Disable Kubernetes RBAC permission checks and assume all tools are enabled. |
-| `--managed-only` | `MANAGED_ONLY` | `true` | `true`, `false` | When true, pod tools only operate on pods managed by this server (`nogoo9/managed-by` label). No one bypasses this, not even admins. See [ADR-008](./decisions/ADR-008-managed-only-pod-access-control.md). |
+| `--managed-only` | `MANAGED_ONLY` | `true` | `true`, `false` | When true, pod tools only operate on pods managed by this server (`nogoo9/managed-by` label). No one bypasses this, not even admins. See [ADR-008](../decisions/ADR-008-managed-only-pod-access-control.md). |
 | `--default-workspace-port` | `DEFAULT_WORKSPACE_PORT` | - | Number | Default target port inside the workspace pods to proxy traffic to. |
 | - | `REGISTRY_URL` | - | URL string | Target container registry URL to query for images (e.g. `http://localhost:5001`). |
-| - | `TEMPLATES_DIR` | - | Path string | Path to local directory containing pod template files (YAML/JSON). See [ADR-001](./decisions/ADR-001-template-file-format.md). |
+| - | `TEMPLATES_DIR` | - | Path string | Path to local directory containing pod template files (YAML/JSON). See [ADR-001](../decisions/ADR-001-template-file-format.md). |
 | - | `BUILTIN_TEMPLATES` | `true` | `true`, `false` | Set to `false` to disable built-in templates shipped with the package. |
 
 ### 🔑 Authentication Configuration

@@ -1,46 +1,30 @@
 /* Name: Vercel */
 :root {
-  --bg-color: #ffffff;
-  --text-color: #444444;
-  --text-title: #000000;
-  --text-muted: #888888;
-  --panel-bg: #fafafa;
-  --panel-border: #eaeaea;
-  --item-border: #eaeaea;
-  --modal-bg: #ffffff;
-  --input-bg: #ffffff;
-  --input-border: #eaeaea;
-  --input-text: #000000;
-  --badge-bg: #fafafa;
-  --badge-text: #444444;
-  --accent-color: #000000;
-  --accent-active: #111111;
-  --success-color: #0070f3;
-  --error-color: #ee0000;
-  --warning-color: #f5a623;
-  --panel-hover-bg: #eaeaea;
-  --accent-amber: #f5a623;
+  --paper: #ffffff;
+  --surface: #eaeaea;
+  --sunken: #eaeaea;
+  --card: #fafafa;
+  --ink: #000000;
+  --ink-2: #444444;
+  --ink-3: #888888;
+  --line: #eaeaea;
+  --line-2: #eaeaea;
+  --accent: #000000;
+  --accent-press: #111111;
+  --accent-soft: rgba(0, 0, 0, 0.12);
 }
 
 :root.dark {
-  --bg-color: #000000;
-  --text-color: #888888;
-  --text-title: #ffffff;
-  --text-muted: #666666;
-  --panel-bg: #111111;
-  --panel-border: #333333;
-  --item-border: #333333;
-  --modal-bg: #111111;
-  --input-bg: #000000;
-  --input-border: #333333;
-  --input-text: #ffffff;
-  --badge-bg: #111111;
-  --badge-text: #888888;
-  --accent-color: #ffffff;
-  --accent-active: #eeeeee;
-  --success-color: #0070f3;
-  --error-color: #ff0000;
-  --warning-color: #f5a623;
-  --panel-hover-bg: #222222;
-  --accent-amber: #f5a623;
+  --paper: #000000;
+  --surface: #222222;
+  --sunken: #222222;
+  --card: #111111;
+  --ink: #ffffff;
+  --ink-2: #888888;
+  --ink-3: #666666;
+  --line: #333333;
+  --line-2: #333333;
+  --accent: #ffffff;
+  --accent-press: #eeeeee;
+  --accent-soft: rgba(255, 255, 255, 0.2);
 }

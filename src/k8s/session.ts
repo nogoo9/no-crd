@@ -136,47 +136,129 @@ export async function resolveSessionSecret(
 		}
 	}
 
-	// Step 4: Peer discovery
+	// Step 4: Peer discovery with deterministic leader election and retry polling
 	if (coreApi) {
 		try {
-			const podList = await coreApi.listNamespacedPod({
-				namespace,
-				labelSelector: "app=nogoo9-mcp",
-			});
 			const myPodName = process.env.HOSTNAME || "";
-			const peers = (podList.items ?? []).filter(
-				(p) =>
-					p.metadata?.name !== myPodName &&
-					p.status?.phase === "Running" &&
-					p.status?.podIP,
-			);
+			const maxAttempts =
+				Number(process.env.PEER_DISCOVERY_RETRIES) ||
+				(process.env.NODE_ENV === "test" ? 3 : 30);
+			const attemptDelayMs =
+				Number(process.env.PEER_DISCOVERY_DELAY_MS) ||
+				(process.env.NODE_ENV === "test" ? 5 : 500);
 
-			for (const peer of peers) {
-				const peerIP = peer.status?.podIP;
+			let labelSelector = "app=nogoo9-mcp";
+			if (myPodName) {
 				try {
-					const res = await fetch(
-						`http://${peerIP}:${port}/internal/session-key`,
-						{
-							headers: { "X-Nogoo9-Internal": namespace },
-							signal: AbortSignal.timeout(2000),
-						},
-					);
-					if (res.ok) {
-						const data = (await res.json()) as { key?: string };
-						if (data.key) {
-							cachedSessionKey = data.key;
-							logger.info("Session key adopted from peer pod '{peer}'", {
-								peer: peer.metadata?.name,
-							});
-							return cachedSessionKey;
-						}
+					const me = await coreApi.readNamespacedPod({
+						name: myPodName,
+						namespace,
+					});
+					const appLabel = me.metadata?.labels?.app;
+					if (appLabel) {
+						labelSelector = `app=${appLabel}`;
+						logger.info(
+							"Dynamic peer discovery: derived labelSelector '{selector}' from pod's own metadata",
+							{ selector: labelSelector },
+						);
 					}
-				} catch {
-					// Peer unreachable — try next
+				} catch (err) {
+					logger.debug(
+						"Could not resolve own pod labels for peer selector: {error}. Falling back to default app=nogoo9-mcp",
+						{ error: err },
+					);
+				}
+			}
+
+			for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+				const podList = await coreApi.listNamespacedPod({
+					namespace,
+					labelSelector,
+				});
+
+				const activePods = (podList.items ?? []).filter(
+					(p) =>
+						p.metadata?.name &&
+						!p.metadata.deletionTimestamp &&
+						p.status?.phase !== "Failed" &&
+						p.status?.phase !== "Succeeded",
+				);
+
+				activePods.sort((a, b) => {
+					const aTime = a.metadata?.creationTimestamp
+						? new Date(a.metadata.creationTimestamp).getTime()
+						: 0;
+					const bTime = b.metadata?.creationTimestamp
+						? new Date(b.metadata.creationTimestamp).getTime()
+						: 0;
+					if (aTime !== bTime) return aTime - bTime;
+					return (a.metadata?.name || "").localeCompare(b.metadata?.name || "");
+				});
+
+				const oldestPod = activePods[0];
+				const oldestPodName = oldestPod?.metadata?.name;
+
+				if (!oldestPodName || oldestPodName === myPodName) {
+					// We are the oldest active pod (leader) or the list is empty (should not happen normally)
+					logger.info(
+						"This pod '{name}' is the oldest active pod (leader). Proceeding to generate new session key.",
+						{ name: myPodName },
+					);
+					break;
+				}
+
+				// We are a follower. Find all active older pods that are Running and have a podIP.
+				const myIndex = activePods.findIndex(
+					(p) => p.metadata?.name === myPodName,
+				);
+				// If we are not in the list for some reason, consider all active pods as older
+				const olderPods = activePods
+					.slice(0, myIndex === -1 ? activePods.length : myIndex)
+					.filter((p) => p.status?.phase === "Running" && p.status?.podIP);
+
+				for (const peer of olderPods) {
+					const peerIP = peer.status?.podIP;
+					const peerName = peer.metadata?.name;
+					try {
+						const res = await fetch(
+							`http://${peerIP}:${port}/internal/session-key`,
+							{
+								headers: { "X-Nogoo9-Internal": namespace },
+								signal: AbortSignal.timeout(1000),
+							},
+						);
+						if (res.ok) {
+							const data = (await res.json()) as { key?: string };
+							if (data.key) {
+								cachedSessionKey = data.key;
+								logger.info(
+									"Session key adopted from peer pod '{peer}' (attempt {attempt})",
+									{ peer: peerName, attempt },
+								);
+								return cachedSessionKey;
+							}
+						}
+					} catch (err) {
+						logger.debug(
+							"Failed to fetch session key from peer '{peer}' (attempt {attempt}): {error}",
+							{ peer: peerName, attempt, error: err },
+						);
+					}
+				}
+
+				// If we are not the leader and could not fetch the key, wait and retry
+				if (attempt < maxAttempts) {
+					logger.info(
+						"Session key not resolved yet from older peers. Retrying in {delay}ms (attempt {attempt}/{maxAttempts})...",
+						{ delay: attemptDelayMs, attempt, maxAttempts },
+					);
+					await new Promise((resolve) => setTimeout(resolve, attemptDelayMs));
 				}
 			}
 		} catch (err) {
-			logger.debug("Peer discovery failed: {error}", { error: err });
+			logger.warn("Peer discovery failed: {error}", {
+				error: err instanceof Error ? err.message : String(err),
+			});
 		}
 	}
 

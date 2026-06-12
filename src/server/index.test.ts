@@ -3,7 +3,12 @@ import { EventEmitter } from "node:events";
 import net from "node:net";
 import { Readable } from "node:stream";
 import * as k8s from "@kubernetes/client-node";
-import { initK8sContext, type K8sContext } from "~/k8s/index.js";
+import {
+	_resetSessionKeyForTesting,
+	initK8sContext,
+	type K8sContext,
+	resolveSessionSecret,
+} from "~/k8s/index.js";
 
 mock.restore();
 
@@ -220,6 +225,45 @@ users:
 		expect(resp.status).toBe(204);
 	});
 
+	test("Internal session key sharing endpoint (/internal/session-key)", async () => {
+		// 1. Without header -> 403 Forbidden
+		const req1 = new Request("http://localhost/internal/session-key", {
+			method: "GET",
+		});
+		const resp1 = await handleWebRequest(req1);
+		expect(resp1.status).toBe(403);
+		const body1 = (await resp1.json()) as any;
+		expect(body1.error).toBe("Forbidden");
+
+		// 2. With wrong header -> 403 Forbidden
+		const req2 = new Request("http://localhost/internal/session-key", {
+			method: "GET",
+			headers: {
+				"X-Nogoo9-Internal": "wrong-namespace",
+			},
+		});
+		const resp2 = await handleWebRequest(req2);
+		expect(resp2.status).toBe(403);
+
+		// 3. With correct header -> 200 OK and returns the key
+		const { resolveNamespace, DEFAULT_NAMESPACE, MODE } = await import(
+			"~/k8s/index.js"
+		);
+		const ns = resolveNamespace(undefined, MODE, DEFAULT_NAMESPACE);
+
+		const req3 = new Request("http://localhost/internal/session-key", {
+			method: "GET",
+			headers: {
+				"X-Nogoo9-Internal": ns,
+			},
+		});
+		const resp3 = await handleWebRequest(req3);
+		expect(resp3.status).toBe(200);
+		const body3 = (await resp3.json()) as { key: string };
+		expect(body3.key).toBeString();
+		expect(body3.key.length).toBeGreaterThan(0);
+	});
+
 	test("Health checks (/healthz) return ok with version", async () => {
 		const req = new Request("http://localhost/healthz", { method: "GET" });
 		const resp = await handleWebRequest(req);
@@ -228,6 +272,53 @@ users:
 		expect(body.status).toBe("ok");
 		expect(body.version).toBeString();
 		expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
+	});
+
+	test("Health checks (/healthz and /mcp/healthz) return 503 when session key is not resolved", async () => {
+		// 1. Eagerly initialize the server first
+		const reqInit = new Request("http://localhost/healthz", { method: "GET" });
+		const respInit = await handleWebRequest(reqInit);
+		expect(respInit.status).toBe(200);
+
+		// 2. Reset the session key
+		_resetSessionKeyForTesting();
+
+		const req = new Request("http://localhost/healthz", { method: "GET" });
+		const resp = await handleWebRequest(req);
+		expect(resp.status).toBe(503);
+		const body = (await resp.json()) as any;
+		expect(body.status).toBe("error");
+		expect(body.message).toBe("Session key not resolved yet");
+
+		const reqMcp = new Request("http://localhost/mcp/healthz", {
+			method: "GET",
+		});
+		const respMcp = await handleWebRequest(reqMcp);
+		expect(respMcp.status).toBe(503);
+		const bodyMcp = (await respMcp.json()) as any;
+		expect(bodyMcp.status).toBe("error");
+		expect(bodyMcp.message).toBe("Session key not resolved yet");
+
+		// Resolve the session key again so subsequent tests don't fail
+		await resolveSessionSecret(null, "default");
+
+		const reqOk = new Request("http://localhost/healthz", { method: "GET" });
+		const respOk = await handleWebRequest(reqOk);
+		expect(respOk.status).toBe(200);
+		const bodyOk = (await respOk.json()) as any;
+		expect(bodyOk.status).toBe("ok");
+	});
+
+	test("Configuration - proxyKeepAlive defaults to true and respects PROXY_KEEP_ALIVE", async () => {
+		const { config } = await import("~/config/index.js");
+		expect(config.server.proxyKeepAlive).toBe(true);
+
+		process.env.PROXY_KEEP_ALIVE = "false";
+		try {
+			expect(config.server.proxyKeepAlive).toBe(false);
+		} finally {
+			delete process.env.PROXY_KEEP_ALIVE;
+		}
 	});
 
 	test("Serves UI HTML at root and /ui paths", async () => {

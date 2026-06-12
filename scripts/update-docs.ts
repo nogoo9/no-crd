@@ -126,7 +126,14 @@ function replaceInFile(
 	let contentToWrite = content;
 	// Resolve relative links inside docs subdirectories to prevent dead links in VitePress
 	if (filePath.includes("/docs/") || filePath.startsWith("docs/")) {
-		contentToWrite = content.replaceAll("](docs/decisions/", "](./decisions/");
+		const relativePathToDocsRoot = path.relative(
+			path.dirname(filePath),
+			path.join(process.cwd(), "docs"),
+		);
+		const prefix = relativePathToDocsRoot
+			? `${relativePathToDocsRoot}/decisions/`
+			: "./decisions/";
+		contentToWrite = content.replaceAll("](docs/decisions/", `](${prefix}`);
 	}
 
 	if (regex.test(fileContent)) {
@@ -161,8 +168,11 @@ replaceInFile(
 	annotationsMarkdown,
 );
 
-// 2. Update docs/permissions.md with permissions
-const permissionsDocPath = path.join(process.cwd(), "docs/permissions.md");
+// 2. Update docs/deploy/rbac-permissions.md with permissions
+const permissionsDocPath = path.join(
+	process.cwd(),
+	"docs/deploy/rbac-permissions.md",
+);
 replaceInFile(
 	permissionsDocPath,
 	"<!-- PERMISSIONS_TABLE_START -->",
@@ -170,31 +180,25 @@ replaceInFile(
 	permissionsMarkdown,
 );
 
-// 3. Update docs/getting-started.md with configuration
-const gettingStartedDocPath = path.join(
+// 3. Update docs/deploy/configuration.md with configuration
+const configurationDocPath = path.join(
 	process.cwd(),
-	"docs/getting-started.md",
+	"docs/deploy/configuration.md",
 );
 replaceInFile(
-	gettingStartedDocPath,
+	configurationDocPath,
 	"<!-- CONFIG_TABLES_START -->",
 	"<!-- CONFIG_TABLES_END -->",
 	configMarkdown,
 );
 
-// 4. Update docs/pod-templates.md with annotations
-const podTemplatesDocPath = path.join(process.cwd(), "docs/pod-templates.md");
-replaceInFile(
-	podTemplatesDocPath,
-	"<!-- TEMPLATE_ANNOTATIONS_TABLE_START -->",
-	"<!-- TEMPLATE_ANNOTATIONS_TABLE_END -->",
-	annotationsMarkdown,
+// 4. Update docs/deploy/workspace-customization.md with annotations
+const workspaceCustomizationDocPath = path.join(
+	process.cwd(),
+	"docs/deploy/workspace-customization.md",
 );
-
-// 5. Update docs/spawner-guide.md with annotations
-const spawnerGuideDocPath = path.join(process.cwd(), "docs/spawner-guide.md");
 replaceInFile(
-	spawnerGuideDocPath,
+	workspaceCustomizationDocPath,
 	"<!-- TEMPLATE_ANNOTATIONS_TABLE_START -->",
 	"<!-- TEMPLATE_ANNOTATIONS_TABLE_END -->",
 	annotationsMarkdown,

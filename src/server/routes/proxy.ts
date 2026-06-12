@@ -1,3 +1,4 @@
+import http from "node:http";
 import fastifyHttpProxy from "@fastify/http-proxy";
 import { getLogger } from "@logtape/logtape";
 import type { FastifyInstance } from "fastify";
@@ -386,6 +387,12 @@ export async function registerProxyRoutes(
 		},
 	);
 
+	const keepAliveAgent = new http.Agent({
+		keepAlive: true,
+		maxSockets: 100,
+		keepAliveMsecs: 1000,
+	});
+
 	// 3. HTTP Proxy with request header rewriting
 	await api.register(
 		fastifyHttpProxy as any,
@@ -394,6 +401,12 @@ export async function registerProxyRoutes(
 			prefix: "/route/:workspaceId",
 			websocket: false,
 			undici: false,
+			http: {
+				agent: config.server.proxyKeepAlive ? keepAliveAgent : undefined,
+				requestOptions: {
+					timeout: config.server.proxyTimeout,
+				},
+			},
 			replyOptions: {
 				getUpstream: (request: any) => {
 					return (request as any).tmpUpstream || "http://localhost:3000";

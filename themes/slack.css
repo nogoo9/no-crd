@@ -1,46 +1,30 @@
 /* Name: Slack */
 :root {
-  --bg-color: #f8f8f8;
-  --text-color: #1d1c1d;
-  --text-title: #4a154b;
-  --text-muted: #616061;
-  --panel-bg: #ffffff;
-  --panel-border: #dddddd;
-  --item-border: #dddddd;
-  --modal-bg: #ffffff;
-  --input-bg: #f8f8f8;
-  --input-border: #dddddd;
-  --input-text: #1d1c1d;
-  --badge-bg: #f3f3f3;
-  --badge-text: #1d1c1d;
-  --accent-color: #4a154b;
-  --accent-active: #3f0e40;
-  --success-color: #2eb67d;
-  --error-color: #e01e5a;
-  --warning-color: #ecb22e;
-  --panel-hover-bg: #f3f3f3;
-  --accent-amber: #ecb22e;
+  --paper: #f8f8f8;
+  --surface: #f3f3f3;
+  --sunken: #f3f3f3;
+  --card: #ffffff;
+  --ink: #4a154b;
+  --ink-2: #1d1c1d;
+  --ink-3: #616061;
+  --line: #dddddd;
+  --line-2: #dddddd;
+  --accent: #4a154b;
+  --accent-press: #3f0e40;
+  --accent-soft: rgba(74, 21, 75, 0.12);
 }
 
 :root.dark {
-  --bg-color: #1a1d21;
-  --text-color: #d1d2d3;
-  --text-title: #f8f8f8;
-  --text-muted: #ababad;
-  --panel-bg: #222529;
-  --panel-border: #35373b;
-  --item-border: #35373b;
-  --modal-bg: #222529;
-  --input-bg: #1a1d21;
-  --input-border: #35373b;
-  --input-text: #d1d2d3;
-  --badge-bg: #35373b;
-  --badge-text: #d1d2d3;
-  --accent-color: #3f0e40;
-  --accent-active: #4a154b;
-  --success-color: #2eb67d;
-  --error-color: #e01e5a;
-  --warning-color: #ecb22e;
-  --panel-hover-bg: #35373b;
-  --accent-amber: #ecb22e;
+  --paper: #1a1d21;
+  --surface: #35373b;
+  --sunken: #35373b;
+  --card: #222529;
+  --ink: #f8f8f8;
+  --ink-2: #d1d2d3;
+  --ink-3: #ababad;
+  --line: #35373b;
+  --line-2: #35373b;
+  --accent: #3f0e40;
+  --accent-press: #4a154b;
+  --accent-soft: rgba(63, 14, 64, 0.2);
 }
