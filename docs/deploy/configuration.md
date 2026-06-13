@@ -114,6 +114,8 @@ graph TD
 | `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | `viewer` | String | User role required for read operations. If not set, read role check is bypassed. |
 | `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | `user` | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
 | - | `PROXY_SESSION_TTL` | `1800` | Number | Session cookie expiration lifetime in seconds (sliding window duration). |
+| - | `PROXY_REFRESH_COOKIE_TTL` | `604800` | Number | Default Max-Age for the encrypted refresh token cookie (nocr_refresh). Overridden by the IdP's refresh_expires_in when available. |
+| - | `PROXY_TOKEN_COOKIE_TTL` | `86400` | Number | Default Max-Age for the access token cookie (nocr_token). Overridden by the JWT exp claim when available. |
 | - | `PROXY_SESSION_SECRET` | `""` | String | HMAC secret key used to sign stateless session cookies. Falls back to `JWT_SECRET` if not configured. |
 | - | `OAUTH_SCOPES` | `openid profile email offline_access` | Space-separated scope string | OAuth scopes to request during authorization. Include 'offline_access' for refresh tokens. |
 | - | `OAUTH_AUTHORIZATION_URL` | - | URL string | Direct OAuth authorization URL. |

@@ -190,6 +190,10 @@ export default withMermaid(
 							text: "ADR-022: Session Key Dependent Health",
 							link: "/decisions/ADR-022-session-key-health-readiness",
 						},
+						{
+							text: "ADR-023: Refresh Token Lifecycle & Rotation Safety",
+							link: "/decisions/ADR-023-refresh-token-lifecycle-and-rotation-safety",
+						},
 					],
 				},
 			],

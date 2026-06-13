@@ -68,8 +68,9 @@ Because standard web elements (like `<a>` links or `<iframe>` tags) cannot send 
 1. **Redirect Bootstrap**: When a user launches a workspace, the dashboard redirects them to `/route/<workspace-id>/?token=<JWT_TOKEN>`.
 2. **Cookie Issuance (`nocr_token`)**: The proxy intercepts this request, validates the token, and writes an HttpOnly, path-scoped cookie:
    ```http
-   Set-Cookie: nocr_token=<JWT_TOKEN>; Path=/route/<workspace-id>/; SameSite=Lax; HttpOnly; Max-Age=86400
+   Set-Cookie: nocr_token=<JWT_TOKEN>; Path=/route/<workspace-id>/; SameSite=Lax; HttpOnly; Max-Age=<ttl>
    ```
+   The `Max-Age` is derived from the JWT `exp` claim (remaining seconds), falling back to the `PROXY_TOKEN_COOKIE_TTL` config (default 86400s).
 3. **Path-Scoped Exclusivity**: Because the cookie's path is strictly limited to `/route/<workspace-id>/`, other workspaces cannot see or retrieve this token, preventing cross-workspace token leaks.
 4. **Header Injections**: For all requests flowing through to the upstream pod, the proxy extracts user details from the active credentials and injects these headers into the request:
    - `x-user-sub`: The OIDC subject of the owner.
@@ -109,12 +110,68 @@ sequenceDiagram
 ```
 
 ### Token Maintenance & Proactive Silent Refresh
-1. **In-Memory JWT**: The OIDC Access Token (`access_token`) is stored strictly in client-side Javascript memory.
-2. **Encrypted Refresh Cookie (`nocr_refresh`)**: The OIDC Refresh Token is encrypted via **AES-256-GCM** using a key derived from the gateway's session secret (preventing client-side JS access) and saved as a secure, HttpOnly cookie:
-   ```http
-   Set-Cookie: nocr_refresh=<encrypted-token>; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800
-   ```
-3. **Transparent Gateway Refresh**: If a workspace request arrives with an expired access token or without one, the gateway's auth hook in [auth.ts](file:///home/eterna2/github/nogoo9-no-crd/src/server/auth.ts#L254) detects the `nocr_refresh` cookie. It decrypts it, exchanges it with the Identity Provider (IdP) for a fresh access token, and transparently updates the cookies (`nocr_sess` and `nocr_refresh`) without interrupting the user session.
+1. **In-Memory JWT**: The OIDC Access Token (`access_token`) is stored strictly in client-side Javascript.
+2. **Encrypted Refresh Cookie (`nocr_refresh`)**: The OIDC Refresh Token is encrypted via **AES-256-GCM** using a key derived from the gateway's session secret (preventing client-side JS access) and saved as a secure, HttpOnly cookie.
+3. **Transparent Gateway Refresh**: If a workspace request arrives with an expired access token or without one, the gateway's auth hook in [auth.ts](file:///home/eterna2/github/nogoo9-no-crd/src/server/auth.ts#L244) detects the `nocr_refresh` cookie. It decrypts it, exchanges it with the Identity Provider (IdP) for a fresh access token, and transparently updates the cookies (`nocr_sess` and `nocr_refresh`) without interrupting the user session.
+
+### Cookie TTL Alignment
+
+Each cookie's `Max-Age` is dynamically derived from the actual token lifetime rather than using a static value:
+
+| Cookie | TTL Source | Config Fallback | Default |
+|---|---|---|---|
+| `nocr_token` | JWT `exp` claim (remaining seconds) | `PROXY_TOKEN_COOKIE_TTL` | 86400 (24h) |
+| `nocr_refresh` | IdP's `refresh_expires_in` response field | `PROXY_REFRESH_COOKIE_TTL` | 604800 (7d) |
+| `nocr_sess` | Always uses config value | `PROXY_SESSION_TTL` | 1800 (30m) |
+
+This alignment prevents a common mismatch where the cookie outlives the token it contains — which would cause the gateway to repeatedly send expired tokens to the IdP on every request until the cookie naturally expires.
+
+> [!TIP]
+> If your Identity Provider does not return `refresh_expires_in` in its token response (e.g. Auth0, some Okta configurations), set `PROXY_REFRESH_COOKIE_TTL` to match your IdP's refresh token lifetime. Keycloak returns this field automatically.
+
+### Stale Cookie Cleanup
+
+When the gateway attempts a transparent refresh and the IdP **rejects** the refresh token (e.g. `invalid_grant` due to token expiration or revocation), the gateway immediately clears the stale `nocr_refresh` cookie:
+
+```http
+Set-Cookie: nocr_refresh=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0
+```
+
+Without this cleanup, every subsequent request would make a futile round-trip to the IdP that's guaranteed to fail, adding unnecessary latency and IdP load. After clearing, the user is redirected to re-authenticate via the normal SSO flow.
+
+### Refresh Token Rotation & Singleflight Deduplication
+
+The gateway fully supports **refresh token rotation** — where the IdP issues a new refresh token with every refresh grant and invalidates the old one. This is a common security hardening (e.g. Keycloak's "Revoke Refresh Token" setting).
+
+The challenge with rotation is **concurrent requests**: if multiple browser requests arrive simultaneously with the same expired access token, they would all try to use the same refresh token. With strict rotation, only the first succeeds — the rest would find the token already revoked.
+
+To prevent this, the gateway implements a **singleflight pattern** in [auth.ts](file:///home/eterna2/github/nogoo9-no-crd/src/server/auth.ts#L118):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Request A
+    participant B as Request B
+    participant C as Request C
+    participant GW as Gateway (singleflight)
+    participant IdP as Identity Provider
+
+    A->>GW: refresh(token_v1)
+    Note over GW: No in-flight request → start refresh
+    GW->>IdP: POST /token (grant_type=refresh_token)
+    B->>GW: refresh(token_v1)
+    Note over GW: In-flight hit → coalesce
+    C->>GW: refresh(token_v1)
+    Note over GW: In-flight hit → coalesce
+    IdP-->>GW: token_v2 (rotated)
+    GW-->>A: token_v2
+    GW-->>B: token_v2 (same result)
+    GW-->>C: token_v2 (same result)
+    Note over GW: Cleanup in-flight entry
+```
+
+All concurrent requests for the same refresh token share a single IdP round-trip. The in-flight map is keyed by the decrypted refresh token and automatically cleaned up after resolution or rejection.
+>>>>>>> 8e23f37 (fix(auth): align cookie TTLs with token lifetimes)
 
 ---
 

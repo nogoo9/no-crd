@@ -236,6 +236,32 @@ export const authSchema = {
 		},
 	} satisfies SchemaItem<number>,
 
+	refreshCookieTtlSeconds: {
+		cli: "-",
+		env: "PROXY_REFRESH_COOKIE_TTL",
+		defaultVal: 604800,
+		allowed: "Number",
+		description:
+			"Default Max-Age for the encrypted refresh token cookie (nocr_refresh). Overridden by the IdP's refresh_expires_in when available.",
+		get value(): number {
+			const val = getEnv(this.env);
+			return val ? Number(val) : this.defaultVal;
+		},
+	} satisfies SchemaItem<number>,
+
+	tokenCookieTtlSeconds: {
+		cli: "-",
+		env: "PROXY_TOKEN_COOKIE_TTL",
+		defaultVal: 86400,
+		allowed: "Number",
+		description:
+			"Default Max-Age for the access token cookie (nocr_token). Overridden by the JWT exp claim when available.",
+		get value(): number {
+			const val = getEnv(this.env);
+			return val ? Number(val) : this.defaultVal;
+		},
+	} satisfies SchemaItem<number>,
+
 	sessionSecret: {
 		cli: "-",
 		env: "PROXY_SESSION_SECRET",

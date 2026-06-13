@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] — 2026-06-14
+
+### Fixed
+
+- **Cookie TTL Alignment**: `nocr_token` cookie `Max-Age` is now derived from the JWT `exp` claim and `nocr_refresh` from the IdP's `refresh_expires_in` field, preventing stale cookies from outliving their tokens. Configurable fallbacks via `PROXY_TOKEN_COOKIE_TTL` and `PROXY_REFRESH_COOKIE_TTL`.
+- **Stale Refresh Cookie Cleanup**: When the IdP rejects an expired refresh token (`invalid_grant`), the gateway immediately clears the `nocr_refresh` cookie to prevent repeated futile round-trips.
+- **Refresh Token Rotation Safety**: Added singleflight deduplication to `performTokenRefresh` — concurrent requests for the same refresh token share a single IdP round-trip, preventing race conditions with strict refresh token rotation.
+
 ## [0.11.0] — 2026-06-12
 
 ### Added

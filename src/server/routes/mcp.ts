@@ -141,7 +141,10 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 	) => {
 		setCorsHeaders(reply);
 
-		const { refresh_token } = request.body as { refresh_token?: string };
+		const { refresh_token, refresh_expires_in } = request.body as {
+			refresh_token?: string;
+			refresh_expires_in?: number;
+		};
 		if (!refresh_token) {
 			reply.status(400);
 			return reply.send({
@@ -164,10 +167,14 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 			}
 
 			const encrypted = encryptRefreshToken(refresh_token, sessKey);
+			const { computeRefreshCookieTtl } = await import("~/server/auth.js");
+			const refreshTtl = computeRefreshCookieTtl(
+				typeof refresh_expires_in === "number" ? refresh_expires_in : undefined,
+			);
 
 			reply.header(
 				"Set-Cookie",
-				`nocr_refresh=${encrypted}; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`,
+				`nocr_refresh=${encrypted}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${refreshTtl}`,
 			);
 
 			return { ok: true };

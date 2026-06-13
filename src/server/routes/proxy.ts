@@ -3,6 +3,7 @@ import fastifyHttpProxy from "@fastify/http-proxy";
 import { getLogger } from "@logtape/logtape";
 import type { FastifyInstance } from "fastify";
 import { ANNOTATION_KEYS, config } from "~/config/index.js";
+import { computeTokenCookieTtl } from "~/server/auth.js";
 import { getBasePrefix, setCorsHeaders } from "~/server/helpers.js";
 import type { RouteDeps } from "./index.js";
 
@@ -323,7 +324,11 @@ export async function registerProxyRoutes(
 			}
 
 			try {
-				const { performTokenRefresh } = await import("~/server/auth.js");
+				const {
+					performTokenRefresh,
+					computeRefreshCookieTtl,
+					computeTokenCookieTtl,
+				} = await import("~/server/auth.js");
 				const result = await performTokenRefresh(
 					request,
 					decryptedRefresh,
@@ -363,14 +368,16 @@ export async function registerProxyRoutes(
 					result.rotatedRefreshToken,
 					sessKey,
 				);
+				const refreshTtl = computeRefreshCookieTtl(result.refreshExpiresIn);
 				reply.header(
 					"Set-Cookie",
-					`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`,
+					`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${refreshTtl}`,
 				);
 
+				const tokenTtl = computeTokenCookieTtl(result.jwtPayload);
 				reply.header(
 					"Set-Cookie",
-					`nocr_token=${result.token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
+					`nocr_token=${result.token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=${tokenTtl}`,
 				);
 
 				return { token: result.token };
@@ -378,6 +385,11 @@ export async function registerProxyRoutes(
 				logger.warn("SPA refresh request failed: {error}", {
 					error: err instanceof Error ? err.message : String(err),
 				});
+				// Clear the stale refresh cookie to prevent repeated futile round-trips to the IdP
+				reply.header(
+					"Set-Cookie",
+					"nocr_refresh=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+				);
 				reply.status(401);
 				return reply.send({
 					error: "Unauthorized",
@@ -478,9 +490,10 @@ export async function registerProxyRoutes(
 						// full browser request path (which includes basePrefix). The logout
 						// handler also clears with the same prefix-consistent path.
 						// See ADR-011 for context on cookie path alignment.
+						const tokenTtl = computeTokenCookieTtl((request as any).jwtPayload);
 						reply.header(
 							"Set-Cookie",
-							`nocr_token=${token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=86400`,
+							`nocr_token=${token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=${tokenTtl}`,
 						);
 					}
 					reply.send(res.stream);
