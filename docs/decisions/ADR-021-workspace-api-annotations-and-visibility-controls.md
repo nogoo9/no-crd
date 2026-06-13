@@ -1,7 +1,7 @@
 # ADR-021: Workspace API Annotations and Routing Proxy Visibility Controls
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-06-11
@@ -52,3 +52,9 @@ For backwards compatibility and out-of-the-box security:
 ## Consequences
 - **Improved Extensibility**: Developer-oriented templates can easily declare auxiliary endpoints with fine-grained access limits.
 - **Consistent Authentication**: Custom subpaths leverage the central gateway OIDC/JWT validations seamlessly.
+
+## Amendments
+
+| Date | Change |
+|------|--------|
+| 2026-06-13 | Promoted from `Proposed` to `Accepted`. Core annotation parsing (`parseWorkspaceApis`) is implemented in `src/mcp/templates.ts` and the `WORKSPACE_AUTH_MODE` annotation key is defined in `src/config/annotations.ts`. Proxy visibility enforcement and API route matching are operational. |

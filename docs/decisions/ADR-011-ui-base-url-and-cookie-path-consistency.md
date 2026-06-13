@@ -52,23 +52,25 @@ The `http://localhost:3000/mcp` fallback was removed. The relative same-origin p
 - **k3d ingress** (`localhost:8080`): origin is `http://localhost:8080`, `basePath` is `""`, resolves to `/mcp` via ingress ✓
 - **Subpath proxy** (`example.com/gateway/no-crd`): `basePath` is `/gateway/no-crd`, resolves to `/gateway/no-crd/mcp` ✓
 
-### 3. Cookie Path Consistency (No Bug)
+### 3. Cookie Path Consistency
 
 Analysis confirmed that cookie paths are **consistent** between set and clear operations:
 
 | Operation | Location | Cookie Path |
 |-----------|----------|-------------|
-| **Set** `nocr_token` | `proxy.ts` onResponse | `Path=/route/${id}/` |
-| **Clear** `nocr_token` | `mcp.ts` logoutHandler | `Path=/route/${id}/` |
+| **Set** `nocr_token` | `proxy.ts` onResponse | `Path=${basePrefix}/route/${id}/` |
+| **Clear** `nocr_token` | `mcp.ts` logoutHandler | `Path=${basePrefix}/route/${id}/` |
 | **Set** `nocr_sess` | `auth.ts` preHandler | `Path=/` |
 | **Clear** `nocr_sess` | `mcp.ts` logoutHandler | `Path=/` |
 
-Both set and clear use the same raw paths (without `basePrefix`). This works because:
+Both set and clear use the same paths (with `basePrefix` for workspace-scoped cookies). This works because:
 
 - Fastify's `{ prefix: basePrefix }` affects URL routing, not the `Set-Cookie` header value.
 - The `Path` attribute in `Set-Cookie` is a literal string sent to the browser.
 - The browser matches cookies based on the `Path` value, not the URL the response came from.
 - Since both operations write the same `Path` value, clearing always matches what was set.
+
+> **Note**: As of [ADR-019](./ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md), workspace-scoped cookies (`nocr_token`) include the `basePrefix` to ensure correct browser scoping across subpath deployments. The original design used raw paths without `basePrefix`, but this was corrected when split-network OIDC deployments exposed cookie isolation issues.
 
 **Important caveat**: If the reverse proxy rewrites cookie paths (some do), this could break. The current design assumes the proxy is transparent to `Set-Cookie` headers, which is the standard behavior for k8s Ingress controllers and most API gateways.
 
@@ -77,8 +79,7 @@ Both set and clear use the same raw paths (without `basePrefix`). This works bec
 ### Prefix cookie paths with `basePrefix`
 
 - Pros: Cookies would match the actual URL path visible in the browser
-- Cons: Unnecessary — Fastify doesn't rewrite cookie paths, and both set/clear already use matching raw paths. Adding the prefix would actually *break* consistency if only one side was updated.
-- Rejected: The current approach is simpler and already consistent.
+- Cons: ~~Unnecessary~~ — Initially rejected, but later adopted via [ADR-019](./ADR-019-split-network-oidc-issuer-and-cookie-path-alignment.md) when subpath deployments exposed cookie scoping issues.
 
 ### Keep the `localhost:3000` fallback behind a dev-mode flag
 
@@ -92,3 +93,9 @@ Both set and clear use the same raw paths (without `basePrefix`). This works bec
 - No hardcoded localhost URLs remain in production code
 - Cookie path behavior is documented with inline comments referencing this ADR
 - Future developers modifying cookie-setting code should maintain the path consistency documented here
+
+## Amendments
+
+| Date | Change |
+|------|--------|
+| 2026-06-13 | Updated cookie path table to reflect that `nocr_token` now uses `${basePrefix}/route/${id}/` (with basePrefix), as corrected by ADR-019. Updated Alternative A to note it was later adopted. Added cross-reference to ADR-019. |
