@@ -77,14 +77,87 @@ async function getTokenEndpoint(): Promise<string> {
 }
 
 /**
- * Performs a refresh token exchange against the OIDC provider.
+ * Computes cookie Max-Age from a JWT's exp claim, falling back to config default.
  */
-export async function performTokenRefresh(
+export function computeTokenCookieTtl(jwtPayload: any): number {
+	if (jwtPayload?.exp && typeof jwtPayload.exp === "number") {
+		const remaining = jwtPayload.exp - Math.floor(Date.now() / 1000);
+		if (remaining > 0) {
+			return remaining;
+		}
+	}
+	return config.auth.tokenCookieTtlSeconds;
+}
+
+/**
+ * Computes cookie Max-Age for the refresh token cookie, using the IdP's
+ * refresh_expires_in when available, otherwise falling back to config default.
+ */
+export function computeRefreshCookieTtl(refreshExpiresIn?: number): number {
+	if (refreshExpiresIn && refreshExpiresIn > 0) {
+		return refreshExpiresIn;
+	}
+	return config.auth.refreshCookieTtlSeconds;
+}
+
+type RefreshResult = {
+	jwtPayload: any;
+	token: string;
+	rotatedRefreshToken: string;
+	refreshExpiresIn?: number;
+};
+
+/**
+ * In-flight refresh promises keyed by the decrypted refresh token.
+ * Ensures concurrent requests for the same token coalesce into
+ * a single IdP round-trip (singleflight pattern).
+ */
+const inflightRefreshes = new Map<string, Promise<RefreshResult>>();
+
+// Exported for testing only
+export const _testInflightRefreshes = inflightRefreshes;
+
+/**
+ * Performs a refresh token exchange against the OIDC provider.
+ * Uses singleflight deduplication: concurrent calls with the same
+ * refresh token share a single in-flight request to avoid race
+ * conditions with refresh token rotation.
+ */
+export function performTokenRefresh(
+	request: FastifyRequest,
+	decryptedRefresh: string,
+	sessKey: string,
+	basePrefix: string,
+): Promise<RefreshResult> {
+	const existing = inflightRefreshes.get(decryptedRefresh);
+	if (existing) {
+		logger.debug("Coalescing concurrent refresh request (singleflight hit)");
+		return existing;
+	}
+
+	const promise = executeTokenRefresh(
+		request,
+		decryptedRefresh,
+		sessKey,
+		basePrefix,
+	).finally(() => {
+		inflightRefreshes.delete(decryptedRefresh);
+	});
+
+	inflightRefreshes.set(decryptedRefresh, promise);
+	return promise;
+}
+
+/**
+ * Core refresh token exchange logic — called at most once per
+ * unique refresh token via the singleflight wrapper above.
+ */
+async function executeTokenRefresh(
 	request: FastifyRequest,
 	decryptedRefresh: string,
 	_sessKey: string,
 	basePrefix: string,
-): Promise<{ jwtPayload: any; token: string; rotatedRefreshToken: string }> {
+): Promise<RefreshResult> {
 	const tokenEndpoint = await getTokenEndpoint();
 	const clientId = config.auth.clientId || "";
 	const clientSecret = config.auth.clientSecret || "";
@@ -115,6 +188,7 @@ export async function performTokenRefresh(
 	const tokenData = (await refreshRes.json()) as {
 		access_token?: string;
 		refresh_token?: string;
+		refresh_expires_in?: number;
 	};
 	if (!tokenData.access_token) {
 		throw new Error("OIDC refresh response did not contain access_token");
@@ -136,6 +210,10 @@ export async function performTokenRefresh(
 		jwtPayload,
 		token: tokenData.access_token,
 		rotatedRefreshToken,
+		refreshExpiresIn:
+			typeof tokenData.refresh_expires_in === "number"
+				? tokenData.refresh_expires_in
+				: undefined,
 	};
 }
 
@@ -297,9 +375,10 @@ export function registerAuthHooks(
 							result.rotatedRefreshToken,
 							sessKey,
 						);
+						const refreshTtl = computeRefreshCookieTtl(result.refreshExpiresIn);
 						reply.header(
 							"Set-Cookie",
-							`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=604800`,
+							`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${refreshTtl}`,
 						);
 						reply.header("x-refreshed-token", token);
 					}
@@ -307,6 +386,11 @@ export function registerAuthHooks(
 					logger.warn("Failed transparent token refresh: {error}", {
 						error: err instanceof Error ? err.message : String(err),
 					});
+					// Clear the stale refresh cookie to prevent repeated futile round-trips to the IdP
+					reply.header(
+						"Set-Cookie",
+						"nocr_refresh=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+					);
 				}
 			}
 		}

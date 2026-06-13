@@ -2562,6 +2562,250 @@ users:
 				globalThis.fetch = originalFetch;
 			}
 		});
+		// ── Shared helpers for refresh token tests ──
+
+		function mockWorkspacePod(authMode = "inject-headers", port = "8080") {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: { "nogoo9/user-sub": "user-1" },
+							annotations: {
+								"nogoo9/workspace-auth-mode": authMode,
+								...(port && { "nogoo9/workspace-port": port }),
+							},
+						},
+						status: { phase: "Running", podIP: "10.0.0.5" },
+					},
+				],
+			});
+		}
+
+		type TokenEndpointBehavior =
+			| {
+					kind: "success";
+					accessToken: string;
+					refreshToken?: string;
+					refreshExpiresIn?: number;
+			  }
+			| { kind: "reject" }
+			| {
+					kind: "success-delayed";
+					accessToken: string;
+					refreshToken?: string;
+					delayMs?: number;
+			  };
+
+		function createOidcFetchMock(
+			tokenBehavior: TokenEndpointBehavior,
+			onTokenCall?: () => void,
+		) {
+			return mock(async (url: string, init?: any) => {
+				if (url.includes("openid-configuration")) {
+					return new Response(
+						JSON.stringify({ token_endpoint: "http://keycloak/token" }),
+						{ status: 200 },
+					);
+				}
+				if (url.includes("/token") && init?.method === "POST") {
+					onTokenCall?.();
+					if (tokenBehavior.kind === "reject") {
+						return new Response(
+							JSON.stringify({
+								error: "invalid_grant",
+								error_description: "Token is not active",
+							}),
+							{ status: 400 },
+						);
+					}
+					if (tokenBehavior.kind === "success-delayed") {
+						await new Promise((resolve) =>
+							setTimeout(resolve, tokenBehavior.delayMs ?? 50),
+						);
+					}
+					return new Response(
+						JSON.stringify({
+							access_token: tokenBehavior.accessToken,
+							refresh_token: tokenBehavior.refreshToken ?? "rotated-refresh",
+							...(tokenBehavior.kind === "success" &&
+							tokenBehavior.refreshExpiresIn != null
+								? { refresh_expires_in: tokenBehavior.refreshExpiresIn }
+								: {}),
+						}),
+						{ status: 200 },
+					);
+				}
+				if (url.includes("10.0.0.5")) {
+					return new Response("workspace-content", { status: 200 });
+				}
+				return new Response("not found", { status: 404 });
+			});
+		}
+
+		async function buildRefreshCookie(plainToken = "test-refresh-token") {
+			const { encryptRefreshToken, resolveSessionSecret } = await import(
+				"~/k8s/index.js"
+			);
+			const key = await resolveSessionSecret(null, "default");
+			return encryptRefreshToken(plainToken, key);
+		}
+
+		function withMockedFetch<T>(mockFn: any, fn: () => Promise<T>): Promise<T> {
+			const original = globalThis.fetch;
+			globalThis.fetch = mockFn as any;
+			return fn().finally(() => {
+				globalThis.fetch = original;
+			});
+		}
+
+		// ── Tests using shared helpers ──
+
+		test("Global preHandler hook - clears stale nocr_refresh cookie when IdP rejects expired refresh token", async () => {
+			mockWorkspacePod();
+			const fetchMock = createOidcFetchMock({ kind: "reject" });
+			const encryptedRefresh = await buildRefreshCookie(
+				"expired-refresh-token",
+			);
+
+			await withMockedFetch(fetchMock, async () => {
+				const resp = await handleWebRequest(
+					new Request("http://localhost/healthz", {
+						method: "GET",
+						headers: { Cookie: `nocr_refresh=${encryptedRefresh}` },
+					}),
+				);
+				expect(resp.status).toBe(200); // healthz doesn't require auth
+				const cookies = resp.headers.get("set-cookie") || "";
+				expect(cookies).toContain("nocr_refresh=;");
+				expect(cookies).toContain("Max-Age=0");
+			});
+		});
+
+		test("POST /route/:workspaceId/_auth/refresh - clears stale nocr_refresh cookie when IdP rejects expired refresh token", async () => {
+			mockWorkspacePod("token-api");
+			const fetchMock = createOidcFetchMock({ kind: "reject" });
+			const encryptedRefresh = await buildRefreshCookie(
+				"expired-refresh-token",
+			);
+
+			await withMockedFetch(fetchMock, async () => {
+				const resp = await handleWebRequest(
+					new Request("http://localhost/route/ws-1/_auth/refresh", {
+						method: "POST",
+						headers: { Cookie: `nocr_refresh=${encryptedRefresh}` },
+					}),
+				);
+				expect(resp.status).toBe(401);
+				const data = (await resp.json()) as any;
+				expect(data.error).toBe("Unauthorized");
+				const cookies = resp.headers.get("set-cookie") || "";
+				expect(cookies).toContain("nocr_refresh=;");
+				expect(cookies).toContain("Max-Age=0");
+			});
+		});
+
+		test("Singleflight - concurrent refresh requests for the same token coalesce into one IdP call", async () => {
+			let idpCallCount = 0;
+			const newAccessToken = createMockToken({ sub: "user-1" });
+			const fetchMock = createOidcFetchMock(
+				{ kind: "success-delayed", accessToken: newAccessToken, delayMs: 50 },
+				() => {
+					idpCallCount++;
+				},
+			);
+
+			await withMockedFetch(fetchMock, async () => {
+				const { performTokenRefresh, _testInflightRefreshes } = await import(
+					"~/server/auth.js"
+				);
+				const mockRequest = {
+					headers: { host: "localhost" },
+					hostname: "localhost",
+					protocol: "http",
+				} as any;
+
+				const results = await Promise.all([
+					performTokenRefresh(mockRequest, "same-refresh-token", "key", ""),
+					performTokenRefresh(mockRequest, "same-refresh-token", "key", ""),
+					performTokenRefresh(mockRequest, "same-refresh-token", "key", ""),
+				]);
+
+				for (const r of results) expect(r.token).toBe(newAccessToken);
+				expect(idpCallCount).toBe(1);
+				expect(_testInflightRefreshes.size).toBe(0);
+			});
+		});
+
+		test("E2E refresh lifecycle - expired token triggers refresh, rotated cookies work on subsequent request", async () => {
+			let idpTokenCalls = 0;
+			const refreshedAccessToken = createMockToken({
+				sub: "user-1",
+				exp: Math.floor(Date.now() / 1000) + 300,
+			});
+			mockWorkspacePod();
+			const fetchMock = createOidcFetchMock(
+				{
+					kind: "success",
+					accessToken: refreshedAccessToken,
+					refreshToken: "rotated-refresh-v2",
+					refreshExpiresIn: 1800,
+				},
+				() => {
+					idpTokenCalls++;
+				},
+			);
+			const encryptedRefresh = await buildRefreshCookie(
+				"original-refresh-token",
+			);
+
+			await withMockedFetch(fetchMock, async () => {
+				// ── Step 1: Request with expired token + valid refresh cookie ──
+				const resp1 = await handleWebRequest(
+					new Request("http://localhost/route/ws-1/page", {
+						method: "GET",
+						headers: {
+							Cookie: `nocr_token=expired-garbage; nocr_refresh=${encryptedRefresh}`,
+						},
+					}),
+				);
+				expect(resp1.status).toBe(200);
+				expect(await resp1.text()).toBe("workspace-content");
+				expect(idpTokenCalls).toBe(1);
+
+				// Verify rotated cookies
+				const setCookies = resp1.headers.get("set-cookie") || "";
+				expect(setCookies).toContain("nocr_sess=");
+				expect(setCookies).toContain("nocr_refresh=");
+				expect(setCookies).toContain("nocr_token=");
+				expect(setCookies).toContain("Max-Age=1800");
+
+				// Parse cookies for the next request
+				const extractCookie = (name: string): string => {
+					const match = setCookies.match(new RegExp(`${name}=([^;,]+)`));
+					return match ? match[1] : "";
+				};
+				const rotatedSess = extractCookie("nocr_sess");
+				const rotatedRefresh = extractCookie("nocr_refresh");
+				const rotatedToken = extractCookie("nocr_token");
+				expect(rotatedSess).not.toBe("");
+				expect(rotatedRefresh).not.toBe("");
+				expect(rotatedToken).not.toBe("");
+
+				// ── Step 2: Subsequent request with rotated cookies — no IdP call ──
+				const resp2 = await handleWebRequest(
+					new Request("http://localhost/route/ws-1/page2", {
+						method: "GET",
+						headers: {
+							Cookie: `nocr_token=${rotatedToken}; nocr_sess=${rotatedSess}; nocr_refresh=${rotatedRefresh}`,
+						},
+					}),
+				);
+				expect(resp2.status).toBe(200);
+				expect(await resp2.text()).toBe("workspace-content");
+				expect(idpTokenCalls).toBe(1); // Still 1 — no redundant refresh
+			});
+		});
 
 		test("HTTP Proxy - does NOT inject x-workspace-jwt if AUTH_INJECT_WORKSPACE_JWT is false", async () => {
 			process.env.AUTH_INJECT_WORKSPACE_JWT = "false";

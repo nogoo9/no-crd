@@ -941,7 +941,10 @@ function Dashboard() {
 											"Content-Type": "application/json",
 											Authorization: `Bearer ${tokenData.access_token}`,
 										},
-										body: JSON.stringify({ refresh_token: tokenData.refresh_token }),
+										body: JSON.stringify({
+											refresh_token: tokenData.refresh_token,
+											refresh_expires_in: tokenData.refresh_expires_in,
+										}),
 									});
 								} catch (err) {
 									console.warn("Failed to set refresh token cookie on server:", err);

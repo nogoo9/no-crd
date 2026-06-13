@@ -146,9 +146,9 @@ http://localhost:3000/route/ws-1/?token=<JWT>
 ```
 The reverse proxy validates this token, allows access to the pod, and immediately issues a path-scoped, secure session cookie:
 ```http
-Set-Cookie: nocr_token=<JWT>; Path=/route/ws-1/; SameSite=Lax; HttpOnly; Max-Age=86400
+Set-Cookie: nocr_token=<JWT>; Path=/route/ws-1/; SameSite=Lax; HttpOnly; Max-Age=<ttl>
 ```
-Subsequent requests (loading JS, CSS, images, or opening WebSockets) automatically transmit the cookie.
+The `Max-Age` is dynamically derived from the JWT's `exp` claim (remaining seconds until expiry), falling back to the `PROXY_TOKEN_COOKIE_TTL` environment variable (default: 86400 seconds / 24 hours). Subsequent requests (loading JS, CSS, images, or opening WebSockets) automatically transmit the cookie.
 
 ### 2. Direct URL Access & SSO Redirect
 If a user navigates directly to a workspace URL (e.g. `http://localhost:3000/route/ws-1/`) and has no active cookies:
@@ -164,8 +164,19 @@ If a user navigates directly to a workspace URL (e.g. `http://localhost:3000/rou
 To keep sessions resilient and survive short access token lifetimes:
 - A stateless signed cookie (`nocr_sess`) is minted on first successful JWT verification.
 - **BFF Token Refresh**: If the OIDC Identity Provider returns a `refresh_token` during OIDC PKCE login, the gateway encrypts it inside a secure, HttpOnly cookie `nocr_refresh`. When the access token expires, the gateway automatically performs a backchannel exchange with the IdP, updates the client cookies, and completes the request transparently.
+- **Dynamic Cookie TTLs**: Each cookie's `Max-Age` is derived from the actual token lifetime — `nocr_token` uses the JWT `exp` claim, `nocr_refresh` uses the IdP's `refresh_expires_in` field — preventing stale cookies from outliving their tokens. See the [Cookie TTL Alignment](./architecture.md#cookie-ttl-alignment) section in the Architecture Guide.
+- **Stale Cookie Cleanup**: If a refresh attempt fails (e.g. the IdP rejects an expired refresh token), the gateway immediately clears the `nocr_refresh` cookie to prevent repeated futile round-trips to the IdP.
+- **Refresh Token Rotation Safety**: The gateway supports strict refresh token rotation via a singleflight deduplication pattern — concurrent requests for the same token are coalesced into a single IdP round-trip, preventing race conditions where a second request would find the token already revoked. See [Refresh Token Rotation & Singleflight](./architecture.md#refresh-token-rotation--singleflight-deduplication) in the Architecture Guide.
 - **Popup SSO Renewal**: In environments where refresh tokens are restricted, the dashboard displays a warning banner 60 seconds before token expiration. Clicking "Renew" launches a user-initiated login popup window to renew the session with the IdP without leaving the page.
 - **Cross-Tab Synchronization**: Token state updates are synchronized across all open browser tabs and workspace sessions via window `storage` listeners.
+
+#### Cookie TTL Configuration
+
+| Environment Variable | Default | Description |
+|---|---|---|
+| `PROXY_SESSION_TTL` | `1800` (30 min) | Max-Age for the `nocr_sess` session cookie |
+| `PROXY_REFRESH_COOKIE_TTL` | `604800` (7 days) | Default Max-Age for `nocr_refresh`; overridden by IdP's `refresh_expires_in` when available |
+| `PROXY_TOKEN_COOKIE_TTL` | `86400` (24 hours) | Default Max-Age for `nocr_token`; overridden by JWT `exp` when available |
 
 ---
 
@@ -291,9 +302,10 @@ async function refreshToken() {
 **How the refresh flow works:**
 1. Your SPA calls `POST /_auth/refresh` with cookies
 2. The gateway decrypts the `nocr_refresh` cookie using AES-256-GCM
-3. It exchanges the refresh token with the Identity Provider for a new access token
+3. It exchanges the refresh token with the Identity Provider for a new access token (concurrent requests are deduplicated via singleflight)
 4. It verifies the refreshed user still owns the workspace pod
-5. It updates all three cookies (`nocr_sess`, `nocr_refresh`, `nocr_token`) and returns the new token
+5. It updates all three cookies (`nocr_sess`, `nocr_refresh`, `nocr_token`) with dynamically computed TTLs and returns the new token
+6. If the refresh fails (expired/revoked token), the `nocr_refresh` cookie is cleared and a `401` is returned
 
 ### 3. `no-auth` — Public Workspaces
 
