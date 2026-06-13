@@ -8,6 +8,7 @@ When the user asks to commit, save, or stage changes, run the `/commit` workflow
 1. Format + typecheck pass before staging
 2. Files are reviewed for accidental secrets, artifacts, and scope creep
 3. A Conventional Commit message is generated and confirmed by the user
-4. Changes are staged and committed atomically
+4. **The subject line MUST be ≤72 characters.** Count before presenting. If it exceeds 72, shorten it.
+5. Changes are staged and committed atomically
 
 Commit messages are validated automatically via the Husky `commit-msg` hook. Never skip the safety review step. Never commit with `--no-verify`.

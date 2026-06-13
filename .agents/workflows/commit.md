@@ -40,7 +40,8 @@ Commit all current changes after ensuring formatting and types are clean.
    ```
 
    Read the diff and write a **Conventional Commit** message:
-   - Subject line: `<type>(<optional scope>): <short imperative summary>` (≤72 chars)
+   - Subject line: `<type>(<optional scope>): <short imperative summary>`
+   - **The subject line MUST be ≤72 characters.** Count the characters before presenting. If it exceeds 72, shorten it.
    - Valid types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`, `ci`
    - Add a body paragraph if the change warrants more context (breaking changes, non-obvious rationale)
    - Mark breaking changes with `BREAKING CHANGE:` in the body or `!` after the type
