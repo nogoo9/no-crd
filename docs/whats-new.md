@@ -2,6 +2,12 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+## What's New in v0.11.1
+
+- **Cookie TTL Alignment**: Session cookies now dynamically match their token's actual lifetime instead of using static defaults. The `nocr_token` cookie derives its `Max-Age` from the JWT `exp` claim, and `nocr_refresh` from the IdP's `refresh_expires_in` field. This prevents stale cookies from outliving expired tokens and causing repeated failed refresh attempts. Configurable fallbacks are available via `PROXY_TOKEN_COOKIE_TTL` (default 24h) and `PROXY_REFRESH_COOKIE_TTL` (default 7d).
+- **Stale Refresh Cookie Cleanup**: When the Identity Provider rejects a refresh token (e.g. `invalid_grant`), the gateway immediately clears the `nocr_refresh` cookie rather than retrying on every subsequent request.
+- **Refresh Token Rotation Safety**: The gateway now safely supports strict refresh token rotation (where the IdP invalidates the old token on each refresh) via a singleflight deduplication pattern. Concurrent browser requests that all need a refresh are coalesced into a single IdP round-trip, preventing race conditions where a second request would find its token already revoked.
+
 ## What's New in v0.11.0
 
 - **Health Check Dependent on Session Key Resolution** ([ADR-022](/decisions/ADR-022-session-key-health-readiness.md)): Implemented dependency checks for `/healthz` and `/mcp/healthz` health check endpoints. The gateway will now fail with `503 Service Unavailable` if the session signing key is not yet resolved. This prevents traffic from being routed to uninitialized replicas during multi-replica deployments.
