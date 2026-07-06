@@ -1,19 +1,18 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 const BASE_URL = "http://localhost:8080/nocr";
 const TOKEN_URL =
 	"http://localhost:8080/auth/realms/nogoo9/protocol/openid-connect/token";
 
 function runKubectl(args: string[]): string {
-	const cmd = `kubectl ${args.join(" ")}`;
 	try {
-		return execSync(cmd, {
+		return execFileSync("kubectl", args, {
 			encoding: "utf-8",
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 	} catch (err: any) {
 		throw new Error(
-			`kubectl command failed: ${cmd}\nError: ${err.stderr || err.message}`,
+			`kubectl command failed: kubectl ${args.join(" ")}\nError: ${err.stderr || err.message}`,
 		);
 	}
 }
@@ -210,7 +209,7 @@ async function main() {
 
 	const cmYaml = JSON.stringify(templateCM);
 	try {
-		execSync(`kubectl apply -f -`, {
+		execFileSync("kubectl", ["apply", "-f", "-"], {
 			input: cmYaml,
 			stdio: ["pipe", "ignore", "pipe"],
 		});
