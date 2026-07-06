@@ -710,7 +710,11 @@ export function verifyAccessOrThrow(
 	let allowedRoles: (string | undefined)[] = [];
 	if (action === "admin") {
 		allowedRoles = [adminRole];
-	} else if (action === "template:create" || action === "template:write") {
+	} else if (
+		action === "template:create" ||
+		action === "template:write" ||
+		action === "write"
+	) {
 		allowedRoles = [adminRole, writeRole];
 	} else {
 		allowedRoles = [adminRole, writeRole, readRole];
@@ -719,7 +723,9 @@ export function verifyAccessOrThrow(
 	const primaryRole =
 		action === "admin"
 			? adminRole
-			: action === "template:create" || action === "template:write"
+			: action === "template:create" ||
+					action === "template:write" ||
+					action === "write"
 				? writeRole
 				: readRole;
 
