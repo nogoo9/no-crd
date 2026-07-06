@@ -25,7 +25,10 @@ ALL_PODS=$(kubectl get pods -n "$NAMESPACE" -l app=nogoo9-mcp -o jsonpath='{.ite
 
 POD_ARRAY=()
 for pod in $ALL_PODS; do
-  DEL_TIME=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.metadata.deletionTimestamp}')
+  if ! kubectl get pod "$pod" -n "$NAMESPACE" &>/dev/null; then
+    continue
+  fi
+  DEL_TIME=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || echo "")
   if [ -z "$DEL_TIME" ]; then
     POD_ARRAY+=("$pod")
   fi

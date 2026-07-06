@@ -8,7 +8,7 @@ import {
 } from "~/k8s/index.js";
 import { registerNamespaceTools } from "~/mcp/namespace.js";
 import { registerPodTools } from "~/mcp/pods.js";
-import { registerSpawnerTools } from "~/mcp/spawner.js";
+import { registerSpawnerTools } from "~/mcp/spawner/index.js";
 import { registerTemplateResources } from "~/mcp/templates.js";
 import { APP_VERSION } from "~/version.js";
 

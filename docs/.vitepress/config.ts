@@ -70,6 +70,10 @@ export default withMermaid(
 							link: "/deploy/workspace-customization",
 						},
 						{
+							text: "Upgrades & Template Versioning",
+							link: "/deploy/workspace-upgrades",
+						},
+						{
 							text: "Dashboard Themes & Branding",
 							link: "/deploy/themes-branding",
 						},

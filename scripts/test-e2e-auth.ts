@@ -41,8 +41,9 @@
 
 export {};
 
-const BASE_URL = "http://localhost:8080";
-const TOKEN_URL = `${BASE_URL}/auth/realms/nogoo9/protocol/openid-connect/token`;
+const BASE_URL = "http://localhost:8080/nocr";
+const TOKEN_URL =
+	"http://localhost:8080/auth/realms/nogoo9/protocol/openid-connect/token";
 
 interface TestContext {
 	readToken: string;
@@ -458,9 +459,14 @@ async function runCookieAuthenticationTest(ctx: TestContext) {
 	if (!sessCookieStr) {
 		throw new Error("Missing nocr_sess session cookie in response");
 	}
-	if (!tokenCookieStr?.includes("Path=/route/writeuser-e2e-pod/")) {
+	const urlObj = new URL(BASE_URL);
+	const basePrefix = urlObj.pathname.endsWith("/")
+		? urlObj.pathname.slice(0, -1)
+		: urlObj.pathname;
+	const expectedPath = `Path=${basePrefix}/route/writeuser-e2e-pod/`;
+	if (!tokenCookieStr?.includes(expectedPath)) {
 		throw new Error(
-			"Missing path-scoped nocr_token session cookie in response",
+			`Missing path-scoped nocr_token session cookie in response (expected: ${expectedPath})`,
 		);
 	}
 

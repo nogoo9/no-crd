@@ -35,7 +35,7 @@ import {
 	TEMPLATE_LABEL_KEY,
 	verifyAccessOrThrow,
 } from "~/k8s/index.js";
-import { WorkspaceApiSchema } from "~/mcp/spawner.js";
+import { WorkspaceApiSchema } from "~/mcp/spawner/index.js";
 
 const logger = getLogger(["nogoo9", "mcp-templates"]);
 

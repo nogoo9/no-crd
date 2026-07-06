@@ -1051,7 +1051,7 @@ function Dashboard() {
 				arguments: { id, namespace, jwtPayload: activeToken ? decodeJwt(activeToken) : undefined },
 			});
 			if (res && !res.isError) {
-				triggerToast(`Workspace ${id} upgraded successfully.`, "success");
+				triggerToast(`Workspace ${id} upgrade triggered in background.`, "success");
 				refreshData();
 			} else {
 				throw new Error(String(res?.error || "Error upgrading workspace"));
@@ -1069,7 +1069,7 @@ function Dashboard() {
 				arguments: { namespace, jwtPayload: activeToken ? decodeJwt(activeToken) : undefined },
 			});
 			if (res && !res.isError) {
-				triggerToast("All outdated workspaces upgraded successfully.", "success");
+				triggerToast("All outdated workspace upgrades triggered in background.", "success");
 				refreshData();
 			} else {
 				throw new Error(String(res?.error || "Error upgrading workspaces"));
@@ -1584,6 +1584,7 @@ function Dashboard() {
 					template={selectedTemplate}
 					isAdmin={capabilities.isAdmin}
 					existingWorkspaces={workspaces}
+					currentUser={getDisplayUser()}
 					onSpawn={async (id, name, userSub, contextVars) => {
 						try {
 							setSelectedTemplate(null);
@@ -1947,7 +1948,7 @@ function WorkspaceCard({
 
 	const getStatusColorClass = () => {
 		if (ws.status === "Running") return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
-		if (ws.status === "Pending") return "bg-amber-500/10 text-amber-500 border-amber-500/20";
+		if (ws.status === "Pending" || ws.status === "Upgrading") return "bg-amber-500/10 text-amber-500 border-amber-500/20";
 		return "bg-red-500/10 text-red-500 border-red-500/20";
 	};
 
@@ -2114,7 +2115,7 @@ function WorkspaceCard({
 							</button>
 						)}
 
-						{(isOwner || isAdmin) && ws.isOutdated && (
+						{(isOwner || isAdmin) && ws.isOutdated && ws.status !== "Upgrading" && (
 							<button 
 								className="btn btn-ghost text-amber-600 hover:bg-amber-500/10 px-2 py-1 text-[10px] font-bold flex items-center gap-1" 
 								onClick={onUpgrade}
@@ -2554,25 +2555,33 @@ interface SpawnWorkspaceModalProps {
 	template: Template;
 	isAdmin: boolean;
 	existingWorkspaces: Workspace[];
+	currentUser: string;
 	onSpawn: (id: string, name: string, userSub: string, contextVars: Record<string, string>) => void;
 	onClose: () => void;
 	onMeowTrigger?: () => void;
 }
 
-function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, onClose, onMeowTrigger }: SpawnWorkspaceModalProps) {
+function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, currentUser, onSpawn, onClose, onMeowTrigger }: SpawnWorkspaceModalProps) {
 	const [workspaceId, setWorkspaceId] = useState("");
 	const [workspaceName, setWorkspaceName] = useState("");
 	const [targetUser, setTargetUser] = useState("");
 	const [contextVars, setContextVars] = useState<Record<string, string>>({});
+	const hasInitializedRef = useRef<string | null>(null);
 
 	useEffect(() => {
+		if (hasInitializedRef.current === template.name) {
+			return;
+		}
+		hasInitializedRef.current = template.name;
+
 		const prefix = template.name.toLowerCase().replace(/[^a-z0-9-]/g, "");
+		const userPrefix = currentUser ? `${currentUser.toLowerCase().replace(/[^a-z0-9-]/g, "")}-` : "";
 		let uniqueId = "";
 		let isUnique = false;
 		let attempts = 0;
 		while (!isUnique && attempts < 100) {
 			const randomSuffix = generateRandomString(6).toLowerCase();
-			uniqueId = `${prefix}-${randomSuffix}`;
+			uniqueId = `${userPrefix}${prefix}-${randomSuffix}`;
 			isUnique = !existingWorkspaces.some((ws) => ws.id === uniqueId);
 			attempts++;
 		}
@@ -2588,7 +2597,7 @@ function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, o
 		} else {
 			setContextVars({});
 		}
-	}, [template, existingWorkspaces]);
+	}, [template, currentUser, existingWorkspaces]);
 
 	const handleWorkspaceNameChange = (val: string) => {
 		const prevContains = workspaceName.toLowerCase().includes("meow");
@@ -2614,7 +2623,12 @@ function SpawnWorkspaceModal({ template, isAdmin, existingWorkspaces, onSpawn, o
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();
-						onSpawn(workspaceId.trim(), workspaceName.trim(), targetUser.trim(), contextVars);
+						const trimmedId = workspaceId.trim();
+						if (existingWorkspaces.some((ws) => ws.id === trimmedId)) {
+							alert(`Workspace ID "${trimmedId}" already exists. Please enter a unique ID.`);
+							return;
+						}
+						onSpawn(trimmedId, workspaceName.trim(), targetUser.trim(), contextVars);
 					}}
 					className="p-6 space-y-4"
 				>

@@ -32,6 +32,7 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-021](./ADR-021-workspace-api-annotations-and-visibility-controls.md) | Workspace API Annotations and Routing Proxy Visibility Controls | Accepted |
 | [ADR-022](./ADR-022-session-key-health-readiness.md) | Session Key Dependent Health Check Readiness | Accepted |
 | [ADR-023](./ADR-023-refresh-token-lifecycle-and-rotation-safety.md) | Dynamic Cookie TTL Alignment, Stale Cookie Cleanup, and Singleflight Refresh Token Rotation Safety | Accepted |
+| [ADR-024](./ADR-024-non-blocking-workspace-template-upgrade.md) | Non-blocking Workspace Template Upgrade | Accepted |
 
 ## How to Read ADRs
 
@@ -73,6 +74,7 @@ graph LR
     ADR003 --> ADR022["ADR-022: Session Key Dependent Health Readiness"]
     ADR009 --> ADR022
     ADR019 --> ADR023["ADR-023: Refresh Token Lifecycle & Rotation Safety"]
+    ADR015 --> ADR024["ADR-024: Non-blocking Workspace Template Upgrade"]
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -96,6 +98,7 @@ graph LR
     style ADR021 fill:#f59e0b,color:#fff
     style ADR022 fill:#4a9eff,color:#fff
     style ADR023 fill:#4a9eff,color:#fff
+    style ADR024 fill:#f59e0b,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain
