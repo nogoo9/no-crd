@@ -317,7 +317,8 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 				userSub = inputUserSub;
 			}
 
-			const templateUser = config.auth.enabled ? userSub : "guest";
+			const templateUser =
+				config.auth.enabled || userSub !== "anonymous" ? userSub : "guest";
 
 			let parsedSpec: any;
 			let annotations: Record<string, string> = {};

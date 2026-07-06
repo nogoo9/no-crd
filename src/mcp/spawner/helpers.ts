@@ -62,7 +62,15 @@ export function verifyAuthAndGetContext(
 		| "template:write",
 ): UserAuthContext {
 	if (!config.auth.enabled) {
-		return { userSub: "anonymous", isAdmin: false, subFilter: "" };
+		let userSub = "anonymous";
+		if (jwtPayload) {
+			try {
+				userSub = extractUserIdentity(jwtPayload, config.auth.subJsonPath);
+			} catch (_) {
+				// Ignore
+			}
+		}
+		return { userSub, isAdmin: false, subFilter: "" };
 	}
 	if (!jwtPayload) {
 		throw new Error(
