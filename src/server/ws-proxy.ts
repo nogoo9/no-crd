@@ -74,7 +74,18 @@ export function registerUpgradeHandler(
 				return;
 			}
 
-			pod = res.items[0];
+			// Sort pods by creationTimestamp descending (newest first)
+			const sortedPods = res.items.sort((a: any, b: any) => {
+				const timeA = new Date(a.metadata?.creationTimestamp || 0).getTime();
+				const timeB = new Date(b.metadata?.creationTimestamp || 0).getTime();
+				return timeB - timeA;
+			});
+
+			// Select the active routing pod: first running/ready pod, or default to newest
+			pod =
+				sortedPods.find(
+					(p: any) => p.status?.phase === "Running" && p.status?.podIP,
+				) || sortedPods[0];
 		} catch (err) {
 			logger.error("Failed to list pods during WebSocket upgrade: {error}", {
 				error: err,

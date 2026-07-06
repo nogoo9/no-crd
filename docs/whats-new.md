@@ -2,6 +2,14 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+## What's New in v0.12.0
+
+- **Non-Blocking Workspace Template Upgrades** ([ADR-024](/decisions/ADR-024-non-blocking-workspace-template-upgrade.md)): Workspace template upgrades are now executed asynchronously in the background. Calling `upgrade_workspace` immediately returns an `"upgrading"` status with a tracking ID, preventing client/network timeouts when pulling large container images.
+- **RWO Volume Recreate Fallback**: If a workspace utilizes Persistent Volume Claims (PVCs) with `ReadWriteOnce` (RWO) mode, the Spawner automatically falls back to a recreate-style upgrade flow. It deletes the old pod immediately to release the volume lock, ensuring the new pod can mount the volume without conflicts.
+- **Side-by-Side Upgrade Readiness**: For standard (non-RWO) workspaces, upgrading pods spawn side-by-side. The routing proxy and WebSocket proxy dynamically select and route traffic to the newest running and ready pod, ensuring a zero-downtime cutover.
+- **Upgrade Failure Logs**: Detailed diagnostic error logs are now captured and annotated onto the old pod under `nogoo9/last-upgrade-error` if a background upgrade fails or times out (10-minute limit), preserving the existing workspace replica instead of causing a total outage.
+- **Upgrades Documentation**: Added a comprehensive guide explaining template versioning rules, upgrade workflows, cutover behavior, and failure reconciliation.
+
 ## What's New in v0.11.1
 
 - **Cookie TTL Alignment**: Session cookies now dynamically match their token's actual lifetime instead of using static defaults. The `nocr_token` cookie derives its `Max-Age` from the JWT `exp` claim, and `nocr_refresh` from the IdP's `refresh_expires_in` field. This prevents stale cookies from outliving expired tokens and causing repeated failed refresh attempts. Configurable fallbacks are available via `PROXY_TOKEN_COOKIE_TTL` (default 24h) and `PROXY_REFRESH_COOKIE_TTL` (default 7d).

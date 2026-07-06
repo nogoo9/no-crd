@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-07-06
+
+### Added
+
+- **Non-Blocking Workspace Template Upgrades** ([ADR-024](docs/decisions/ADR-024-non-blocking-workspace-template-upgrade.md)): Implemented asynchronous background upgrade processing for running workspaces, allowing long-running workspace migrations to run without client-side timeouts.
+- **RWO Volume Recreate Fallback**: Automatically fallback to recreate-style upgrades when PersistentVolumeClaims (PVCs) use `ReadWriteOnce` mode, preventing multi-pod mounting conflicts.
+- **Upgrade Failure Logs**: Added a `nogoo9/last-upgrade-error` annotation to preserve detailed logs on the old pod if a background upgrade fails.
+- **Upgrades Documentation**: Added a dedicated VitePress guide for workspace upgrades and template versioning.
+
+### Changed
+
+- **Spawner Module Consolidation**: Refactored and incorporated spawner entry point (`src/mcp/spawner.ts` -> `src/mcp/spawner/index.ts`) and test files into the `spawner` sub-package directory.
+- **Simplified Handler Architecture**: Modularized handler code in `src/mcp/spawner/handlers.ts` to delegate to extracted helper modules in `helpers.ts`.
+
+### Security
+
+- **CVE Mitigation & Package Hardening**: Upgraded nested dependencies (`dompurify`, `form-data`, `undici`) to secure versions via overrides/resolutions.
+
 ## [0.11.1] — 2026-06-14
 
 ### Fixed

@@ -397,6 +397,21 @@ export async function startHttpServer(
 			limit: 1,
 		});
 		logger.info("Kubernetes API connectivity verified.");
+
+		// Run startup workspace upgrade reconciliation scan
+		const { reconcileUpgradingWorkspaces } = await import(
+			"~/mcp/spawner/index.js"
+		);
+		reconcileUpgradingWorkspaces(k8sCtx, config.k8s.namespace).catch(
+			(recErr) => {
+				logger.error(
+					"Failed to run startup workspace upgrade reconciliation: {error}",
+					{
+						error: recErr,
+					},
+				);
+			},
+		);
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		logger.error(

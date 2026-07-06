@@ -12,7 +12,7 @@ const coreApi = {
 	readNamespacedConfigMap: async (_args: any) => ({}) as any,
 	listNamespacedEvent: async () => ({ items: [] }),
 	deleteNamespacedPod: async () => ({}) as any,
-	readNamespacedPod: async () => ({}) as any,
+	readNamespacedPod: async (..._args: any[]) => ({}) as any,
 };
 const kc = {
 	getCurrentCluster: () => null,
@@ -23,7 +23,7 @@ const k8sContext = {
 } as any;
 
 // Import target under test (needs mock to be registered first)
-import { registerSpawnerTools } from "./spawner.js";
+import { registerSpawnerTools } from "./index.js";
 
 describe("Spawner MCP Tools - get_workspace", () => {
 	let registerSpy: any;
@@ -1205,10 +1205,19 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 				{ body: { metadata: { name: "ws-pod-xyz" } } } as any,
 			);
 
-			// Mock readNamespacedPod for deletion check to throw 404 (indicating deletion complete)
-			const readPodSpy = spyOn(coreApi, "readNamespacedPod").mockRejectedValue({
-				response: { statusCode: 404 },
-			} as any);
+			// Mock readNamespacedPod for deletion check & readiness check
+			const readPodSpy = spyOn(coreApi, "readNamespacedPod").mockImplementation(
+				async (req: any) => {
+					const name = req?.name || "";
+					if (name.includes("-up-")) {
+						return {
+							metadata: { name },
+							status: { phase: "Running", podIP: "10.0.0.1" },
+						} as any;
+					}
+					throw { response: { statusCode: 404 } };
+				},
+			);
 
 			const handler = registeredTools.get("upgrade_workspace")!;
 			const result = await handler({
@@ -1222,7 +1231,10 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 			});
 
 			expect(result.isError).toBeUndefined();
-			expect(result.structuredContent.status).toBe("Running");
+			expect(result.structuredContent.status).toBe("upgrading");
+
+			// Yield execution to let background promises execute
+			await new Promise((resolve) => setTimeout(resolve, 50));
 
 			expect(listSpy).toHaveBeenCalledTimes(1);
 			expect(readCMSpy).toHaveBeenCalledTimes(1);
