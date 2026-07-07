@@ -2,6 +2,13 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+## What's New in v0.13.0
+
+- **Template Version & Outdated Display in UI**: The React dashboard now displays the active template version of each workspace pod (e.g. `v1.0.0`) alongside the target template version (e.g. `v1.0.0 → v1.1.0`) when a template update is available, making version management visually clear.
+- **Upgrade Failure Display in UI**: If a background upgrade fails or times out (exceeding the 10-minute threshold), the React dashboard renders an inline alert block detailing the upgrade error (e.g., `ImagePullBackOff` logs) on the workspace card and the specifications details panel, helping users troubleshoot issues immediately.
+- **Dynamic Get Workspace Status Alignment**: Fixed an inconsistency where the `get_workspace` tool bypassed the upgrade transition reconciliation loop. It now correctly returns `"Upgrading"` status during active migrations and dynamically cleans up duplicate/stale upgrade pods.
+- **Upgrade Demo Tasks with Delay**: Added `trigger-upgrade-demo` and `revert-upgrade-demo` Moon tasks which apply ConfigMap manifests with a `30s` `initContainer` delay, allowing developers to test and witness the upgrading transition state on the UI easily.
+
 ## What's New in v0.12.0
 
 - **Non-Blocking Workspace Template Upgrades** ([ADR-024](/decisions/ADR-024-non-blocking-workspace-template-upgrade.md)): Workspace template upgrades are now executed asynchronously in the background. Calling `upgrade_workspace` immediately returns an `"upgrading"` status with a tracking ID, preventing client/network timeouts when pulling large container images.

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-demo
+  namespace: nogoo9
+  labels:
+    nogoo9/pod-template: "true"
+  annotations:
+    nogoo9/template-version: "1.1.0"
+    nogoo9/description: "Auth Demo - Combined Mode. Demonstrates both Header Injection and Token & Redirect API modes."
+    nogoo9/tag: "demo"
+    nogoo9/auth-require-token: "true"
+    nogoo9/workspace-port: "3000"
+    nogoo9/workspace-path: "/"
+    nogoo9/workspace-auth-mode: "inject-headers,token-api"
+    nogoo9/api.stats.port: "3000"
+    nogoo9/api.stats.path: "/api/stats"
+    nogoo9/api.stats.method: "GET"
+    nogoo9/api.stats.desc: "Return server stats"
+    nogoo9/api.stats.refresh: "10s"
+    nogoo9/api.last_activity.port: "3000"
+    nogoo9/api.last_activity.path: "/api/last-activity"
+    nogoo9/api.last_activity.method: "GET"
+    nogoo9/api.last_activity.desc: "Return last activity time"
+    nogoo9/api.last_activity.refresh: "30s"
+data:
+  spec: |
+    {
+      "containers": [{
+        "name": "auth-demo-app",
+        "image": "nogoo9-registry.localhost:5001/bun:latest",
+        "command": ["bun", "run", "/app/server.ts"],
+        "volumeMounts": [
+          {"name": "app-code", "mountPath": "/app"}
+        ]
+      }],
+      "initContainers": [{
+        "name": "delay",
+        "image": "nogoo9-registry.localhost:5001/bun:latest",
+        "command": ["sleep", "30"]
+      }],
+      "volumes": [{
+        "name": "app-code",
+        "configMap": {
+          "name": "auth-demo-app-code"
+        }
+      }]
+    }

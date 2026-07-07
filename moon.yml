@@ -121,3 +121,15 @@ tasks:
     command: "kubectl delete -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/ --ignore-not-found"
     options:
       runInCI: false
+
+  trigger-upgrade-demo:
+    command: "kubectl apply -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/auth-demo-upgraded.yaml"
+    options:
+      runInCI: false
+      cache: false
+
+  revert-upgrade-demo:
+    command: "kubectl apply -f $MOON_WORKSPACE_ROOT/infra/k3d/manifests/mcp/auth-demo.yaml"
+    options:
+      runInCI: false
+      cache: false

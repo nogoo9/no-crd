@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] — 2026-07-07
+
+### Added
+
+- **Template Version & Outdated Display in UI**: Added template version indicators and update arrows (e.g. `v1.0.0 → v1.1.0`) on both workspace cards and the console view specs card.
+- **Upgrade Failure Display in UI**: Added inline alert boxes on workspace cards and the console specifications panel to show the latest upgrade error annotation (`nogoo9/last-upgrade-error`).
+- **Upgrade Demo Tasks**: Added `moon run mcp:trigger-upgrade-demo` and `moon run mcp:revert-upgrade-demo` tasks to k3d, introducing a 30s `initContainer` delay to easily witness the upgrade transition process.
+
+### Fixed
+
+- **Aligned Workspace Upgrade Status**: Fixed an inconsistency where `get_workspace` bypassed `reconcileUpgradeTransition` and returned the raw first pod, resulting in incorrect status reporting and skipping dynamic reconciliation cleanups during upgrade.
+
 ## [0.12.0] — 2026-07-06
 
 ### Added

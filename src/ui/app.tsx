@@ -1988,7 +1988,18 @@ function WorkspaceCard({
 
 				{/* Metadata badges */}
 				<div className="flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-[var(--ink-3)] mb-3 mt-1.5 font-mono">
-					{ws.templateRef && <span>Tmpl: <strong className="text-[var(--ink-2)]">{ws.templateRef}</strong></span>}
+					{ws.templateRef && (
+						<span>
+							Tmpl: <strong className="text-[var(--ink-2)]">
+								{ws.templateRef}
+								{ws.templateVersion && (
+									ws.isOutdated && ws.latestTemplateVersion
+										? ` (v${ws.templateVersion} → v${ws.latestTemplateVersion})`
+										: ` (v${ws.templateVersion})`
+								)}
+							</strong>
+						</span>
+					)}
 					{(ws.owner || ws.userSub) && <span>Owner: <strong className="text-[var(--ink-2)]">{ws.owner || ws.userSub}</strong></span>}
 					{ws.creationTime && <span>Created: <strong className="text-[var(--ink-2)]">{new Date(ws.creationTime).toLocaleString()}</strong></span>}
 					{ws.podIP && <span>IP: <strong className="text-[var(--ink-2)]">{ws.podIP}</strong></span>}
@@ -2030,6 +2041,19 @@ function WorkspaceCard({
 							);
 						})}
 						{ws.apis.length > 4 && <span className="text-[8px] text-[var(--ink-3)] font-mono self-center">+{ws.apis.length - 4}</span>}
+					</div>
+				)}
+
+				{/* Upgrade Error Alert */}
+				{ws.annotations?.["nogoo9/last-upgrade-error"] && (
+					<div className="mt-2.5 mb-1.5 bg-red-500/5 p-3 rounded-xl border border-red-500/15 text-[11px] space-y-1">
+						<div className="flex items-center gap-1.5 uppercase font-bold text-red-500 tracking-wider text-[9px]">
+							<I.info className="w-3.5 h-3.5" />
+							Last Upgrade Error
+						</div>
+						<p className="font-mono text-red-600 dark:text-red-400 leading-normal break-all line-clamp-3" title={ws.annotations["nogoo9/last-upgrade-error"]}>
+							{ws.annotations["nogoo9/last-upgrade-error"]}
+						</p>
 					</div>
 				)}
 			</div>
@@ -2299,7 +2323,14 @@ function WorkspaceConsoleView({
 							{ws.templateRef && (
 								<div className="flex justify-between gap-2">
 									<span className="text-[var(--ink-3)] font-bold">Template:</span>
-									<span className="font-mono">{ws.templateRef}</span>
+									<span className="font-mono">
+										{ws.templateRef}
+										{ws.templateVersion && (
+											ws.isOutdated && ws.latestTemplateVersion
+												? ` (v${ws.templateVersion} → v${ws.latestTemplateVersion})`
+												: ` (v${ws.templateVersion})`
+										)}
+									</span>
 								</div>
 							)}
 							{ws.podIP && (
@@ -2318,6 +2349,17 @@ function WorkspaceConsoleView({
 								<div className="flex justify-between gap-2">
 									<span className="text-[var(--ink-3)] font-bold">Owner:</span>
 									<span className="font-mono">{ws.userSub}</span>
+								</div>
+							)}
+							{ws.annotations?.["nogoo9/last-upgrade-error"] && (
+								<div className="mt-4 pt-3 border-t border-[var(--line)] border-dashed space-y-1">
+									<span className="text-[10px] uppercase font-bold text-red-500 tracking-wider flex items-center gap-1.5">
+										<I.info className="w-3.5 h-3.5" />
+										Last Upgrade Error
+									</span>
+									<p className="font-mono text-[11px] text-red-600 dark:text-red-400 bg-red-500/5 p-2 rounded-lg border border-red-500/10 whitespace-pre-wrap break-all leading-normal">
+										{ws.annotations["nogoo9/last-upgrade-error"]}
+									</p>
 								</div>
 							)}
 						</div>

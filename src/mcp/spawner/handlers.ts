@@ -140,7 +140,17 @@ export function getWorkspaceHandler(k8sContext: K8sContext) {
 				throw new Error(`Workspace ${id} not found or access denied`);
 			}
 
-			const details = await buildWorkspaceDetails(k8sContext, id, res.items[0]);
+			const { activePod, isTransitioning } = await reconcileUpgradeTransition(
+				k8sContext,
+				ns,
+				res.items,
+			);
+			const details = await buildWorkspaceDetails(
+				k8sContext,
+				id,
+				activePod,
+				isTransitioning,
+			);
 			const fullWorkspaceObj = {
 				metadata: {
 					name: details.name,
