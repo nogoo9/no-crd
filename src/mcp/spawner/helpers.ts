@@ -6,6 +6,8 @@ import {
 	extractUserIdentity,
 	findLocalTemplate,
 	type K8sContext,
+	PodSpecSchema,
+	parseSpecString,
 	parseTemplateRef,
 	parseWorkspaceApis,
 	readTemplateMap,
@@ -62,7 +64,7 @@ export function verifyAuthAndGetContext(
 		| "template:write",
 ): UserAuthContext {
 	if (!config.auth.enabled) {
-		let userSub = "anonymous";
+		let userSub = "guest";
 		if (jwtPayload) {
 			try {
 				userSub = extractUserIdentity(jwtPayload, config.auth.subJsonPath);
@@ -296,6 +298,7 @@ export async function buildWorkspaceDetails(
 
 export interface TemplateResolution {
 	raw: string;
+	spec: any;
 	version: string;
 	annotations: Record<string, string>;
 	labels: Record<string, string>;
@@ -379,8 +382,12 @@ export async function resolveTemplateSpec(
 		);
 	}
 
+	const interpolatedRaw = replacePlaceholders(raw);
+	const spec = PodSpecSchema.parse(parseSpecString(interpolatedRaw));
+
 	return {
-		raw,
+		raw: interpolatedRaw,
+		spec,
 		version,
 		annotations,
 		labels,

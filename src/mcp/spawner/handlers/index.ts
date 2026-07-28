@@ -7,6 +7,7 @@ import {
 	errorResult,
 	type K8sContext,
 	MODE,
+	mergeContainersByName,
 	PodSpecSchema,
 	parseSpecString,
 	provisionServiceAccount,
@@ -16,7 +17,6 @@ import {
 import {
 	buildWorkspaceDetails,
 	getTemplateLatestVersion,
-	mergeContainerOverrides,
 	reconcileUpgradeTransition,
 	resolveTemplateSpec,
 	verifyAuthAndGetContext,
@@ -110,6 +110,7 @@ export function listWorkspacesHandler(k8sContext: K8sContext) {
 export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 	return async ({
 		id,
+		name: displayName,
 		templateRef,
 		namespace,
 		context,
@@ -119,8 +120,10 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 		annotations,
 		spec,
 		jwtPayload,
+		userSub: targetUserSub,
 	}: {
 		id: string;
+		name?: string;
 		templateRef?: string;
 		namespace?: string;
 		context?: Record<string, string>;
@@ -130,6 +133,7 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 		annotations?: Record<string, string>;
 		spec?: any;
 		jwtPayload?: Record<string, unknown>;
+		userSub?: string;
 	}) => {
 		const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
 		const activeJwtPayload = resolveActiveJwt(jwtPayload);
@@ -146,12 +150,33 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 				activeJwtPayload,
 				"workspace:write",
 			);
-			const userSub = authCtx.userSub;
+			let userSub = authCtx.userSub;
+			if (targetUserSub && targetUserSub !== userSub) {
+				if (config.auth.enabled && !authCtx.isAdmin) {
+					throw new Error(
+						"Forbidden: Non-admin users cannot specify a different userSub",
+					);
+				}
+				userSub = targetUserSub;
+			}
+
+			// Check workspace ID uniqueness
+			const existingPods = await k8sContext.coreApi.listNamespacedPod({
+				namespace: ns,
+				labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}`,
+			});
+			if (existingPods.items && existingPods.items.length > 0) {
+				throw new Error(`Workspace with ID "${id}" already exists`);
+			}
 
 			let resolvedSpec: any;
 			let resolvedAnnotations: Record<string, string> = {};
 			let resolvedLabels: Record<string, string> = {};
 			let _templateVersion = "1.0.0";
+
+			if (displayName) {
+				resolvedAnnotations[ANNOTATION_KEYS.WORKSPACE_NAME] = displayName;
+			}
 
 			if (templateRef) {
 				const resolved = await resolveTemplateSpec(
@@ -160,8 +185,12 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 					userSub,
 					id,
 				);
-				resolvedSpec = (resolved as any).spec;
-				resolvedAnnotations = resolved.annotations;
+				resolvedSpec = resolved.spec;
+				resolvedAnnotations = {
+					...resolved.annotations,
+					[ANNOTATION_KEYS.TEMPLATE_REF]: templateRef,
+					[ANNOTATION_KEYS.TEMPLATE_VERSION]: resolved.version,
+				};
 				resolvedLabels = resolved.labels;
 				_templateVersion = resolved.version;
 			} else if (spec) {
@@ -209,7 +238,7 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 				containerOverrides.length > 0 &&
 				mergedSpec.containers
 			) {
-				mergedSpec.containers = mergeContainerOverrides(
+				mergedSpec.containers = mergeContainersByName(
 					mergedSpec.containers,
 					containerOverrides,
 				);
@@ -227,11 +256,33 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 			}
 
 			const podName = `ws-${userSub}-${id}`;
+			const mergedAnnotations = {
+				...resolvedAnnotations,
+				...(annotations || {}),
+			};
+			const mergedLabels = {
+				...resolvedLabels,
+				...(labels || {}),
+				[ANNOTATION_KEYS.TYPE]: "workspace",
+				[ANNOTATION_KEYS.WORKSPACE_ID]: id,
+				[ANNOTATION_KEYS.MANAGED_BY]: "nogoo9-spawner",
+				[ANNOTATION_KEYS.USER_SUB]: userSub,
+			};
+
 			const finalPodArgs = applySpawnerAnnotations(
 				mergedSpec,
-				resolvedAnnotations,
+				mergedAnnotations,
 				context,
 			);
+			finalPodArgs.labels = {
+				...(finalPodArgs.labels || {}),
+				...mergedLabels,
+			};
+			finalPodArgs.annotations = {
+				...mergedAnnotations,
+				...(finalPodArgs.annotations || {}),
+				[ANNOTATION_KEYS.USER_SUB]: userSub,
+			};
 
 			const createdPod = await createPodFromArgs(
 				k8sContext.coreApi,
@@ -473,14 +524,20 @@ export function getWorkspaceEventsHandler(k8sContext: K8sContext) {
 				.map((p) => p.metadata?.name)
 				.filter(Boolean) as string[];
 
+			const fieldSelector =
+				podNames.length === 1
+					? `involvedObject.name=${podNames[0]}`
+					: undefined;
+
 			const eventsRes = await k8sContext.coreApi.listNamespacedEvent({
 				namespace: ns,
+				fieldSelector,
 			});
 
 			const events = (eventsRes.items || [])
 				.filter(
 					(e) =>
-						e.involvedObject?.name && podNames.includes(e.involvedObject.name),
+						!e.involvedObject?.name || podNames.includes(e.involvedObject.name),
 				)
 				.map((e) => ({
 					type: e.type || "Normal",

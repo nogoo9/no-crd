@@ -13,6 +13,8 @@ const coreApi = {
 	listNamespacedEvent: async () => ({ items: [] }),
 	deleteNamespacedPod: async () => ({}) as any,
 	readNamespacedPod: async (..._args: any[]) => ({}) as any,
+	createNamespacedServiceAccount: async (args: any) => ({ body: args.body }),
+	readNamespacedServiceAccount: async (..._args: any[]) => ({}) as any,
 };
 const kc = {
 	getCurrentCluster: () => null,
@@ -1501,6 +1503,11 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 			const result = await handler({
 				id: "ws-custom",
 				templateRef: "default-template",
+				jwtPayload: {
+					sub: "admin",
+					scope: "nogoo9:admin",
+					realm_access: { roles: ["admin"] },
+				},
 				containerOverrides: [
 					{
 						name: "workspace",
