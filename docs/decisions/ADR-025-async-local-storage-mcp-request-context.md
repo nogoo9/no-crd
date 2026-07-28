@@ -1,19 +1,18 @@
 # ADR-025: Request Context Propagation over JSON-RPC via AsyncLocalStorage
 
-- **Status**: Accepted
-- **Date**: 2026-07-28
-- **Authors**: eterna2
-- **Deciders**: eterna2, AI Assistant
+## Status
+Accepted
 
----
+## Date
+2026-07-28
 
 ## Context
 
-In `@nogoo9/no-crd`, Model Context Protocol (MCP) clients invoke spawner and workspace orchestration tools over HTTP via JSON-RPC endpoint `/mcp`.
+In `@nogoo9/no-crd`, Model Context Protocol (MCP) clients invoke spawner and workspace orchestration tools over HTTP via the JSON-RPC endpoint `/mcp`.
 
 When an HTTP request arrives at `/mcp`:
 1. Fastify processes HTTP authentication in a `preHandler` hook, validating the Bearer JWT or session cookie and attaching the caller's JWT payload (`jwtPayload` containing `sub`, `roles`, `isAdmin`) to the HTTP request object.
-2. The MCP SDK's transport layer (`WebStandardStreamTransport` / `SSEServerTransport`) decodes the incoming JSON-RPC payload and dispatches tool requests asynchronously inside its internal transport handler callbacks.
+2. The MCP SDK's transport layer (`WebStandardStreamableHTTPServerTransport`) decodes the incoming JSON-RPC payload and dispatches tool requests asynchronously inside its internal transport handler callbacks.
 
 Because transport callbacks execute outside Fastify's route handler scope, the tool handler functions (`list_workspaces`, `spawn_workspace`, `upgrade_workspace`, `upgrade_all_workspaces`, etc.) execute without direct access to the outer Fastify `request` or `reply` objects.
 
@@ -25,8 +24,6 @@ Without a mechanism to propagate request context, tool handlers cannot determine
 - What RBAC roles the caller possesses (`authCtx.roles`).
 
 Passing `jwtPayload` as an explicit parameter through every transport function would require mutating standard MCP SDK interfaces, creating heavy coupling and risking missing parameters.
-
----
 
 ## Decision
 
@@ -81,8 +78,6 @@ sequenceDiagram
        return jwtPayload || store?.jwtPayload;
    }
    ```
-
----
 
 ## Consequences
 
