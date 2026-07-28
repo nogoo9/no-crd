@@ -7,9 +7,9 @@ import {
 	MODE,
 } from "~/k8s/index.js";
 import { registerNamespaceTools } from "~/mcp/namespace.js";
-import { registerPodTools } from "~/mcp/pods.js";
+import { registerPodTools } from "~/mcp/pods/index.js";
 import { registerSpawnerTools } from "~/mcp/spawner/index.js";
-import { registerTemplateResources } from "~/mcp/templates.js";
+import { registerTemplateResources } from "~/mcp/templates/index.js";
 import { APP_VERSION } from "~/version.js";
 
 const logger = getLogger(["nogoo9", "mcp-server"]);
