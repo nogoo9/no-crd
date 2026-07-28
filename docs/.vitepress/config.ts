@@ -23,6 +23,7 @@ export default withMermaid(
 			nav: [
 				{ text: "Home", link: "/" },
 				{ text: "Guide", link: "/getting-started" },
+				{ text: "Wiki", link: "/wiki/" },
 				{ text: "What's New", link: "/whats-new" },
 				{ text: "Decisions", link: "/decisions/" },
 				{ text: "API Reference", link: "/api/" },
@@ -34,6 +35,41 @@ export default withMermaid(
 						{ text: "What is no-crd?", link: "/getting-started" },
 						{ text: "Setup Cheatsheet", link: "/setup-cheatsheet" },
 						{ text: "What's New", link: "/whats-new" },
+					],
+				},
+				{
+					text: "Deep Wiki Knowledge Base",
+					collapsed: false,
+					items: [
+						{ text: "Wiki Overview", link: "/wiki/" },
+						{
+							text: "Architecture Overview",
+							link: "/wiki/architecture-overview",
+						},
+						{
+							text: "Zero-CRD Pod Lifecycle",
+							link: "/wiki/zero-crd-pod-lifecycle",
+						},
+						{
+							text: "Auth & Security Model",
+							link: "/wiki/auth-and-security-model",
+						},
+						{
+							text: "Routing Proxy & Tunneling",
+							link: "/wiki/routing-proxy-and-tunneling",
+						},
+						{
+							text: "Peer Discovery & HA",
+							link: "/wiki/peer-discovery-and-ha",
+						},
+						{
+							text: "MCP Tool Engine & Schemas",
+							link: "/wiki/mcp-tool-engine-and-schemas",
+						},
+						{
+							text: "UI & Client Integration",
+							link: "/wiki/ui-and-mcp-client-integration",
+						},
 					],
 				},
 				{

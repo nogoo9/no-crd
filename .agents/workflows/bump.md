@@ -52,13 +52,14 @@ grep 'APP_VERSION' src/version.ts
 
 2. Create or update a section in the "What's New" documentation page at `docs/whats-new.md` describing key highlights, features, and user-facing benefits of the new release version.
 
-## Step 6 — Sync Permissions and Build Documentation
+## Step 6 — Sync Permissions, Generate Deep Wiki, and Build Documentation
 
 1. Execute the automated permissions table synchroniser:
    ```bash
    bun run update:permissions
    ```
-2. Rebuild the TypeDoc API references:
+2. Execute the `/generate-deep-wiki` workflow (`.agents/workflows/generate-deep-wiki.md`) to audit release changes and update `docs/wiki/`.
+3. Rebuild the TypeDoc API references:
    ```bash
    bun run build:docs
    ```
