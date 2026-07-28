@@ -1,0 +1,34 @@
+import { resolveComponent, useSSRContext } from "vue";
+import { ssrRenderAttrs, ssrRenderSuspense, ssrRenderComponent } from "vue/server-renderer";
+import { _ as _export_sfc } from "./plugin-vue_export-helper.1tPrXgE0.js";
+const __pageData = JSON.parse('{"title":"Architecture Overview & System Boundaries","description":"","frontmatter":{},"headers":[],"relativePath":"wiki/architecture-overview.md","filePath":"wiki/architecture-overview.md"}');
+const _sfc_main = { name: "wiki/architecture-overview.md" };
+function _sfc_ssrRender(_ctx, _push, _parent, _attrs, $props, $setup, $data, $options) {
+  const _component_Mermaid = resolveComponent("Mermaid");
+  _push(`<div${ssrRenderAttrs(_attrs)}><h1 id="architecture-overview-system-boundaries" tabindex="-1">Architecture Overview &amp; System Boundaries <a class="header-anchor" href="#architecture-overview-system-boundaries" aria-label="Permalink to &quot;Architecture Overview &amp; System Boundaries&quot;">​</a></h1><p><code>nogoo9</code> is an agent-driven platform for on-demand pod orchestration in Kubernetes (k8s/k3s) <strong>without Custom Resource Definitions (CRDs)</strong> or cluster-level operators. It enables AI agents, CLI tools, and web dashboards to dynamically spawn, route traffic to, and manage ephemeral workspace pods.</p><hr><h2 id="🏛️-architectural-principles" tabindex="-1">🏛️ Architectural Principles <a class="header-anchor" href="#🏛️-architectural-principles" aria-label="Permalink to &quot;🏛️ Architectural Principles&quot;">​</a></h2><ol><li><strong>Zero-CRD Philosophy</strong>: Uses native Kubernetes primitives (<code>Pod</code>, <code>ConfigMap</code>, <code>Secret</code>, <code>PersistentVolumeClaim</code>) without registering custom resource definitions or requiring cluster-admin CRD permissions.</li><li><strong>Isomorphic Runtime Compatibility</strong>: Cross-runtime support for <strong>Bun</strong>, <strong>Deno</strong>, and <strong>Node.js</strong> execution targets pinned via <code>.prototools</code> and <code>.moon/toolchain.yml</code>.</li><li><strong>Stateless / Leaderless Gateway</strong>: Multiple gateway replicas run in parallel without stateful databases (Postgres/Redis), negotiating encryption secrets via Kubernetes Secrets.</li><li><strong>Strict Security Boundaries</strong>: Identity-aware access control enforcing per-user isolation, RFC 9728 OIDC resource discovery, and RBAC scope validation.</li></ol><hr><h2 id="🔄-end-to-end-request-flow-sequence" tabindex="-1">🔄 End-to-End Request Flow Sequence <a class="header-anchor" href="#🔄-end-to-end-request-flow-sequence" aria-label="Permalink to &quot;🔄 End-to-End Request Flow Sequence&quot;">​</a></h2>`);
+  ssrRenderSuspense(_push, {
+    default: () => {
+      _push(ssrRenderComponent(_component_Mermaid, {
+        id: "mermaid-36",
+        class: "mermaid",
+        graph: "sequenceDiagram%0A%20%20%20%20autonumber%0A%20%20%20%20actor%20Agent%20as%20AI%20Agent%20%2F%20User%0A%20%20%20%20participant%20Gateway%20as%20Fastify%20Server%20(src%2Fserver%2F)%0A%20%20%20%20participant%20Auth%20as%20OIDC%20Validator%20(src%2Fserver%2Fauth.ts)%0A%20%20%20%20participant%20IdP%20as%20Keycloak%20IdP%0A%20%20%20%20participant%20MCP%20as%20MCP%20Engine%20(src%2Fmcp%2F)%0A%20%20%20%20participant%20K8s%20as%20Kubernetes%20API%0A%0A%20%20%20%20Agent-%3E%3EGateway%3A%20POST%20%2Fmcp%20(Call%20Tool%3A%20spawn_workspace)%0A%20%20%20%20Gateway-%3E%3EAuth%3A%20Verify%20Authorization%20Header%20%2F%20Cookie%0A%20%20%20%20Auth-%3E%3EIdP%3A%20Validate%20JWT%20%2F%20Introspect%20Claims%0A%20%20%20%20IdP--%3E%3EAuth%3A%20Claims%3A%20sub%3D%22user-123%22%2C%20roles%3D%5B%22mcp-writer%22%5D%0A%20%20%20%20Auth--%3E%3EGateway%3A%20Authenticated%20UserContext%0A%20%20%20%20Gateway-%3E%3EMCP%3A%20Execute%20spawn_workspace(templateId)%0A%20%20%20%20MCP-%3E%3EK8s%3A%20Create%20Pod%20(Labels%3A%20nogoo9%2Fuser-sub%3D%22user-123%22)%0A%20%20%20%20K8s--%3E%3EMCP%3A%20Pod%20Created%20(Status%3A%20Pending%20-%3E%20Running)%0A%20%20%20%20MCP--%3E%3EGateway%3A%20Workspace%20Details%20(Pod%20IP%2C%20Route%20Path)%0A%20%20%20%20Gateway--%3E%3EAgent%3A%20JSON-RPC%20Response%20(Workspace%20Ready)%0A"
+      }, null, _parent));
+    },
+    fallback: () => {
+      _push(` Loading... `);
+    },
+    _: 1
+  });
+  _push(`<hr><h2 id="📂-source-code-map" tabindex="-1">📂 Source Code Map <a class="header-anchor" href="#📂-source-code-map" aria-label="Permalink to &quot;📂 Source Code Map&quot;">​</a></h2><table tabindex="0"><thead><tr><th>Subsystem</th><th>Primary Location</th><th>Key Responsibilities</th></tr></thead><tbody><tr><td><strong>Server Gateway</strong></td><td>[<code>src/server/index.ts</code>](file:///home/eterna2/github/nogoo9-no-crd/src/server/index.ts)</td><td>HTTP/WebSocket bootstrap, rate limiting, CORS, SSE session cleanup</td></tr><tr><td><strong>Auth &amp; Crypto</strong></td><td>[<code>src/server/auth.ts</code>](file:///home/eterna2/github/nogoo9-no-crd/src/server/auth.ts)</td><td>OIDC discovery, AES-256-GCM session cookies, singleflight refresh deduplication</td></tr><tr><td><strong>Routing Proxy</strong></td><td>[<code>src/server/routes/proxy.ts</code>](file:///home/eterna2/github/nogoo9-no-crd/src/server/routes/proxy.ts)</td><td>Direct pod IP tunneling, header injection (<code>X-User-Sub</code>), WebSocket upgrade piping</td></tr><tr><td><strong>MCP Engine</strong></td><td>[<code>src/mcp/server.ts</code>](file:///home/eterna2/github/nogoo9-no-crd/src/mcp/server.ts)</td><td>Protocol initialization, tool registration, capabilities reporting</td></tr><tr><td><strong>Spawner Handlers</strong></td><td>[<code>src/mcp/spawner/handlers/index.ts</code>](file:///home/eterna2/github/nogoo9-no-crd/src/mcp/spawner/handlers/index.ts)</td><td>Workspace spawn, stop, upgrade, and event streaming tool logic</td></tr><tr><td><strong>Kubernetes Client</strong></td><td>[<code>src/k8s/index.ts</code>](file:///home/eterna2/github/nogoo9-no-crd/src/k8s/index.ts)</td><td>Pod spec construction, annotation expansion, PVC binding,RBAC security</td></tr><tr><td><strong>Peer Discovery</strong></td><td>[<code>src/server/peer-discovery.ts</code>](file:///home/eterna2/github/nogoo9-no-crd/src/server/peer-discovery.ts)</td><td>Multi-replica secret negotiation via K8s secrets</td></tr><tr><td><strong>Frontend UI</strong></td><td>[<code>src/ui/</code>](file:///home/eterna2/github/nogoo9-no-crd/src/ui/)</td><td>React web dashboard, OIDC PKCE hooks, themes, MCP client integration</td></tr></tbody></table></div>`);
+}
+const _sfc_setup = _sfc_main.setup;
+_sfc_main.setup = (props, ctx) => {
+  const ssrContext = useSSRContext();
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("wiki/architecture-overview.md");
+  return _sfc_setup ? _sfc_setup(props, ctx) : void 0;
+};
+const architectureOverview = /* @__PURE__ */ _export_sfc(_sfc_main, [["ssrRender", _sfc_ssrRender]]);
+export {
+  __pageData,
+  architectureOverview as default
+};

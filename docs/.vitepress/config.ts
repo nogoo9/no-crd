@@ -141,105 +141,108 @@ export default withMermaid(
 				{
 					text: "Architecture Decisions",
 					items: [
-						{ text: "Overview", link: "/decisions/" },
 						{
-							text: "ADR-001: Template File Format",
+							text: "Overview",
+							link: "/decisions/",
+						},
+						{
+							text: "ADR-001: Support YAML and JSON for Pod Template Files",
 							link: "/decisions/ADR-001-template-file-format",
 						},
 						{
-							text: "ADR-002: Session Cookies",
+							text: "ADR-002: Stateless Signed Session Cookies for Proxy Auth",
 							link: "/decisions/ADR-002-stateless-session-cookies",
 						},
 						{
-							text: "ADR-003: Peer Discovery",
+							text: "ADR-003: Peer Discovery for Session Key Sharing",
 							link: "/decisions/ADR-003-peer-discovery-session-key",
 						},
 						{
-							text: "ADR-004: Theme Merge",
+							text: "ADR-004: Three-Source Theme Merge with Built-In Fallback",
 							link: "/decisions/ADR-004-three-source-theme-merge",
 						},
 						{
-							text: "ADR-005: Endpoint Coverage",
+							text: "ADR-005: Session Cookie Coverage for All Endpoints",
 							link: "/decisions/ADR-005-ui-proactive-oidc-refresh",
 						},
 						{
-							text: "ADR-006: Asset Resolution",
+							text: "ADR-006: Packaged UI Asset and Built-in Resource Resolution",
 							link: "/decisions/ADR-006-packaged-ui-asset-resolution",
 						},
 						{
-							text: "ADR-007: Schema Config",
+							text: "ADR-007: Schema-Driven Configuration & Unified Annotation Keys",
 							link: "/decisions/ADR-007-schema-driven-configuration",
 						},
 						{
-							text: "ADR-008: Managed-Only Access",
+							text: "ADR-008: Managed-Only Pod Access Control",
 							link: "/decisions/ADR-008-managed-only-pod-access-control",
 						},
 						{
-							text: "ADR-009: Eager Startup",
+							text: "ADR-009: Eager MCP Server Initialization with K8s Health Check",
 							link: "/decisions/ADR-009-eager-startup-health-check",
 						},
 						{
-							text: "ADR-010: ConfigMap Fallback",
+							text: "ADR-010: Graceful ConfigMap Template Fallback",
 							link: "/decisions/ADR-010-graceful-configmap-template-fallback",
 						},
 						{
-							text: "ADR-011: BASE_URL & Cookies",
+							text: "ADR-011: UI BASE_URL Contract and Cookie Path Consistency",
 							link: "/decisions/ADR-011-ui-base-url-and-cookie-path-consistency",
 						},
 						{
-							text: "ADR-012: Per-Session Factory",
+							text: "ADR-012: Per-Session McpServer Factory Pattern",
 							link: "/decisions/ADR-012-per-session-mcp-server-factory",
 						},
 						{
-							text: "ADR-013: Workspace App Auth",
+							text: "ADR-013: Workspace App Authorization Support",
 							link: "/decisions/ADR-013-workspace-app-authorization",
 						},
 						{
-							text: "ADR-014: Admin Hardening",
+							text: "ADR-014: Hardened Administrator Access with Scope and Role Mapping",
 							link: "/decisions/ADR-014-admin-access-hardening-and-role-mapping",
 						},
 						{
-							text: "ADR-015: Workspace Consolidation",
+							text: "ADR-015: Workspace View Consolidation, Safe Template Upgrades, and STDIO Auth Bypass",
 							link: "/decisions/ADR-015-workspace-view-consolidation-and-template-upgrades",
 						},
 						{
-							text: "ADR-016: Custom JSONPaths",
+							text: "ADR-016: Session Cookie Reconstitution Compatibility with Custom JSONPaths",
 							link: "/decisions/ADR-016-session-cookie-custom-jsonpath-compatibility",
 						},
 						{
-							text: "ADR-017: Redirection Recovery",
+							text: "ADR-017: Unauthenticated Workspace Redirection Recovery",
 							link: "/decisions/ADR-017-unauthenticated-workspace-redirection-recovery",
 						},
 						{
-							text: "ADR-018: Workspace Ownership",
+							text: "ADR-018: Workspace Owner Association and Server Metadata Reporting",
 							link: "/decisions/ADR-018-workspace-ownership-and-version-metadata",
 						},
 						{
-							text: "ADR-019: Split-Network OIDC Issuer",
+							text: "ADR-019: Split-Network OIDC Issuer Alignment and Path-Scoped Cookie Routing",
 							link: "/decisions/ADR-019-split-network-oidc-issuer-and-cookie-path-alignment",
 						},
 						{
-							text: "ADR-020: Fine-Grained Roles",
+							text: "ADR-020: Fine-Grained Role Permissions, Template Creator Tracking, and Workspace API Visibility",
 							link: "/decisions/ADR-020-fine-grained-roles-template-ownership-and-api-visibility",
 						},
 						{
-							text: "ADR-021: API Annotations",
+							text: "ADR-021: Workspace API Annotations and Routing Proxy Visibility Controls",
 							link: "/decisions/ADR-021-workspace-api-annotations-and-visibility-controls",
 						},
 						{
-							text: "ADR-022: Session Key Dependent Health",
+							text: "ADR-022: Session Key Dependent Health Check Readiness",
 							link: "/decisions/ADR-022-session-key-health-readiness",
 						},
 						{
-							text: "ADR-023: Refresh Token Lifecycle & Rotation Safety",
+							text: "ADR-023: Dynamic Cookie TTL Alignment, Stale Cookie Cleanup, and Singleflight Refresh Token Rotation Safety",
 							link: "/decisions/ADR-023-refresh-token-lifecycle-and-rotation-safety",
 						},
 						{
-							text: "ADR-024: Non-blocking Template Upgrade",
+							text: "ADR-024: Non-blocking Workspace Template Upgrade & Multi-User Authorization",
 							link: "/decisions/ADR-024-non-blocking-workspace-template-upgrade",
 						},
 						{
-							text: "ADR-025: Request Context via AsyncLocalStorage",
+							text: "ADR-025: Request Context Propagation over JSON-RPC via AsyncLocalStorage",
 							link: "/decisions/ADR-025-async-local-storage-mcp-request-context",
 						},
 					],
