@@ -33,4 +33,3 @@ Before pushing commits or triggers that lead to publishing (e.g., version bumps,
 When addressing security vulnerabilities or performing package upgrades:
 1. **Verify if Overrides are Removable**: Before introducing or modifying `overrides` or `resolutions` in `package.json`, check if the parent dependencies (the packages pulling in the vulnerable dependency) can be upgraded to versions that transitively resolve the vulnerability.
 2. **Perform Regular Cleanup**: During any dependency upgrade cycle, inspect the existing `overrides` and `resolutions` blocks. Verify if newer versions of the parent packages have been released that natively include secure versions of those transitive dependencies. If so, upgrade the parent packages and remove the hardcoded overrides from `package.json`.
-

@@ -8,6 +8,7 @@ This reference details the Model Context Protocol (MCP) tools exposed by `@nogoo
 1. [Diagnostics & Utility Tools](#diagnostics-utility-tools)
    - [`current_namespace`](#current_namespace)
    - [`check_permissions`](#check_permissions)
+   - [`get_capabilities`](#get_capabilities)
 2. [Pod Management Tools](#pod-management-tools)
    - [`list_pods`](#list_pods)
    - [`get_pod`](#get_pod)
@@ -29,6 +30,10 @@ This reference details the Model Context Protocol (MCP) tools exposed by `@nogoo
    - [`get_workspace`](#get_workspace)
    - [`spawn_workspace`](#spawn_workspace)
    - [`stop_workspace`](#stop_workspace)
+   - [`get_workspace_events`](#get_workspace_events)
+   - [`run_agent_in_workspace`](#run_agent_in_workspace)
+   - [`upgrade_workspace`](#upgrade_workspace)
+   - [`upgrade_all_workspaces`](#upgrade_all_workspaces)
 
 ---
 
@@ -84,6 +89,33 @@ Interrogates the Kubernetes API using `SelfSubjectAccessReview` to check active 
       "pods": { "create": true, "list": true, "delete": true },
       "namespaces": { "list": false }
     }
+  }
+}
+```
+
+### `get_capabilities`
+Returns the active server capabilities, runtime mode, default namespace, authentication configuration, and caller permissions summary.
+
+* **Inputs:** None
+* **Example Call:**
+```json
+{}
+```
+* **Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Server Version: 0.15.0\nMode: cluster\nNamespace: nogoo9"
+    }
+  ],
+  "structuredContent": {
+    "version": "0.15.0",
+    "mode": "cluster",
+    "namespace": "nogoo9",
+    "authEnabled": true,
+    "isAdmin": true
   }
 }
 ```
@@ -735,6 +767,124 @@ Initiates a graceful cleanup and termination of the target workspace pod, trigge
   "structuredContent": {
     "id": "session45",
     "status": "terminating"
+  }
+}
+```
+
+### `get_workspace_events`
+Returns historical Kubernetes event logs and status transitions for a specific workspace, useful for debugging pod startup failures.
+
+* **Inputs:**
+  * `id` (string): Workspace ID.
+  * `namespace` (optional string): Target namespace.
+* **Example Call:**
+```json
+{
+  "id": "session45"
+}
+```
+* **Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Event: Scheduled -> Pod assigned to node k3d-nogoo-dev-server-0\nEvent: Pulled -> Container image node:20-alpine pulled"
+    }
+  ],
+  "structuredContent": {
+    "id": "session45",
+    "events": [
+      { "reason": "Scheduled", "message": "Pod assigned to node k3d-nogoo-dev-server-0", "type": "Normal" }
+    ]
+  }
+}
+```
+
+### `run_agent_in_workspace`
+Executes an arbitrary shell command directly inside a running workspace pod container and returns standard output/error.
+
+* **Inputs:**
+  * `id` (string): Workspace ID.
+  * `command` (array of strings): Command array to execute (e.g. `["echo", "hello"]`).
+  * `container` (optional string): Target container name.
+  * `namespace` (optional string): Target namespace.
+* **Example Call:**
+```json
+{
+  "id": "session45",
+  "command": ["echo", "hello from agent"]
+}
+```
+* **Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "hello from agent\n"
+    }
+  ],
+  "structuredContent": {
+    "stdout": "hello from agent\n",
+    "stderr": "",
+    "exitCode": 0
+  }
+}
+```
+
+### `upgrade_workspace`
+Triggers a non-blocking background template version upgrade for a target workspace owned by the caller.
+
+* **Inputs:**
+  * `id` (string): Target workspace ID.
+  * `namespace` (optional string): Target namespace.
+* **Example Call:**
+```json
+{
+  "id": "session45"
+}
+```
+* **Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Initiated non-blocking upgrade for workspace session45 (Pod: ws-guest-session45-up-a2f5c)"
+    }
+  ],
+  "structuredContent": {
+    "id": "session45",
+    "status": "upgrading",
+    "podName": "ws-guest-session45-up-a2f5c"
+  }
+}
+```
+
+### `upgrade_all_workspaces`
+Initiates non-blocking background template version upgrades for all outdated workspaces across the cluster. **Requires administrator privileges (`admin` scope / `nogoo9:admin` role).**
+
+* **Inputs:**
+  * `namespace` (optional string): Target namespace.
+* **Example Call:**
+```json
+{}
+```
+* **Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Triggered bulk upgrade for 2 outdated workspaces."
+    }
+  ],
+  "structuredContent": {
+    "upgradedWorkspaces": [
+      { "id": "session45", "podName": "ws-guest-session45-up-a2f5c" },
+      { "id": "session46", "podName": "ws-user2-session46-up-91b3e" }
+    ]
   }
 }
 ```

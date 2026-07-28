@@ -109,3 +109,19 @@ export function errorResult<
 		...(structuredContent ? { structuredContent } : {}),
 	};
 }
+
+/**
+ * Checks if a Kubernetes API error corresponds to HTTP 404 Not Found.
+ */
+export function isNotFound(error: unknown): boolean {
+	const k8sErr = getK8sError(error);
+	return k8sErr.statusCode === 404;
+}
+
+/**
+ * Checks if a Kubernetes API error corresponds to HTTP 403 Forbidden.
+ */
+export function isForbidden(error: unknown): boolean {
+	const k8sErr = getK8sError(error);
+	return k8sErr.statusCode === 403;
+}

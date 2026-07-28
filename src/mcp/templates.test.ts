@@ -25,7 +25,7 @@ const k8sContext = {
 	kc,
 } as any;
 
-import { registerTemplateResources } from "./templates.js";
+import { registerTemplateResources } from "./templates/index.js";
 
 describe("Templates MCP Tools", () => {
 	let registerSpy: any;

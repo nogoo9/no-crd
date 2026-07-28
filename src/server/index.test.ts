@@ -3017,6 +3017,58 @@ users:
 			}
 		});
 
+		test("HTTP Proxy - correctly preserves nested sub-paths and query parameters", async () => {
+			mockListNamespacedPod.mockResolvedValue({
+				items: [
+					{
+						metadata: {
+							name: "ws-user1-ws-1",
+							labels: {
+								"nogoo9/user-sub": "user-1",
+							},
+							annotations: {
+								"nogoo9/workspace-port": "8080",
+							},
+						},
+						status: {
+							phase: "Running",
+							podIP: "10.0.0.5",
+						},
+					},
+				],
+			});
+
+			const token = createMockToken({ sub: "user-1" });
+			const originalFetch = globalThis.fetch;
+			let requestedUrl = "";
+			const mockFetch = mock((url: string) => {
+				requestedUrl = url;
+				return Promise.resolve(
+					new Response("proxied-query-resp", { status: 200 }),
+				);
+			});
+			globalThis.fetch = mockFetch as any;
+
+			try {
+				const req = new Request(
+					"http://localhost/route/ws-1/api/v1/data?search=test&page=2",
+					{
+						method: "GET",
+						headers: {
+							Authorization: `Bearer ${token}`,
+						},
+					},
+				);
+				const resp = await handleWebRequest(req);
+				expect(resp.status).toBe(200);
+				expect(requestedUrl).toBe(
+					"http://10.0.0.5:8080/api/v1/data?search=test&page=2",
+				);
+			} finally {
+				globalThis.fetch = originalFetch;
+			}
+		});
+
 		test("Session cookie parsing works with custom subJsonPath and rolesJsonPath", async () => {
 			process.env.AUTH_SUB_JSONPATH = "$.user.id";
 			process.env.AUTH_ROLES_JSONPATH = "$.user.roles";

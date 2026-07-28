@@ -2,6 +2,14 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+## What's New in v0.15.0
+
+- **Deep Wiki Knowledge Base & Strategy Workflow**: Added 8 comprehensive Deep Wiki documentation articles under `docs/wiki/` and established the `/generate-deep-wiki` strategy workflow for automated codebase auditing, architecture diagramming, and VitePress navigation management.
+- **Automatic ADR Sidebar Synchronization**: Implemented dynamic ADR auto-discovery (`syncAdrs()`) in `scripts/update-docs.ts` to automatically discover and register all `ADR-*.md` records into VitePress navigation sidebar configs during builds.
+- **Repeatable Documentation Accuracy Audit**: Created `/audit-docs-accuracy` workflow to systematically audit tool descriptions, parameter schemas, configuration tables, and upgrade state machines against ground truth code.
+- **Server Subsystem Refactoring**: Streamlined and simplified `src/server/` into modular components (`sse.ts`, `auth-singleflight.ts`, `routes/proxy-auth.ts`, `routes/proxy.ts`), enhancing readability and subsystem isolation.
+- **Import Boundary & Path Alias Envariant**: Added `bun run lint` (`scripts/check-imports.ts`) to all quality gates, enforcing mandatory `~/` path alias usage across `src/` modules.
+
 ## What's New in v0.14.0
 
 - **Multi-User Upgrade Access Controls**: Strict RBAC permissions are now enforced for template upgrades. The `upgrade_all_workspaces` tool is restricted exclusively to administrators (`Forbidden` for non-admin accounts), while normal users can only upgrade their own workspaces 1-by-1 (`Access Denied` for non-admin cross-user upgrades).

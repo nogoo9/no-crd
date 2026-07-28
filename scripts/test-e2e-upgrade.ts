@@ -147,7 +147,7 @@ async function waitForPodDeleted(
 async function waitForWorkspaceRunning(
 	token: string,
 	wsId: string,
-	timeoutSec = 60,
+	timeoutSec = 120,
 ): Promise<any> {
 	for (let i = 0; i < timeoutSec; i++) {
 		const listRes = await makeMcpCall(token, "tools/call", {

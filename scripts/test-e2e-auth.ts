@@ -523,6 +523,60 @@ async function runCookieAuthenticationTest(ctx: TestContext) {
 }
 
 /**
+ * Step 8: Workspace event streaming and cross-user control safeguards.
+ */
+async function runWorkspaceEventsAndControlsTest(ctx: TestContext) {
+	console.log(
+		"\n[8/8] Testing workspace events streaming & cross-user spawner safeguards...",
+	);
+
+	console.log("    Fetching workspace events as 'writeuser' (owner)...");
+	const eventsRes = await makeMcpCall(ctx.writeToken, "tools/call", {
+		name: "get_workspace_events",
+		arguments: { id: "writeuser-e2e-pod" },
+	});
+	if (eventsRes.data.result?.isError === true) {
+		throw new Error(
+			`Failed to fetch workspace events as owner: ${JSON.stringify(eventsRes.data)}`,
+		);
+	}
+	console.log("      -> Events retrieved successfully by owner.");
+
+	console.log(
+		"    Testing cross-user get_workspace_events restriction ('readuser' on 'writeuser-e2e-pod')...",
+	);
+	const crossEventsRes = await makeMcpCall(ctx.readToken, "tools/call", {
+		name: "get_workspace_events",
+		arguments: { id: "writeuser-e2e-pod" },
+	});
+	if (crossEventsRes.data.result?.isError !== true) {
+		throw new Error(
+			"Security failure: readuser was allowed to fetch writeuser's workspace events!",
+		);
+	}
+	console.log(
+		"      -> Cross-user workspace events request correctly blocked.",
+	);
+
+	console.log(
+		"    Testing cross-user stop_workspace restriction ('readuser' stopping 'writeuser-e2e-pod')...",
+	);
+	const crossStopRes = await makeMcpCall(ctx.readToken, "tools/call", {
+		name: "stop_workspace",
+		arguments: { id: "writeuser-e2e-pod" },
+	});
+	if (crossStopRes.data.result?.isError !== true) {
+		throw new Error(
+			"Security failure: readuser was allowed to stop writeuser's workspace!",
+		);
+	}
+	console.log("      -> Cross-user stop_workspace request correctly blocked.");
+	console.log(
+		"    ✅ Workspace events & cross-user spawner safeguards verified.",
+	);
+}
+
+/**
  * Step 8: Cleanup Kubernetes pods.
  */
 async function cleanupPods(ctx: TestContext) {
@@ -549,6 +603,7 @@ async function main() {
 		await runPodIsolationTest(ctx);
 		await runResourceAccessEscalationTest(ctx);
 		await runCookieAuthenticationTest(ctx);
+		await runWorkspaceEventsAndControlsTest(ctx);
 	} finally {
 		await cleanupPods(ctx);
 	}

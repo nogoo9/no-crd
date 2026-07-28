@@ -1,5 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { computeRefreshCookieTtl } from "~/auth/index.js";
 import { ANNOTATION_KEYS, config } from "~/config/index.js";
 import {
 	createSessionCookie,
@@ -76,46 +77,18 @@ async function getTokenEndpoint(): Promise<string> {
 	}
 }
 
-/**
- * Computes cookie Max-Age from a JWT's exp claim, falling back to config default.
- */
-export function computeTokenCookieTtl(jwtPayload: any): number {
-	if (jwtPayload?.exp && typeof jwtPayload.exp === "number") {
-		const remaining = jwtPayload.exp - Math.floor(Date.now() / 1000);
-		if (remaining > 0) {
-			return remaining;
-		}
-	}
-	return config.auth.tokenCookieTtlSeconds;
-}
+export {
+	computeRefreshCookieTtl,
+	computeTokenCookieTtl,
+} from "~/auth/index.js";
 
-/**
- * Computes cookie Max-Age for the refresh token cookie, using the IdP's
- * refresh_expires_in when available, otherwise falling back to config default.
- */
-export function computeRefreshCookieTtl(refreshExpiresIn?: number): number {
-	if (refreshExpiresIn && refreshExpiresIn > 0) {
-		return refreshExpiresIn;
-	}
-	return config.auth.refreshCookieTtlSeconds;
-}
+import {
+	_testInflightRefreshes,
+	deduplicateRefreshCall,
+	type RefreshResult,
+} from "./auth-singleflight.js";
 
-type RefreshResult = {
-	jwtPayload: any;
-	token: string;
-	rotatedRefreshToken: string;
-	refreshExpiresIn?: number;
-};
-
-/**
- * In-flight refresh promises keyed by the decrypted refresh token.
- * Ensures concurrent requests for the same token coalesce into
- * a single IdP round-trip (singleflight pattern).
- */
-const inflightRefreshes = new Map<string, Promise<RefreshResult>>();
-
-// Exported for testing only
-export const _testInflightRefreshes = inflightRefreshes;
+export { _testInflightRefreshes };
 
 /**
  * Performs a refresh token exchange against the OIDC provider.
@@ -129,23 +102,9 @@ export function performTokenRefresh(
 	sessKey: string,
 	basePrefix: string,
 ): Promise<RefreshResult> {
-	const existing = inflightRefreshes.get(decryptedRefresh);
-	if (existing) {
-		logger.debug("Coalescing concurrent refresh request (singleflight hit)");
-		return existing;
-	}
-
-	const promise = executeTokenRefresh(
-		request,
-		decryptedRefresh,
-		sessKey,
-		basePrefix,
-	).finally(() => {
-		inflightRefreshes.delete(decryptedRefresh);
-	});
-
-	inflightRefreshes.set(decryptedRefresh, promise);
-	return promise;
+	return deduplicateRefreshCall(decryptedRefresh, () =>
+		executeTokenRefresh(request, decryptedRefresh, sessKey, basePrefix),
+	);
 }
 
 /**

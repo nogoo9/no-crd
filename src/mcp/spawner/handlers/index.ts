@@ -16,11 +16,12 @@ import {
 import {
 	buildWorkspaceDetails,
 	getTemplateLatestVersion,
+	mergeContainerOverrides,
 	reconcileUpgradeTransition,
 	resolveTemplateSpec,
 	verifyAuthAndGetContext,
-} from "./helpers.js";
-import { upgradeWorkspaceInner } from "./upgrade.js";
+} from "~/mcp/spawner/helpers.js";
+import { upgradeWorkspaceInner } from "~/mcp/spawner/upgrade.js";
 
 const logger = getLogger(["nogoo9", "mcp-spawner"]);
 
@@ -100,78 +101,171 @@ export function listWorkspacesHandler(k8sContext: K8sContext) {
 				structuredContent: { workspaces },
 			};
 		} catch (err: any) {
-			logger.error(
-				"Failed to list workspaces in namespace {namespace}: {error}",
-				{
-					namespace: ns,
-					error: err,
-				},
-			);
+			logger.error("Failed to list workspaces: {error}", { error: err });
 			return errorResult(k8sContext.kc, err, { workspaces: [] });
 		}
 	};
 }
 
-export function getWorkspaceHandler(k8sContext: K8sContext) {
+export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 	return async ({
 		id,
+		templateRef,
 		namespace,
+		context,
+		containerOverrides,
+		topLevelOverrides,
+		labels,
+		annotations,
+		spec,
 		jwtPayload,
 	}: {
 		id: string;
+		templateRef?: string;
 		namespace?: string;
+		context?: Record<string, string>;
+		containerOverrides?: any[];
+		topLevelOverrides?: any;
+		labels?: Record<string, string>;
+		annotations?: Record<string, string>;
+		spec?: any;
 		jwtPayload?: Record<string, unknown>;
 	}) => {
 		const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
 		const activeJwtPayload = resolveActiveJwt(jwtPayload);
 		logger.info(
-			"Tool get_workspace called for workspace ID {id} in namespace {namespace} (authEnabled: {authEnabled})",
-			{ id, namespace: ns, authEnabled: config.auth.enabled },
-		);
-		try {
-			const authCtx = verifyAuthAndGetContext(activeJwtPayload, "read");
-			const labelSelector = `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}${authCtx.subFilter}`;
-
-			const res = await k8sContext.coreApi.listNamespacedPod({
+			"Tool spawn_workspace called for workspace ID {id} in namespace {namespace}",
+			{
+				id,
 				namespace: ns,
-				labelSelector,
-			});
-			if (res.items.length === 0) {
-				throw new Error(`Workspace ${id} not found or access denied`);
+			},
+		);
+
+		try {
+			const authCtx = verifyAuthAndGetContext(
+				activeJwtPayload,
+				"workspace:write",
+			);
+			const userSub = authCtx.userSub;
+
+			let resolvedSpec: any;
+			let resolvedAnnotations: Record<string, string> = {};
+			let resolvedLabels: Record<string, string> = {};
+			let _templateVersion = "1.0.0";
+
+			if (templateRef) {
+				const resolved = await resolveTemplateSpec(
+					k8sContext,
+					templateRef,
+					userSub,
+					id,
+				);
+				resolvedSpec = (resolved as any).spec;
+				resolvedAnnotations = resolved.annotations;
+				resolvedLabels = resolved.labels;
+				_templateVersion = resolved.version;
+			} else if (spec) {
+				const raw = JSON.stringify(spec);
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+				const VAR_USER = "${{user}}";
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+				const VAR_WORKSPACE_ID = "${{workspace_id}}";
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
+				const VAR_WORKSPACE = "${{workspace}}";
+				const interpolated = raw
+					.replaceAll(VAR_USER, userSub)
+					.replaceAll(VAR_WORKSPACE_ID, id)
+					.replaceAll(VAR_WORKSPACE, id);
+				resolvedSpec = PodSpecSchema.parse(parseSpecString(interpolated));
+
+				if (annotations) {
+					for (const [k, v] of Object.entries(annotations)) {
+						if (k === "__proto__" || k === "constructor") continue;
+						resolvedAnnotations[k] = v
+							.replaceAll(VAR_USER, userSub)
+							.replaceAll(VAR_WORKSPACE_ID, id)
+							.replaceAll(VAR_WORKSPACE, id);
+					}
+				}
+				if (labels) {
+					for (const [k, v] of Object.entries(labels)) {
+						if (k === "__proto__" || k === "constructor") continue;
+						resolvedLabels[k] = v
+							.replaceAll(VAR_USER, userSub)
+							.replaceAll(VAR_WORKSPACE_ID, id)
+							.replaceAll(VAR_WORKSPACE, id);
+					}
+				}
+			} else {
+				throw new Error("Either templateRef or spec must be provided");
 			}
 
-			const { activePod, isTransitioning } = await reconcileUpgradeTransition(
-				k8sContext,
+			const mergedSpec = topLevelOverrides
+				? { ...resolvedSpec, ...topLevelOverrides }
+				: resolvedSpec;
+
+			if (
+				containerOverrides &&
+				containerOverrides.length > 0 &&
+				mergedSpec.containers
+			) {
+				mergedSpec.containers = mergeContainerOverrides(
+					mergedSpec.containers,
+					containerOverrides,
+				);
+			}
+
+			let serviceAccountName = mergedSpec.serviceAccountName;
+			if (!serviceAccountName) {
+				serviceAccountName = await provisionServiceAccount(
+					k8sContext.coreApi,
+					ns,
+					id,
+					userSub,
+				);
+				mergedSpec.serviceAccountName = serviceAccountName;
+			}
+
+			const podName = `ws-${userSub}-${id}`;
+			const finalPodArgs = applySpawnerAnnotations(
+				mergedSpec,
+				resolvedAnnotations,
+				context,
+			);
+
+			const createdPod = await createPodFromArgs(
+				k8sContext.coreApi,
 				ns,
-				res.items,
+				podName,
+				finalPodArgs,
 			);
-			const details = await buildWorkspaceDetails(
-				k8sContext,
-				id,
-				activePod,
-				isTransitioning,
-			);
-			const fullWorkspaceObj = {
-				metadata: {
-					name: details.name,
+
+			logger.info(
+				"Successfully spawned workspace {id} (Pod: {podName}) in namespace {namespace}",
+				{
+					id,
+					podName: createdPod.name,
 					namespace: ns,
-					labels: details.labels || {},
-					annotations: details.annotations || {},
 				},
-				spec: details.spec,
-			};
+			);
+
 			return {
 				content: [
 					{
 						type: "text" as const,
-						text: JSON.stringify(fullWorkspaceObj, null, 2),
+						text: `Successfully spawned workspace ${id} (Pod: ${createdPod.name})`,
 					},
 				],
-				structuredContent: details,
+				structuredContent: {
+					id,
+					status: "spawned",
+					podName: createdPod.name,
+					namespace: ns,
+				},
 			};
 		} catch (err: any) {
 			logger.error(
-				"Failed to get workspace ID {id} in namespace {namespace}: {error}",
+				"Failed to spawn workspace {id} in namespace {namespace}: {error}",
 				{
 					id,
 					namespace: ns,
@@ -180,17 +274,8 @@ export function getWorkspaceHandler(k8sContext: K8sContext) {
 			);
 			return errorResult(k8sContext.kc, err, {
 				id,
-				name: "",
-				status: "",
-				podIP: "",
-				port: "",
-				workspacePath: "",
-				workspaceType: "",
-				previewPath: "",
-				previewType: "",
-				userSub: "",
-				annotations: {},
-				templateRef: "",
+				status: "Failed",
+				podName: "",
 			});
 		}
 	};
@@ -209,8 +294,11 @@ export function stopWorkspaceHandler(k8sContext: K8sContext) {
 		const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
 		const activeJwtPayload = resolveActiveJwt(jwtPayload);
 		logger.info(
-			"Tool stop_workspace called for workspace ID {id} in namespace {namespace} (authEnabled: {authEnabled})",
-			{ id, namespace: ns, authEnabled: config.auth.enabled },
+			"Tool stop_workspace called for workspace ID {id} in namespace {namespace}",
+			{
+				id,
+				namespace: ns,
+			},
 		);
 		try {
 			const authCtx = verifyAuthAndGetContext(
@@ -223,235 +311,126 @@ export function stopWorkspaceHandler(k8sContext: K8sContext) {
 				namespace: ns,
 				labelSelector,
 			});
-			if (res.items.length === 0) {
-				throw new Error(`Workspace ${id} not found or access denied`);
+
+			if (!res.items || res.items.length === 0) {
+				throw new Error(
+					`Workspace ${id} not found or access denied in namespace ${ns}`,
+				);
 			}
-			const podName = res.items[0].metadata?.name;
-			if (!podName) {
-				throw new Error("Pod missing name");
+
+			for (const pod of res.items) {
+				const podName = pod.metadata?.name;
+				if (podName) {
+					logger.info(
+						"Deleting workspace pod {podName} for workspace ID {id} in namespace {namespace}",
+						{ podName, id, namespace: ns },
+					);
+					await k8sContext.coreApi.deleteNamespacedPod({
+						name: podName,
+						namespace: ns,
+					});
+				}
 			}
-			await k8sContext.coreApi.deleteNamespacedPod({
-				name: podName,
-				namespace: ns,
-			});
+
 			logger.info(
-				"Successfully deleted workspace pod {podName} for workspace ID {id} in namespace {namespace}",
-				{ podName, id, namespace: ns },
+				"Successfully stopped workspace {id} in namespace {namespace}",
+				{
+					id,
+					namespace: ns,
+				},
 			);
+
 			return {
 				content: [
 					{
 						type: "text" as const,
-						text: `Stopped workspace ${id} (Pod: ${podName})`,
+						text: `Stopped workspace ${id}`,
 					},
 				],
-				structuredContent: { id, status: "terminating" },
+				structuredContent: {
+					id,
+					status: "stopped",
+				},
 			};
 		} catch (err: any) {
 			logger.error(
-				"Failed to stop workspace ID {id} in namespace {namespace}: {error}",
+				"Failed to stop workspace {id} in namespace {namespace}: {error}",
 				{
 					id,
 					namespace: ns,
 					error: err,
 				},
 			);
-			return errorResult(k8sContext.kc, err, { id, status: "" });
+			return errorResult(k8sContext.kc, err, { id, status: "Failed" });
 		}
 	};
 }
 
-export function spawnWorkspaceHandler(k8sContext: K8sContext) {
+export function getWorkspaceHandler(k8sContext: K8sContext) {
 	return async ({
 		id,
-		name,
-		templateRef,
-		spec: inlineSpec,
-		annotations: inlineAnnotations,
 		namespace,
-		context,
 		jwtPayload,
-		userSub: inputUserSub,
 	}: {
 		id: string;
-		name?: string;
-		templateRef?: string;
-		spec?: any;
-		annotations?: Record<string, string>;
 		namespace?: string;
-		context?: Record<string, string>;
 		jwtPayload?: Record<string, unknown>;
-		userSub?: string;
 	}) => {
-		// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
-		const VAR_USER = "${{user}}";
-		// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
-		const VAR_WORKSPACE_ID = "${{workspace_id}}";
-		// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
-		const VAR_WORKSPACE = "${{workspace}}";
-
 		const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
 		const activeJwtPayload = resolveActiveJwt(jwtPayload);
 		logger.info(
-			"Tool spawn_workspace called for workspace ID {id} (name: {name}) in namespace {namespace} (templateRef: {templateRef}, authEnabled: {authEnabled})",
+			"Tool get_workspace called for workspace ID {id} in namespace {namespace}",
 			{
 				id,
-				name,
 				namespace: ns,
-				templateRef,
-				authEnabled: config.auth.enabled,
 			},
 		);
-
 		try {
-			// Pre-flight uniqueness check
-			const existingPods = await k8sContext.coreApi.listNamespacedPod({
+			const authCtx = verifyAuthAndGetContext(activeJwtPayload, "read");
+			const labelSelector = `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}${authCtx.subFilter}`;
+
+			const res = await k8sContext.coreApi.listNamespacedPod({
 				namespace: ns,
-				labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}`,
+				labelSelector,
 			});
-			if (existingPods.items && existingPods.items.length > 0) {
-				throw new Error(`Workspace with ID "${id}" already exists`);
-			}
 
-			const authCtx = verifyAuthAndGetContext(
-				activeJwtPayload,
-				"workspace:write",
-			);
-			let userSub = authCtx.userSub;
-			if (inputUserSub) {
-				if (config.auth.enabled && !authCtx.isAdmin) {
-					throw new Error(
-						"Forbidden: Non-admin users cannot specify a different userSub",
-					);
-				}
-				userSub = inputUserSub;
-			}
-
-			const templateUser =
-				config.auth.enabled || userSub !== "anonymous" ? userSub : "guest";
-
-			let parsedSpec: any;
-			let annotations: Record<string, string> = {};
-			const templateLabels: Record<string, string> = {};
-			let templateVersion = "1.0.0";
-
-			if (templateRef) {
-				const resolved = await resolveTemplateSpec(
-					k8sContext,
-					templateRef,
-					templateUser,
-					id,
-				);
-				const interpolatedRaw = resolved.raw
-					.replaceAll(VAR_USER, templateUser)
-					.replaceAll(VAR_WORKSPACE_ID, id)
-					.replaceAll(VAR_WORKSPACE, id);
-				parsedSpec = PodSpecSchema.parse(parseSpecString(interpolatedRaw));
-				annotations = resolved.annotations;
-				Object.assign(templateLabels, resolved.labels);
-				templateVersion = resolved.version;
-			} else if (inlineSpec) {
-				const rawSpec = JSON.stringify(inlineSpec);
-				const interpolatedRawSpec = rawSpec
-					.replaceAll(VAR_USER, templateUser)
-					.replaceAll(VAR_WORKSPACE_ID, id)
-					.replaceAll(VAR_WORKSPACE, id);
-				parsedSpec = JSON.parse(interpolatedRawSpec);
-
-				if (inlineAnnotations) {
-					for (const [k, v] of Object.entries(inlineAnnotations)) {
-						if (k === "__proto__" || k === "constructor") continue;
-						annotations[k] = (v as string)
-							.replaceAll(VAR_USER, templateUser)
-							.replaceAll(VAR_WORKSPACE_ID, id)
-							.replaceAll(VAR_WORKSPACE, id);
-					}
-				}
-			} else {
-				throw new Error("Either templateRef or spec must be provided");
-			}
-
-			parsedSpec = applySpawnerAnnotations(parsedSpec, annotations, context);
-
-			const roleArn = annotations[ANNOTATION_KEYS.IAM_ROLE_ARN];
-			if (roleArn) {
-				logger.debug(
-					"Provisioning ServiceAccount with IAM role ARN {roleArn}",
-					{ roleArn },
-				);
-				parsedSpec.serviceAccountName = await provisionServiceAccount(
-					k8sContext.coreApi,
-					ns,
-					id,
-					roleArn,
-					config.auth.enabled ? userSub : undefined,
+			if (!res.items || res.items.length === 0) {
+				throw new Error(
+					`Workspace ${id} not found or access denied in namespace ${ns}`,
 				);
 			}
 
-			parsedSpec.labels = {
-				...templateLabels,
-				...(parsedSpec.labels || {}),
-				[ANNOTATION_KEYS.TYPE]: "workspace",
-				[ANNOTATION_KEYS.WORKSPACE_ID]: id,
-				[ANNOTATION_KEYS.MANAGED_BY]: "nogoo9-spawner",
-				[ANNOTATION_KEYS.USER_SUB]: userSub,
-			};
-			const displayName = name || id;
-			parsedSpec.annotations = {
-				...annotations,
-				...(parsedSpec.annotations || {}),
-				[ANNOTATION_KEYS.WORKSPACE_NAME]: displayName,
-			};
-			if (templateRef) {
-				parsedSpec.annotations[ANNOTATION_KEYS.TEMPLATE_REF] = templateRef;
-				parsedSpec.annotations[ANNOTATION_KEYS.TEMPLATE_VERSION] =
-					templateVersion;
-			}
-			if (config.auth.enabled) {
-				parsedSpec.annotations[ANNOTATION_KEYS.USER_SUB] = userSub;
-			}
-
-			const podName = `ws-${userSub.replace(/[^a-z0-9-]/gi, "").slice(0, 10)}-${id}`;
-			logger.info(
-				"Spawning workspace pod {podName} for workspace ID {id} in namespace {namespace}",
-				{
-					podName,
-					id,
-					namespace: ns,
-				},
-			);
-			const result = await createPodFromArgs(
-				k8sContext.coreApi,
+			const { activePod, isTransitioning } = await reconcileUpgradeTransition(
+				k8sContext,
 				ns,
-				podName,
-				parsedSpec,
+				res.items,
 			);
-			logger.info(
-				"Successfully spawned workspace pod {podName} (actual name: {actualPodName})",
-				{
-					podName: id,
-					actualPodName: result.name,
-				},
+			const details = await buildWorkspaceDetails(
+				k8sContext,
+				id,
+				activePod,
+				isTransitioning,
 			);
+
 			return {
 				content: [
 					{
 						type: "text" as const,
-						text: `Spawned workspace ${id} (Pod: ${result.name})`,
+						text: JSON.stringify(details, null, 2),
 					},
 				],
-				structuredContent: { id, podName: result.name },
+				structuredContent: details,
 			};
 		} catch (err: any) {
 			logger.error(
-				"Failed to spawn workspace ID {id} in namespace {namespace}: {error}",
+				"Failed to get workspace {id} in namespace {namespace}: {error}",
 				{
 					id,
 					namespace: ns,
 					error: err,
 				},
 			);
-			return errorResult(k8sContext.kc, err, { id, podName: "" });
+			return errorResult(k8sContext.kc, err, { id, status: "NotFound" });
 		}
 	};
 }
@@ -479,59 +458,43 @@ export function getWorkspaceEventsHandler(k8sContext: K8sContext) {
 			const authCtx = verifyAuthAndGetContext(activeJwtPayload, "read");
 			const labelSelector = `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}${authCtx.subFilter}`;
 
-			const podRes = await k8sContext.coreApi.listNamespacedPod({
+			const res = await k8sContext.coreApi.listNamespacedPod({
 				namespace: ns,
 				labelSelector,
 			});
-			if (!podRes.items || podRes.items.length === 0) {
-				throw new Error(`Workspace ${id} not found or access denied`);
-			}
-			const podName = podRes.items[0].metadata?.name;
-			if (!podName) {
-				throw new Error("Workspace pod has no name");
-			}
-			const eventRes = await k8sContext.coreApi.listNamespacedEvent({
-				namespace: ns,
-				fieldSelector: `involvedObject.name=${podName}`,
-			});
-			const events = (eventRes.items || [])
-				.map((e) => {
-					const timestampVal =
-						e.lastTimestamp ||
-						e.firstTimestamp ||
-						e.metadata?.creationTimestamp;
-					let timestampStr = new Date().toISOString();
-					if (timestampVal) {
-						timestampStr =
-							timestampVal instanceof Date
-								? timestampVal.toISOString()
-								: new Date(timestampVal).toISOString();
-					}
-					return {
-						type: e.type || "Normal",
-						reason: e.reason || "",
-						message: e.message || "",
-						timestamp: timestampStr,
-					};
-				})
-				.sort(
-					(a, b) =>
-						new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+
+			if (!res.items || res.items.length === 0) {
+				throw new Error(
+					`Workspace ${id} not found or access denied in namespace ${ns}`,
 				);
+			}
+
+			const podNames = res.items
+				.map((p) => p.metadata?.name)
+				.filter(Boolean) as string[];
+
+			const eventsRes = await k8sContext.coreApi.listNamespacedEvent({
+				namespace: ns,
+			});
+
+			const events = (eventsRes.items || [])
+				.filter(
+					(e) =>
+						e.involvedObject?.name && podNames.includes(e.involvedObject.name),
+				)
+				.map((e) => ({
+					type: e.type || "Normal",
+					reason: e.reason || "",
+					message: e.message || "",
+					timestamp: e.lastTimestamp || e.eventTime || e.firstTimestamp,
+					podName: e.involvedObject?.name,
+				}));
 
 			return {
 				content: [
 					{
 						type: "text" as const,
-						text:
-							events.length > 0
-								? events
-										.map(
-											(e) =>
-												`[${e.timestamp}] [${e.type}] ${e.reason}: ${e.message}`,
-										)
-										.join("\n")
-								: "(no events)",
+						text: JSON.stringify(events, null, 2),
 					},
 				],
 				structuredContent: { events },
@@ -700,6 +663,113 @@ export function upgradeAllWorkspacesHandler(k8sContext: K8sContext) {
 				},
 			);
 			return errorResult(k8sContext.kc, err, { upgraded: [], failed: [] });
+		}
+	};
+}
+
+export function runAgentInWorkspaceHandler(k8sContext: K8sContext) {
+	return async ({
+		id,
+		command,
+		namespace,
+		jwtPayload,
+	}: {
+		id: string;
+		command: string[];
+		namespace?: string;
+		jwtPayload?: Record<string, unknown>;
+	}) => {
+		const ns = resolveNamespace(namespace, MODE, DEFAULT_NAMESPACE);
+		const activeJwtPayload = resolveActiveJwt(jwtPayload);
+		logger.info(
+			"Tool run_agent_in_workspace called for workspace ID {id} in namespace {namespace}",
+			{
+				id,
+				namespace: ns,
+			},
+		);
+
+		try {
+			const authCtx = verifyAuthAndGetContext(
+				activeJwtPayload,
+				"workspace:write",
+			);
+			const labelSelector = `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.WORKSPACE_ID}=${id}${authCtx.subFilter}`;
+
+			const res = await k8sContext.coreApi.listNamespacedPod({
+				namespace: ns,
+				labelSelector,
+			});
+
+			if (!res.items || res.items.length === 0) {
+				throw new Error(
+					`Workspace ${id} not found or access denied in namespace ${ns}`,
+				);
+			}
+
+			const pod = res.items[0];
+			const podName = pod.metadata?.name;
+			if (!podName) {
+				throw new Error(`Workspace pod for ${id} has no name`);
+			}
+
+			const exec = new (await import("@kubernetes/client-node")).Exec(
+				k8sContext.kc,
+			);
+			const stdoutStream = new (await import("node:stream")).PassThrough();
+			const stderrStream = new (await import("node:stream")).PassThrough();
+
+			let stdoutText = "";
+			let stderrText = "";
+
+			stdoutStream.on("data", (chunk) => {
+				stdoutText += chunk.toString();
+			});
+			stderrStream.on("data", (chunk) => {
+				stderrText += chunk.toString();
+			});
+
+			await new Promise<void>((resolve, reject) => {
+				exec
+					.exec(
+						ns,
+						podName,
+						"agent",
+						command,
+						stdoutStream,
+						stderrStream,
+						null,
+						false,
+					)
+					.then((ws) => {
+						ws.on("close", () => resolve());
+						ws.on("error", (err: any) => reject(err));
+					})
+					.catch(reject);
+			});
+
+			logger.info("Successfully executed agent command in workspace {id}", {
+				id,
+			});
+
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: stdoutText || stderrText || "Command executed successfully",
+					},
+				],
+				structuredContent: {
+					stdout: stdoutText,
+					stderr: stderrText,
+				},
+			};
+		} catch (err: any) {
+			logger.error("Failed to run agent command in workspace {id}: {error}", {
+				id,
+				error: err,
+			});
+			return errorResult(k8sContext.kc, err, { stdout: "", stderr: "" });
 		}
 	};
 }

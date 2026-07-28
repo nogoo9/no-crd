@@ -8,9 +8,10 @@ Run all lint and test checks that do **not** require infrastructure (Docker, k3d
 
 ```bash
 bun run format
+bun run lint
 ```
 
-Biome auto-fixes style issues. If it reports **errors** (not warnings), stop and fix them before continuing.
+Biome auto-fixes style issues, while `bun run lint` validates import boundaries (`scripts/check-imports.ts`). If either reports **errors**, stop and fix them before continuing.
 
 ## Step 2 — Type checking
 
@@ -23,10 +24,11 @@ TypeScript compiler in project-references mode. Any type error is a hard failure
 ## Step 3 — Unit tests
 
 ```bash
+bun run test
 moon run mcp:test
 ```
 
-Runs unit tests via Moon. All tests should pass. If any fail, note the test file and failing assertion and fix before continuing.
+Runs all unit tests. All tests must pass cleanly with 0 failures before proceeding.
 
 ## Summary
 

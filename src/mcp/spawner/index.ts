@@ -16,7 +16,7 @@ import {
 	stopWorkspaceHandler,
 	upgradeAllWorkspacesHandler,
 	upgradeWorkspaceHandler,
-} from "./handlers.js";
+} from "./handlers/index.js";
 import {
 	GetWorkspaceEventsOutputSchema,
 	GetWorkspaceOutputSchema,

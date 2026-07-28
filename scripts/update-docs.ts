@@ -203,3 +203,77 @@ replaceInFile(
 	"<!-- TEMPLATE_ANNOTATIONS_TABLE_END -->",
 	annotationsMarkdown,
 );
+
+// ==========================================
+// Part 4: Auto-Discover & Sync ADRs in VitePress Config
+// ==========================================
+
+function syncAdrs(): void {
+	const decisionsDir = path.join(process.cwd(), "docs/decisions");
+	const configPath = path.join(process.cwd(), "docs/.vitepress/config.ts");
+
+	if (!fs.existsSync(decisionsDir) || !fs.existsSync(configPath)) {
+		return;
+	}
+
+	const files = fs
+		.readdirSync(decisionsDir)
+		.filter((f) => f.startsWith("ADR-") && f.endsWith(".md"))
+		.sort((a, b) => {
+			const numA = Number.parseInt(a.match(/ADR-(\d+)/)?.[1] || "0", 10);
+			const numB = Number.parseInt(b.match(/ADR-(\d+)/)?.[1] || "0", 10);
+			return numA - numB;
+		});
+
+	const adrItems: { text: string; link: string }[] = [
+		{ text: "Overview", link: "/decisions/" },
+	];
+
+	for (const file of files) {
+		const filePath = path.join(decisionsDir, file);
+		const content = fs.readFileSync(filePath, "utf-8");
+		const match = content.match(/^# (ADR-\d+:\s*.+)/m);
+		let fullTitle = match ? match[1].trim() : file.replace(".md", "");
+
+		// Remove inline code formatting markers if any
+		fullTitle = fullTitle.replace(/`([^`]+)`/g, "$1");
+
+		const link = `/decisions/${file.replace(/\.md$/, "")}`;
+		adrItems.push({
+			text: fullTitle,
+			link,
+		});
+	}
+
+	const configContent = fs.readFileSync(configPath, "utf-8");
+	const startMarker = 'text: "Architecture Decisions",';
+	const startIndex = configContent.indexOf(startMarker);
+	if (startIndex === -1) {
+		console.warn(
+			"Warning: Could not find Architecture Decisions section in docs/.vitepress/config.ts",
+		);
+		return;
+	}
+
+	const itemsStart = configContent.indexOf("items: [", startIndex);
+	if (itemsStart === -1) return;
+
+	const itemsEnd = configContent.indexOf("],", itemsStart);
+	if (itemsEnd === -1) return;
+
+	const formattedItems = adrItems
+		.map(
+			(item) =>
+				`						{\n\t\t\t\t\t\t\ttext: ${JSON.stringify(item.text)},\n\t\t\t\t\t\t\tlink: ${JSON.stringify(item.link)},\n\t\t\t\t\t\t},`,
+		)
+		.join("\n");
+
+	const newConfigContent = `${configContent.slice(0, itemsStart + "items: [\n".length)}${formattedItems}\n${configContent.slice(itemsEnd)}`;
+
+	fs.writeFileSync(configPath, newConfigContent, "utf-8");
+	console.log(
+		`Synced ${files.length} ADRs to docs/.vitepress/config.ts sidebar.`,
+	);
+}
+
+syncAdrs();

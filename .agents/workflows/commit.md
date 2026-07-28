@@ -6,11 +6,11 @@ Commit all current changes after ensuring formatting and types are clean.
 
 ## Steps
 
-1. Run `bun run format` to lint, auto-fix, and format. If it reports errors, stop and fix them before proceeding.
+1. Run `bun run format` to lint, auto-fix, and format code with Biome. Run `bun run lint` to verify that no circular or invalid imports exist (`scripts/check-imports.ts`). If either reports errors, stop and fix them before proceeding.
 
 2. Run `bun run typecheck` to verify TypeScript types. If it reports errors, stop and fix them before proceeding.
 
-3. Run `npm pack --dry-run` to verify that all necessary build artifacts (specifically `dist/**/*.js` and `dist/ui/index.html`) are correctly packaged and that no bulky compiled binaries (such as `dist/server-entry`) are accidentally included.
+3. Run `bun run build` followed by `npm pack --dry-run` to verify that all necessary build artifacts (specifically `dist/**/*.js` and `dist/ui/index.html`) are correctly packaged and that no bulky compiled binaries or temporary files are accidentally included.
 
 4. **Safety review** — inspect every file that would be staged:
 

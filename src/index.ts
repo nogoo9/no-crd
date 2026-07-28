@@ -3,12 +3,12 @@ import "~/polyfill.js";
 // Re-export everything from Kubernetes client modules
 export * from "./k8s/index.js";
 export { registerNamespaceTools } from "./mcp/namespace.js";
-export { registerPodTools } from "./mcp/pods.js";
+export { registerPodTools } from "./mcp/pods/index.js";
 // Re-export main MCP and HTTP server creation factory functions
 export { createMcpServer } from "./mcp/server.js";
 // Re-export MCP tool registration helpers
 export { registerSpawnerTools } from "./mcp/spawner/index.js";
-export { registerTemplateResources } from "./mcp/templates.js";
+export { registerTemplateResources } from "./mcp/templates/index.js";
 export {
 	handleWebRequest,
 	resetMcpServer,

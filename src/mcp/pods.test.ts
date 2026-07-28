@@ -22,7 +22,7 @@ const k8sContext = {
 } as any;
 
 // Import target under test (needs mock to be registered first)
-import { registerPodTools } from "./pods.js";
+import { registerPodTools } from "./pods/index.js";
 
 describe("Pods MCP Tools", () => {
 	let registerSpy: any;

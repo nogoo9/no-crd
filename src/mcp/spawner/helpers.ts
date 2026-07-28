@@ -386,3 +386,23 @@ export async function resolveTemplateSpec(
 		labels,
 	};
 }
+
+/**
+ * Merges container overrides into base container list.
+ */
+export function mergeContainerOverrides(
+	baseContainers: any[],
+	overrides: any[],
+): any[] {
+	if (!overrides || overrides.length === 0) return baseContainers;
+	const result = [...baseContainers];
+	for (const override of overrides) {
+		const match = result.find((c: any) => c.name === override.name);
+		if (match) {
+			Object.assign(match, override);
+		} else {
+			result.push(override);
+		}
+	}
+	return result;
+}
