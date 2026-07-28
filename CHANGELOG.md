@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] — 2026-07-28
+
+### Added
+
+- **Deep Wiki Knowledge Base & Strategy**: Created 8 comprehensive Deep Wiki articles under `docs/wiki/` and established `/generate-deep-wiki` strategy workflow for automated codebase auditing, architecture diagramming, and VitePress navigation updates.
+- **Automatic ADR Discovery**: Added dynamic ADR auto-discovery (`syncAdrs()`) to `scripts/update-docs.ts` to automatically register new Architecture Decision Records in `docs/.vitepress/config.ts` on build.
+- **Repeatable Documentation Accuracy Audit**: Created `/audit-docs-accuracy` workflow to systematically audit tool parameters, configuration tables, pod annotations, and state machine flowcharts against codebase truth.
+- **Import Boundary & Path Alias Envariant**: Added `bun run lint` (`scripts/check-imports.ts`) to format, commit, and pre-push quality gates, enforcing project path alias (`~/`) invariants across `src/` modules.
+
+### Changed
+
+- **Server Subsystem Modularization**: Refactored `src/server/` into decoupled modules (`sse.ts`, `auth-singleflight.ts`, `routes/proxy-auth.ts`, `routes/proxy.ts`), improving code readability and maintainability.
+
 ## [0.14.0] — 2026-07-28
 
 ### Added

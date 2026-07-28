@@ -107,11 +107,11 @@ Returns the active server capabilities, runtime mode, default namespace, authent
   "content": [
     {
       "type": "text",
-      "text": "Server Version: 0.14.0\nMode: cluster\nNamespace: nogoo9"
+      "text": "Server Version: 0.15.0\nMode: cluster\nNamespace: nogoo9"
     }
   ],
   "structuredContent": {
-    "version": "0.14.0",
+    "version": "0.15.0",
     "mode": "cluster",
     "namespace": "nogoo9",
     "authEnabled": true,
