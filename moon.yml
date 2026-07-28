@@ -72,9 +72,8 @@ tasks:
 
   test:
     command: "bun test src/**/*.test.ts src/*.test.ts"
-    inputs:
-      - "src/**/*"
-      - "**/*.test.ts"
+    options:
+      cache: false
 
   test-lifecycle:
     command: "bun run scripts/test-lifecycle.ts"
