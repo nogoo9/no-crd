@@ -58,13 +58,7 @@ function getK8sContext(): K8sContext {
 	return globalK8sContext;
 }
 
-const activeSessions = new Map<
-	string,
-	{
-		server: McpServer;
-		transport: WebStandardStreamableHTTPServerTransport;
-	}
->();
+import { sessionManager } from "./sse.js";
 
 /**
  * Creates a fresh MCP server + transport pair.
@@ -101,11 +95,7 @@ async function getMcpServerAndTransport(req: Request): Promise<{
 			await server.connect(globalTransport);
 			return { server, transport: globalTransport };
 		}
-		// Subsequent calls reuse the same transport (it's already connected)
-		// The SDK routes through transport.handleRequest().
-		// We need the server reference from activeSessions if stored,
-		// but for test mode this path just re-returns the transport.
-		const existing = activeSessions.get(globalTransport.sessionId);
+		const existing = sessionManager.get(globalTransport.sessionId);
 		if (existing) return existing;
 		// Fallback: create fresh
 		const server = await createMcpServer(getK8sContext());
@@ -116,8 +106,8 @@ async function getMcpServerAndTransport(req: Request): Promise<{
 
 	// ── Stateful mode: session-based server instances ─────────────────────
 	const sessionId = req.headers.get("mcp-session-id");
-	if (sessionId && activeSessions.has(sessionId)) {
-		return activeSessions.get(sessionId)!;
+	if (sessionId && sessionManager.has(sessionId)) {
+		return sessionManager.get(sessionId)!;
 	}
 
 	logger.info("Creating new stateful session transport.");
@@ -128,13 +118,10 @@ async function getMcpServerAndTransport(req: Request): Promise<{
 		sessionIdGenerator: () => uuidv7(),
 		enableJsonResponse: true,
 		onsessioninitialized: (sessId) => {
-			logger.info("Session initialized: {sessionId}", { sessionId: sessId });
-			activeSessions.set(sessId, { server, transport });
+			sessionManager.set(sessId, { server, transport });
 		},
 		onsessionclosed: (sessId) => {
-			logger.info("Session closed: {sessionId}", { sessionId: sessId });
-			activeSessions.delete(sessId);
-			void server.close().catch(() => {});
+			void sessionManager.closeSession(sessId);
 		},
 	});
 
@@ -153,12 +140,7 @@ export async function resetMcpServer(
 	logger.info("Resetting MCP Server state. stateless={isStateless}", {
 		isStateless,
 	});
-	for (const session of activeSessions.values()) {
-		try {
-			await session.server.close();
-		} catch (_) {}
-	}
-	activeSessions.clear();
+	await sessionManager.resetAll();
 
 	globalTransport = customTransport ?? null;
 	globalIsStateless = isStateless;

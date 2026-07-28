@@ -82,22 +82,13 @@ export {
 	computeTokenCookieTtl,
 } from "~/auth/index.js";
 
-type RefreshResult = {
-	jwtPayload: any;
-	token: string;
-	rotatedRefreshToken: string;
-	refreshExpiresIn?: number;
-};
+import {
+	_testInflightRefreshes,
+	deduplicateRefreshCall,
+	type RefreshResult,
+} from "./auth-singleflight.js";
 
-/**
- * In-flight refresh promises keyed by the decrypted refresh token.
- * Ensures concurrent requests for the same token coalesce into
- * a single IdP round-trip (singleflight pattern).
- */
-const inflightRefreshes = new Map<string, Promise<RefreshResult>>();
-
-// Exported for testing only
-export const _testInflightRefreshes = inflightRefreshes;
+export { _testInflightRefreshes };
 
 /**
  * Performs a refresh token exchange against the OIDC provider.
@@ -111,23 +102,9 @@ export function performTokenRefresh(
 	sessKey: string,
 	basePrefix: string,
 ): Promise<RefreshResult> {
-	const existing = inflightRefreshes.get(decryptedRefresh);
-	if (existing) {
-		logger.debug("Coalescing concurrent refresh request (singleflight hit)");
-		return existing;
-	}
-
-	const promise = executeTokenRefresh(
-		request,
-		decryptedRefresh,
-		sessKey,
-		basePrefix,
-	).finally(() => {
-		inflightRefreshes.delete(decryptedRefresh);
-	});
-
-	inflightRefreshes.set(decryptedRefresh, promise);
-	return promise;
+	return deduplicateRefreshCall(decryptedRefresh, () =>
+		executeTokenRefresh(request, decryptedRefresh, sessKey, basePrefix),
+	);
 }
 
 /**
