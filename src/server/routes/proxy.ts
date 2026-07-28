@@ -9,6 +9,17 @@ import type { RouteDeps } from "./index.js";
 
 const logger = getLogger(["nogoo9", "routes", "proxy"]);
 
+function isWorkspaceAuthModeEnabled(
+	annotations: Record<string, string>,
+	mode: string,
+): boolean {
+	const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
+	return authMode
+		.split(",")
+		.map((m) => m.trim().toLowerCase())
+		.includes(mode.toLowerCase());
+}
+
 export async function registerProxyRoutes(
 	api: FastifyInstance,
 	deps: RouteDeps,
@@ -33,12 +44,7 @@ export async function registerProxyRoutes(
 
 			// Verify if token-api mode is enabled
 			const annotations = (request as any).workspaceAnnotations || {};
-			const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
-			const modes = authMode
-				.split(",")
-				.map((m: string) => m.trim().toLowerCase());
-
-			if (!modes.includes("token-api")) {
+			if (!isWorkspaceAuthModeEnabled(annotations, "token-api")) {
 				reply.status(403);
 				return reply.send({
 					error: "Forbidden",
@@ -140,12 +146,7 @@ export async function registerProxyRoutes(
 
 			// Verify if token-api mode is enabled
 			const annotations = (request as any).workspaceAnnotations || {};
-			const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
-			const modes = authMode
-				.split(",")
-				.map((m: string) => m.trim().toLowerCase());
-
-			if (!modes.includes("token-api")) {
+			if (!isWorkspaceAuthModeEnabled(annotations, "token-api")) {
 				reply.status(403);
 				return reply.send({
 					error: "Forbidden",
@@ -276,12 +277,7 @@ export async function registerProxyRoutes(
 
 			// 2. Verify if token-api mode is enabled
 			const annotations = pod.metadata?.annotations || {};
-			const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
-			const modes = authMode
-				.split(",")
-				.map((m: string) => m.trim().toLowerCase());
-
-			if (!modes.includes("token-api")) {
+			if (!isWorkspaceAuthModeEnabled(annotations, "token-api")) {
 				reply.status(403);
 				return reply.send({
 					error: "Forbidden",
