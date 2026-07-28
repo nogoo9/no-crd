@@ -16,6 +16,7 @@ import {
 import {
 	buildWorkspaceDetails,
 	getTemplateLatestVersion,
+	mergeContainerOverrides,
 	reconcileUpgradeTransition,
 	resolveTemplateSpec,
 	verifyAuthAndGetContext,
@@ -203,19 +204,15 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 				? { ...resolvedSpec, ...topLevelOverrides }
 				: resolvedSpec;
 
-			if (containerOverrides && containerOverrides.length > 0) {
-				if (mergedSpec.containers && Array.isArray(mergedSpec.containers)) {
-					for (const override of containerOverrides) {
-						const match = mergedSpec.containers.find(
-							(c: any) => c.name === override.name,
-						);
-						if (match) {
-							Object.assign(match, override);
-						} else {
-							mergedSpec.containers.push(override);
-						}
-					}
-				}
+			if (
+				containerOverrides &&
+				containerOverrides.length > 0 &&
+				mergedSpec.containers
+			) {
+				mergedSpec.containers = mergeContainerOverrides(
+					mergedSpec.containers,
+					containerOverrides,
+				);
 			}
 
 			let serviceAccountName = mergedSpec.serviceAccountName;
