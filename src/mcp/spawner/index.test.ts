@@ -1258,10 +1258,218 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 				createCallBody.spec.volumes[0].persistentVolumeClaim.claimName,
 			).toBe("pvc-xyz"); // PVC volume preserved
 
+			// Verify owner (nogoo9/user-sub) remains the original owner ("user-abc"), NOT the caller ("admin-user")
+			expect(createCallBody.metadata.labels["nogoo9/user-sub"]).toBe(
+				"user-abc",
+			);
+			expect(createCallBody.metadata.annotations["nogoo9/user-sub"]).toBe(
+				"user-abc",
+			);
+
 			readCMSpy.mockRestore();
 			deleteSpy.mockRestore();
 			createSpy.mockRestore();
 			readPodSpy.mockRestore();
+		});
+
+		test("upgrade_workspace as non-admin on another user's workspace is denied", async () => {
+			const mockPod = {
+				metadata: {
+					name: "ws-pod-user-b",
+					labels: {
+						"nogoo9/workspace-id": "ws-user-b",
+						"nogoo9/user-sub": "user-b",
+						"nogoo9/type": "workspace",
+					},
+					annotations: {
+						"nogoo9/template-ref": "default/node-template",
+					},
+				},
+				spec: { containers: [{ name: "workspace", image: "node:18" }] },
+			};
+
+			spyOn(coreApi, "listNamespacedPod" as any).mockImplementation(
+				async (args: any) => {
+					if (args.labelSelector?.includes("nogoo9/user-sub=user-a")) {
+						return { items: [] } as any;
+					}
+					return { items: [mockPod] } as any;
+				},
+			);
+
+			const handler = registeredTools.get("upgrade_workspace")!;
+			const result = await handler({
+				id: "ws-user-b",
+				namespace: "default",
+				jwtPayload: {
+					sub: "user-a",
+					realm_access: { roles: ["user"] },
+				},
+			});
+
+			expect(result.isError).toBe(true);
+			expect(result.message).toContain(
+				"Workspace ws-user-b not found or access denied",
+			);
+		});
+
+		test("upgrade_workspace as non-admin on own workspace succeeds", async () => {
+			const mockPod = {
+				metadata: {
+					name: "ws-pod-user-a",
+					labels: {
+						"nogoo9/workspace-id": "ws-user-a",
+						"nogoo9/user-sub": "user-a",
+						"nogoo9/type": "workspace",
+					},
+					annotations: {
+						"nogoo9/template-ref": "default/node-template",
+						"nogoo9/template-version": "1.0.0",
+					},
+				},
+				spec: { containers: [{ name: "workspace", image: "node:18" }] },
+			};
+
+			spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+				items: [mockPod],
+			} as any);
+			spyOn(coreApi, "readNamespacedConfigMap").mockResolvedValue({
+				metadata: {
+					name: "node-template",
+					annotations: { "nogoo9/template-version": "2.0.0" },
+				},
+				data: {
+					spec: JSON.stringify({
+						containers: [{ name: "workspace", image: "node:20" }],
+					}),
+				},
+			} as any);
+			spyOn(coreApi, "deleteNamespacedPod").mockResolvedValue({} as any);
+			spyOn(coreApi, "createNamespacedPod").mockResolvedValue({
+				body: { metadata: { name: "ws-pod-user-a" } },
+			} as any);
+
+			const handler = registeredTools.get("upgrade_workspace")!;
+			const result = await handler({
+				id: "ws-user-a",
+				namespace: "default",
+				jwtPayload: {
+					sub: "user-a",
+					realm_access: { roles: ["user"] },
+				},
+			});
+
+			expect(result.isError).toBeUndefined();
+			expect(result.structuredContent.status).toBe("upgrading");
+		});
+	});
+
+	describe("upgrade_all_workspaces", () => {
+		test("upgrade_all_workspaces as non-admin is forbidden", async () => {
+			const handler = registeredTools.get("upgrade_all_workspaces")!;
+			const result = await handler({
+				namespace: "default",
+				jwtPayload: {
+					sub: "user-a",
+					realm_access: { roles: ["user"] },
+				},
+			});
+
+			expect(result.isError).toBe(true);
+			expect(result.message).toContain(
+				"Forbidden: Only admin users can upgrade all workspaces",
+			);
+		});
+
+		test("upgrade_all_workspaces as admin succeeds and processes outdated workspaces across users", async () => {
+			const mockPods = [
+				{
+					metadata: {
+						name: "ws-pod-user-a",
+						labels: {
+							"nogoo9/workspace-id": "ws-user-a",
+							"nogoo9/user-sub": "user-a",
+							"nogoo9/type": "workspace",
+						},
+						annotations: {
+							"nogoo9/template-ref": "default/node-template",
+							"nogoo9/template-version": "1.0.0",
+						},
+					},
+					spec: { containers: [{ name: "workspace", image: "node:18" }] },
+				},
+				{
+					metadata: {
+						name: "ws-pod-user-b",
+						labels: {
+							"nogoo9/workspace-id": "ws-user-b",
+							"nogoo9/user-sub": "user-b",
+							"nogoo9/type": "workspace",
+						},
+						annotations: {
+							"nogoo9/template-ref": "default/node-template",
+							"nogoo9/template-version": "1.0.0",
+						},
+					},
+					spec: { containers: [{ name: "workspace", image: "node:18" }] },
+				},
+			];
+
+			spyOn(coreApi, "listNamespacedPod" as any).mockImplementation(
+				async (args: any) => {
+					const selector = args?.labelSelector || "";
+					if (selector.includes("nogoo9/workspace-id=ws-user-a")) {
+						return { items: [mockPods[0]] } as any;
+					}
+					if (selector.includes("nogoo9/workspace-id=ws-user-b")) {
+						return { items: [mockPods[1]] } as any;
+					}
+					return { items: mockPods } as any;
+				},
+			);
+			spyOn(coreApi, "readNamespacedConfigMap").mockResolvedValue({
+				metadata: {
+					name: "node-template",
+					annotations: { "nogoo9/template-version": "2.0.0" },
+				},
+				data: {
+					spec: JSON.stringify({
+						containers: [{ name: "workspace", image: "node:20" }],
+					}),
+				},
+			} as any);
+			spyOn(coreApi, "deleteNamespacedPod").mockResolvedValue({} as any);
+			const createSpy = spyOn(coreApi, "createNamespacedPod").mockResolvedValue(
+				{ body: { metadata: { name: "ws-upgraded" } } } as any,
+			);
+
+			const handler = registeredTools.get("upgrade_all_workspaces")!;
+			const result = await handler({
+				namespace: "default",
+				jwtPayload: {
+					sub: "admin-user",
+					scope: "nogoo9:admin",
+					realm_access: { roles: ["admin"] },
+				},
+			});
+
+			expect(result.isError).toBeUndefined();
+			expect(result.structuredContent.upgraded).toEqual([
+				"ws-user-a",
+				"ws-user-b",
+			]);
+
+			// Yield execution for background promise in upgradeWorkspaceInner
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			// Verify create calls preserved respective original owners
+			const createCalls = createSpy.mock.calls as any[];
+			expect(createCalls.length).toBe(2);
+			const firstOwner =
+				createCalls[0][0].body.metadata.labels["nogoo9/user-sub"];
+			const secondOwner =
+				createCalls[1][0].body.metadata.labels["nogoo9/user-sub"];
+			expect([firstOwner, secondOwner]).toEqual(["user-a", "user-b"]);
 		});
 	});
 });

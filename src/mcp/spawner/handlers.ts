@@ -626,6 +626,11 @@ export function upgradeAllWorkspacesHandler(k8sContext: K8sContext) {
 				activeJwtPayload,
 				"workspace:write",
 			);
+			if (config.auth.enabled && !authCtx.isAdmin) {
+				throw new Error(
+					"Forbidden: Only admin users can upgrade all workspaces",
+				);
+			}
 			const labelSelector = `${ANNOTATION_KEYS.TYPE}=workspace${authCtx.subFilter}`;
 
 			const res = await k8sContext.coreApi.listNamespacedPod({
