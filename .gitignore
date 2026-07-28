@@ -63,6 +63,7 @@ docs/api/
 # VitePress cache and build outputs
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+docs/.vitepress/.temp/
 
 # Root VitePress cache
 /.vitepress/
