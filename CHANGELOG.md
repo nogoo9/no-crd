@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-07-28
+
+### Added
+
+- **Multi-User Upgrade Authorization & Access Control**: Enforced strict RBAC permission scoping for template upgrades — `upgrade_all_workspaces` is restricted exclusively to administrators (`Forbidden` for non-admins), while normal users can only upgrade their own workspaces 1-by-1 (`Access Denied` for cross-user non-admin upgrades).
+- **Owner Identity & Routing Preservation**: Ensured single and bulk workspace upgrades retain original workspace owner identities (`nogoo9/user-sub`) and URL routing endpoints (`workspacePath`/`previewPath`) across all user and administrator upgrades.
+- **AsyncLocalStorage Context Propagation**: Preserved caller JWT identity and role context across `/mcp` HTTP JSON-RPC tool dispatch bounds via `requestContextStore`.
+- **Multi-User E2E Upgrade Test Suite**: Expanded E2E validation script (`scripts/test-e2e-upgrade.ts`) to test non-admin rejections, admin cross-user upgrades, owner retention, full upgrade lifecycle completion (old pod termination, upgraded env marker verification), and RWO PVC recreate-style upgrade fallback.
+
+### Security
+
+- **Updated Core Dependencies**: Upgraded direct dependencies (`@fastify/static` to v10.1.2, `@modelcontextprotocol/sdk` to v1.30.0) and patched transitive security advisories (`body-parser`, `vite`, `esbuild`) to achieve a 100% clean security audit.
+
 ## [0.13.0] — 2026-07-07
 
 ### Added

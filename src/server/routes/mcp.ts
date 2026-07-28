@@ -1,6 +1,7 @@
 import { getLogger } from "@logtape/logtape";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ANNOTATION_KEYS, config } from "~/config/index.js";
+import { requestContextStore } from "~/k8s/index.js";
 import {
 	getBasePrefix,
 	getRequestHostAndProto,
@@ -263,7 +264,10 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 		});
 
 		const { transport } = await deps.getMcpServerAndTransport(standardReq);
-		const res = await transport.handleRequest(standardReq);
+		const res = await requestContextStore.run(
+			{ jwtPayload: (request as any).jwtPayload },
+			() => transport.handleRequest(standardReq),
+		);
 
 		reply.status(res.status);
 		res.headers.forEach((value: string, key: string) => {

@@ -101,7 +101,11 @@ export async function registerStaticRoutes(
 		decorateReply: false,
 		setHeaders: (res: any) => {
 			for (const [k, v] of Object.entries(CORS_HEADERS)) {
-				res.setHeader(k, v);
+				if (typeof res.setHeader === "function") {
+					res.setHeader(k, v);
+				} else if (typeof res.header === "function") {
+					res.header(k, v);
+				}
 			}
 		},
 	} as any);

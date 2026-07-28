@@ -46,6 +46,10 @@ export async function upgradeWorkspaceInner(
 	}
 	const oldPodAnnotations = oldPod.metadata?.annotations ?? {};
 	const oldPodLabels = oldPod.metadata?.labels ?? {};
+	const oldPodOwner =
+		oldPodLabels[ANNOTATION_KEYS.USER_SUB] ||
+		oldPodAnnotations[ANNOTATION_KEYS.USER_SUB] ||
+		userSub;
 	const templateRef = oldPodAnnotations[ANNOTATION_KEYS.TEMPLATE_REF];
 	if (!templateRef) {
 		throw new Error(
@@ -73,7 +77,7 @@ export async function upgradeWorkspaceInner(
 	const VAR_WORKSPACE_ID = "${{workspace_id}}";
 	// biome-ignore lint/suspicious/noTemplateCurlyInString: template variable placeholder
 	const VAR_WORKSPACE = "${{workspace}}";
-	const templateUser = userSub || "guest";
+	const templateUser = oldPodOwner || "guest";
 
 	if (cm?.data?.spec) {
 		raw = cm.data.spec;
@@ -229,11 +233,12 @@ export async function upgradeWorkspaceInner(
 		[ANNOTATION_KEYS.TYPE]: "workspace",
 		[ANNOTATION_KEYS.WORKSPACE_ID]: id,
 		[ANNOTATION_KEYS.MANAGED_BY]: "nogoo9-spawner",
-		[ANNOTATION_KEYS.USER_SUB]: userSub,
+		[ANNOTATION_KEYS.USER_SUB]: oldPodOwner,
 	};
 	parsedSpec.annotations = {
 		...mergedAnnotations,
 		...(parsedSpec.annotations || {}),
+		[ANNOTATION_KEYS.USER_SUB]: oldPodOwner,
 	};
 
 	// 5. Detect RWO PVCs to decide on recreate vs side-by-side
@@ -242,7 +247,7 @@ export async function upgradeWorkspaceInner(
 
 	// Generate a unique pod name for the upgraded pod to support concurrent run
 	const suffix = `-up-${Math.random().toString(36).substring(2, 7)}`;
-	const basePodName = `ws-${userSub.replace(/[^a-z0-9-]/gi, "").slice(0, 10)}-${id}`;
+	const basePodName = `ws-${oldPodOwner.replace(/[^a-z0-9-]/gi, "").slice(0, 10)}-${id}`;
 	const newPodName = basePodName.slice(0, 63 - suffix.length) + suffix;
 
 	logger.info(

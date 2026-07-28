@@ -1179,7 +1179,7 @@ function Dashboard() {
 	});
 
 	const sharedWorkspaces = capabilities.isAdmin ? workspaces.filter((ws) => ws.userSub !== getDisplayUser()) : [];
-	const upgradeAllBtn = activeUserWorkspaces.some((ws) => ws.isOutdated);
+	const upgradeAllBtn = capabilities.isAdmin && workspaces.some((ws) => ws.isOutdated);
 
 	if (!isInitialized) {
 		if (connectionError) {

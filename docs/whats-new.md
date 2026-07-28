@@ -2,6 +2,14 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+## What's New in v0.14.0
+
+- **Multi-User Upgrade Access Controls**: Strict RBAC permissions are now enforced for template upgrades. The `upgrade_all_workspaces` tool is restricted exclusively to administrators (`Forbidden` for non-admin accounts), while normal users can only upgrade their own workspaces 1-by-1 (`Access Denied` for non-admin cross-user upgrades).
+- **UI Header Action Scoping**: The "Upgrade All Outdated" header button on the React dashboard is now conditionally rendered only for administrator accounts (`capabilities.isAdmin`).
+- **Owner Identity & Routing Preservation**: Single and bulk workspace upgrades retain original workspace owner identities (`nogoo9/user-sub`) and routing URLs (`workspacePath`/`previewPath`). When an administrator upgrades another user's workspace, the newly spawned pod retains the original owner's sub (`oldPodOwner`) for labels, annotations, and pod name prefix (`ws-{oldPodOwner}-...`), preventing owner mutation to admin.
+- **AsyncLocalStorage Context Propagation**: Context routing now preserves caller JWT identity and role payload across `/mcp` HTTP JSON-RPC tool dispatch bounds via `requestContextStore`.
+- **Multi-User E2E Upgrade Test Suite**: Expanded E2E validation script (`scripts/test-e2e-upgrade.ts`) to test non-admin rejections, admin cross-user upgrades, owner retention, full upgrade lifecycle completion (old pod termination, upgraded env marker verification), and RWO PVC recreate-style upgrade fallback.
+
 ## What's New in v0.13.0
 
 - **Template Version & Outdated Display in UI**: The React dashboard now displays the active template version of each workspace pod (e.g. `v1.0.0`) alongside the target template version (e.g. `v1.0.0 → v1.1.0`) when a template update is available, making version management visually clear.
