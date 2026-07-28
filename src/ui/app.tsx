@@ -3913,9 +3913,15 @@ function MeowEasterEgg() {
 	);
 }
 
+import { AppProvider } from "./context/AppContext.js";
+
 // Render root mount
 const container = document.getElementById("root");
 if (container) {
 	const root = createRoot(container);
-	root.render(<Dashboard />);
+	root.render(
+		<AppProvider>
+			<Dashboard />
+		</AppProvider>,
+	);
 }
