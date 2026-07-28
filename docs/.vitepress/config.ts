@@ -234,6 +234,14 @@ export default withMermaid(
 							text: "ADR-023: Refresh Token Lifecycle & Rotation Safety",
 							link: "/decisions/ADR-023-refresh-token-lifecycle-and-rotation-safety",
 						},
+						{
+							text: "ADR-024: Non-blocking Template Upgrade",
+							link: "/decisions/ADR-024-non-blocking-workspace-template-upgrade",
+						},
+						{
+							text: "ADR-025: Request Context via AsyncLocalStorage",
+							link: "/decisions/ADR-025-async-local-storage-mcp-request-context",
+						},
 					],
 				},
 			],

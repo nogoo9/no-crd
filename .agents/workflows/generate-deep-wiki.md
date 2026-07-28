@@ -57,11 +57,12 @@ Add any additional subsystem articles dynamically if new major features or compo
 
 ---
 
-## Step 4 — Sync VitePress Navigation (`docs/.vitepress/config.ts`)
+## Step 4 — Sync VitePress Navigation & ADR Index (`docs/.vitepress/config.ts`)
 
 Verify `docs/.vitepress/config.ts` includes:
 - Top navbar link `{ text: "Wiki", link: "/wiki/" }`
 - Sidebar group `"Deep Wiki Knowledge Base"` containing all generated wiki pages under `docs/wiki/`.
+- Sidebar group `"Architecture Decisions"` containing links to all active ADRs (`docs/decisions/ADR-*.md`). Ensure any newly created ADRs (e.g. ADR-024, ADR-025) are registered in `docs/.vitepress/config.ts` and `docs/decisions/index.md`.
 
 ---
 
