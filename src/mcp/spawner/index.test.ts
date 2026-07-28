@@ -1472,4 +1472,61 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 			expect([firstOwner, secondOwner]).toEqual(["user-a", "user-b"]);
 		});
 	});
+
+	describe("spawn_workspace - container overrides & resource limits", () => {
+		test("applies container overrides and resource limits during spawn", async () => {
+			spyOn(coreApi, "readNamespacedConfigMap").mockResolvedValue({
+				metadata: {
+					name: "default-template",
+					annotations: { "nogoo9/template-version": "1.0.0" },
+				},
+				data: {
+					spec: JSON.stringify({
+						containers: [
+							{
+								name: "workspace",
+								image: "default-image:1.0",
+								env: [{ name: "EXISTING_ENV", value: "old" }],
+							},
+						],
+					}),
+				},
+			} as any);
+
+			const createSpy = spyOn(coreApi, "createNamespacedPod").mockResolvedValue(
+				{ body: { metadata: { name: "ws-custom-pod" } } } as any,
+			);
+
+			const handler = registeredTools.get("spawn_workspace")!;
+			const result = await handler({
+				id: "ws-custom",
+				templateRef: "default-template",
+				containerOverrides: [
+					{
+						name: "workspace",
+						image: "custom-image:2.0",
+						env: [{ name: "CUSTOM_VAR", value: "custom-value" }],
+						resources: {
+							limits: { cpu: "2", memory: "2Gi" },
+							requests: { cpu: "500m", memory: "512Mi" },
+						},
+					},
+				],
+			});
+
+			expect(result.isError).toBeUndefined();
+			expect(createSpy).toHaveBeenCalled();
+			const createdBody = (createSpy.mock.calls[0] as any)[0].body;
+			const mainContainer = createdBody.spec.containers[0];
+			expect(mainContainer.image).toBe("custom-image:2.0");
+			expect(mainContainer.resources.limits).toEqual({
+				cpu: "2",
+				memory: "2Gi",
+			});
+			expect(mainContainer.resources.requests).toEqual({
+				cpu: "500m",
+				memory: "512Mi",
+			});
+		});
+	});
 });

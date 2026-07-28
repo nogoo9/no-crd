@@ -125,6 +125,32 @@ async function main() {
 		const podName = getPodOut.trim();
 		console.log(`Pod is ready: ${podName}`);
 
+		console.log(
+			`\n[3.5/6] Testing 'run_agent_in_workspace' command execution inside live pod...`,
+		);
+		const agentExecRes = await client.callTool({
+			name: "run_agent_in_workspace",
+			arguments: {
+				id: workspaceId,
+				namespace: "nogoo9",
+				command: [
+					"bun",
+					"-e",
+					"console.log('hello from live agent execution');",
+				],
+			},
+		});
+		console.log(
+			"run_agent_in_workspace output:",
+			(agentExecRes.content as any)?.[0],
+		);
+		if (agentExecRes.isError) {
+			throw new Error(
+				`run_agent_in_workspace tool failed: ${JSON.stringify(agentExecRes)}`,
+			);
+		}
+		console.log("✅ run_agent_in_workspace execution verified.");
+
 		console.log(`\n[4/6] Querying HTTP Echo Server...`);
 		const response =
 			await $`kubectl exec -n nogoo9 ${podName} -c agent -- wget -qO- http://127.0.0.1:5678`.text();
