@@ -81,15 +81,22 @@ export function verifyAuthAndGetContext(
 	}
 	verifyAccessOrThrow(jwtPayload, requiredPermission);
 
+	const sub = extractUserIdentity(jwtPayload, config.auth.subJsonPath);
 	let isAdmin = false;
-	try {
-		verifyAccessOrThrow(jwtPayload, "admin");
+	if (
+		config.auth.adminUsers.length > 0 &&
+		config.auth.adminUsers.includes(sub)
+	) {
 		isAdmin = true;
-	} catch (_) {
-		// Ignore
+	} else {
+		try {
+			verifyAccessOrThrow(jwtPayload, "admin");
+			isAdmin = true;
+		} catch (_) {
+			// Ignore
+		}
 	}
 
-	const sub = extractUserIdentity(jwtPayload, config.auth.subJsonPath);
 	return {
 		userSub: sub,
 		isAdmin,

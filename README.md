@@ -152,6 +152,7 @@ The server and command-line utility are configurable using CLI options or enviro
 | `--auth-required-read-scope` | `AUTH_REQUIRED_READ_SCOPE` | `nogoo9:read` | String | OAuth scope required for read operations. If not set, read scope check is bypassed. |
 | `--auth-required-write-scope` | `AUTH_REQUIRED_WRITE_SCOPE` | `nogoo9:write` | String | OAuth scope required for write/mutation operations. If not set, write scope check is bypassed. |
 | `--auth-required-admin-scope` | `AUTH_REQUIRED_ADMIN_SCOPE` | `nogoo9:admin` | String | OAuth scope required for administrator operations. If not set, admin scope check is bypassed. |
+| - | `AUTH_ADMIN_USERS` | `` | Comma-separated list of user subject IDs (sub) | Comma-separated list of user subject IDs (sub) granted admin privileges without requiring OIDC scope/role claims (workaround fallback). |
 | `--auth-required-read-role` | `AUTH_REQUIRED_READ_ROLE` | `viewer` | String | User role required for read operations. If not set, read role check is bypassed. |
 | `--auth-required-write-role` | `AUTH_REQUIRED_WRITE_ROLE` | `user` | String | User role required for write/mutation operations. If not set, write role check is bypassed. |
 | - | `PROXY_SESSION_TTL` | `1800` | Number | Session cookie expiration lifetime in seconds (sliding window duration). |

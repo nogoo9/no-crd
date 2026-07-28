@@ -2,6 +2,11 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+## What's New in v0.16.0
+
+- **Admin User Whitelist (`AUTH_ADMIN_USERS`)**: Added support for configuring an administrative user whitelist via `AUTH_ADMIN_USERS` (e.g. `AUTH_ADMIN_USERS="user-sub-123,admin@example.com"`). Authenticated users whose subject ID (`sub`) matches an entry in the whitelist automatically gain administrator privileges (`isAdmin = true`), bypassing standard OIDC scope (`AUTH_REQUIRED_ADMIN_SCOPE`) and role (`AUTH_ADMIN_ROLE`) checks.
+  > **Note**: This feature serves as an administrative fallback/workaround for environments where configuring full OIDC client scopes and realm roles in the Identity Provider is unfeasible.
+
 ## What's New in v0.15.0
 
 - **Deep Wiki Knowledge Base & Strategy Workflow**: Added 8 comprehensive Deep Wiki documentation articles under `docs/wiki/` and established the `/generate-deep-wiki` strategy workflow for automated codebase auditing, architecture diagramming, and VitePress navigation management.

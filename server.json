@@ -6,13 +6,13 @@
     "url": "https://github.com/nogoo9/no-crd",
     "source": "github"
   },
-  "version": "0.15.0",
+  "version": "0.16.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@nogoo9/no-crd",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "runtimeHint": "bunx",
       "transport": {
         "type": "stdio"
@@ -262,6 +262,12 @@
         {
           "name": "AUTH_ADMIN_ROLE",
           "description": "Bypass role name that grants admin access (default: nogoo9-admin)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "AUTH_ADMIN_USERS",
+          "description": "Comma-separated list of user subject IDs (sub) granted admin privileges without OIDC scope/role claims",
           "isRequired": false,
           "isSecret": false
         },

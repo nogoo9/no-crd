@@ -5,6 +5,7 @@ import {
 	extractUserIdentity,
 	hasRequiredRole,
 	hasRequiredScope,
+	isAdminUser,
 	verifyAccessOrThrow,
 	verifyScopeOrThrow,
 	verifyToken,
@@ -422,6 +423,32 @@ describe("admin scope and access hierarchy", () => {
 		expect(() => verifyAccessOrThrow(payload, "admin")).toThrow(
 			"Forbidden: Missing required role: admin",
 		);
+	});
+
+	describe("AUTH_ADMIN_USERS whitelist workaround", () => {
+		const origAdminUsers = process.env.AUTH_ADMIN_USERS;
+
+		afterEach(() => {
+			if (origAdminUsers !== undefined) {
+				process.env.AUTH_ADMIN_USERS = origAdminUsers;
+			} else {
+				delete process.env.AUTH_ADMIN_USERS;
+			}
+		});
+
+		test("whitelisted user sub bypasses scope and role checks for admin access", () => {
+			process.env.AUTH_ADMIN_USERS = "whitelisted-sub-123, other-admin";
+			const payload = { sub: "whitelisted-sub-123" };
+			expect(() => verifyAccessOrThrow(payload, "admin")).not.toThrow();
+			expect(isAdminUser(payload)).toBe(true);
+		});
+
+		test("non-whitelisted user sub is rejected if missing admin scope and role", () => {
+			process.env.AUTH_ADMIN_USERS = "whitelisted-sub-123, other-admin";
+			const payload = { sub: "regular-user-456" };
+			expect(() => verifyAccessOrThrow(payload, "admin")).toThrow("Forbidden:");
+			expect(isAdminUser(payload)).toBe(false);
+		});
 	});
 
 	test("hasRequiredScope allows nogoo9:admin to satisfy nogoo9:read and nogoo9:write checks", () => {

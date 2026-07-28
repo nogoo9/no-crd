@@ -199,6 +199,23 @@ export const authSchema = {
 		},
 	} satisfies SchemaItem<string | undefined>,
 
+	adminUsers: {
+		cli: "-",
+		env: "AUTH_ADMIN_USERS",
+		defaultVal: [] as string[],
+		allowed: "Comma-separated list of user subject IDs (sub)",
+		description:
+			"Comma-separated list of user subject IDs (sub) granted admin privileges without requiring OIDC scope/role claims (workaround fallback).",
+		get value(): string[] {
+			const raw = getEnv(this.env);
+			if (!raw) return this.defaultVal;
+			return raw
+				.split(",")
+				.map((s) => s.trim())
+				.filter(Boolean);
+		},
+	} satisfies SchemaItem<string[]>,
+
 	requiredReadRole: {
 		cli: "--auth-required-read-role",
 		env: "AUTH_REQUIRED_READ_ROLE",
