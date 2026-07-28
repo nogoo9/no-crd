@@ -9,16 +9,7 @@ import type { RouteDeps } from "./index.js";
 
 const logger = getLogger(["nogoo9", "routes", "proxy"]);
 
-function isWorkspaceAuthModeEnabled(
-	annotations: Record<string, string>,
-	mode: string,
-): boolean {
-	const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
-	return authMode
-		.split(",")
-		.map((m) => m.trim().toLowerCase())
-		.includes(mode.toLowerCase());
-}
+import { isWorkspaceAuthModeEnabled } from "../proxy-common.js";
 
 export async function registerProxyRoutes(
 	api: FastifyInstance,
