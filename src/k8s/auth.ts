@@ -9,7 +9,9 @@ export const requestContextStore = new AsyncLocalStorage<{
 	jwtPayload?: any;
 }>();
 
-export { extractUserIdentity } from "~/auth/index.js";
+import { extractUserIdentity } from "~/auth/index.js";
+
+export { extractUserIdentity };
 
 /**
  * Base64url decode a string.
@@ -627,6 +629,17 @@ export function verifyAccessOrThrow(
 		| "template:write"
 		| "admin",
 ): void {
+	if (config.auth.adminUsers.length > 0) {
+		try {
+			const sub = extractUserIdentity(jwtPayload, config.auth.subJsonPath);
+			if (config.auth.adminUsers.includes(sub)) {
+				return;
+			}
+		} catch (_) {
+			// Ignore identity extraction failures
+		}
+	}
+
 	// 1. Verify Scope
 	const requiredScope =
 		action === "admin"
@@ -690,5 +703,27 @@ export function verifyAccessOrThrow(
 					? writeRole
 					: readRole;
 		throw new Error(`Forbidden: Missing required role: ${displayRole}`);
+	}
+}
+
+/**
+ * Checks if the caller has administrator privileges, either via OIDC scope/role checks or the AUTH_ADMIN_USERS whitelist.
+ */
+export function isAdminUser(jwtPayload: unknown): boolean {
+	if (config.auth.adminUsers.length > 0) {
+		try {
+			const sub = extractUserIdentity(jwtPayload, config.auth.subJsonPath);
+			if (config.auth.adminUsers.includes(sub)) {
+				return true;
+			}
+		} catch (_) {
+			// Ignore
+		}
+	}
+	try {
+		verifyAccessOrThrow(jwtPayload, "admin");
+		return true;
+	} catch (_) {
+		return false;
 	}
 }

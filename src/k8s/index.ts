@@ -7,6 +7,7 @@ export {
 	extractUserIdentity,
 	hasRequiredRole,
 	hasRequiredScope,
+	isAdminUser,
 	requestContextStore,
 	verifyAccessOrThrow,
 	verifyRoleOrThrow,
