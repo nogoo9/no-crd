@@ -20,8 +20,8 @@ import {
 	reconcileUpgradeTransition,
 	resolveTemplateSpec,
 	verifyAuthAndGetContext,
-} from "../helpers.js";
-import { upgradeWorkspaceInner } from "../upgrade.js";
+} from "~/mcp/spawner/helpers.js";
+import { upgradeWorkspaceInner } from "~/mcp/spawner/upgrade.js";
 
 const logger = getLogger(["nogoo9", "mcp-spawner"]);
 

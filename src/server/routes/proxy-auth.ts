@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "~/config/index.js";
 import { setCorsHeaders } from "~/server/helpers.js";
-import { isWorkspaceAuthModeEnabled } from "../proxy-common.js";
+import { isWorkspaceAuthModeEnabled } from "~/server/proxy-common.js";
 import type { RouteDeps } from "./index.js";
 
 /**
@@ -221,8 +221,8 @@ export function registerProxyAuthRoutes(
 				extractTokenFromCookie,
 				getSessionKey,
 			} = await import("~/k8s/index.js");
-			const { performTokenRefresh } = await import("../auth.js");
-			const { getBasePrefix } = await import("../helpers.js");
+			const { performTokenRefresh } = await import("~/server/auth.js");
+			const { getBasePrefix } = await import("~/server/helpers.js");
 
 			const sessKey = getSessionKey();
 			const encryptedRefresh = extractTokenFromCookie(

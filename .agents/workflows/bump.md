@@ -72,13 +72,15 @@ Search the README and documentation files for hardcoded version strings and upda
 grep -rn '<old_version>' README.md docs/
 ```
 
-## Step 8 — Run format, typecheck, and build verification
+## Step 8 — Run format, typecheck, build, and docs compilation
 
-Run the full local gate to verify formatting, type-safety, and documentation site compilation:
+Run the full local gate to verify formatting, import integrity, build outputs, type-safety, and documentation site compilation:
 
 ```bash
 bun run format
+bun run lint
 bun run typecheck
+bun run build
 bun run docs:build
 ```
 
