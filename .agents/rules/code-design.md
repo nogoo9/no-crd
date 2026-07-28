@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Behavioral guidelines to reduce common LLM coding mistakes.
+description: Behavioral guidelines to reduce common LLM coding mistakes and enforce project invariants.
 ---
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
@@ -15,10 +15,11 @@ Before implementing:
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
-## 2. Simplicity First
+## 2. Simplicity & Module Path Invariants
 
-**Minimum code that solves the problem. Nothing speculative.**
+**Minimum code that solves the problem. Always use path aliases.**
 
+- **Path Alias Invariant**: Never use relative parent paths (`../`) in `src/` modules. Always use the project path alias (`~/`) (e.g. `import { foo } from "~/server/helpers.js"`).
 - No features beyond what was asked.
 - No abstractions for single-use code.
 - No "flexibility" or "configurability" that wasn't requested.
@@ -63,4 +64,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+**These guidelines are working if:** fewer unnecessary changes in diffs, zero relative parent imports, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
