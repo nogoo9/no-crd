@@ -50,9 +50,9 @@ When an upgrade is requested for a workspace via the `upgrade_workspace` or `upg
 flowchart TD
     Start["Upgrade Triggered"] --> CheckPVC{"Has PVC (RWO)?"}
     
-    CheckPVC -- "Yes (Recreate)" --> SpawnNewRecreate["Spawn New Pod"]
-    SpawnNewRecreate --> DeleteOldRecreate["Delete Old Pod Immediately"]
-    DeleteOldRecreate --> End["Upgrade Finished"]
+    CheckPVC -- "Yes (Recreate)" --> DeleteOldRecreate["Delete Old Pod First (Release Volume Lock)"]
+    DeleteOldRecreate --> SpawnNewRecreate["Spawn New Upgraded Pod"]
+    SpawnNewRecreate --> End["Upgrade Finished"]
     
     CheckPVC -- "No (Side-by-Side)" --> SpawnNewSbS["Spawn New Pod (Unique Name)"]
     SpawnNewSbS --> PollReady{"Is New Pod Ready?"}
@@ -74,7 +74,7 @@ To support concurrent execution during side-by-side upgrades, the new pod is spa
 
 ### 3. Volume Lock Fallback (RWO PVCs)
 *   **Side-by-Side Upgrades (Default)**: For workspaces with no volumes or ReadWriteMany volumes, the Spawner spawns the new pod *alongside* the old pod. It waits for the new pod to become ready before terminating the old one, minimizing downtime.
-*   **Recreate-Style Upgrades**: Kubernetes PersistentVolumeClaims (PVCs) using `ReadWriteOnce` (RWO) access mode cannot be mounted by multiple pods concurrently. If the Spawner detects an RWO PVC, it falls back to a recreate flow: it spawns the new pod and immediately deletes the old pod to release the volume lock, enabling the new pod to mount the volume.
+*   **Recreate-Style Upgrades**: Kubernetes PersistentVolumeClaims (PVCs) using `ReadWriteOnce` (RWO) access mode cannot be mounted by multiple pods concurrently. If the Spawner detects an RWO PVC, it falls back to a recreate flow: it deletes the old pod **first** to unmount the volume and release volume attachment locks, and then spawns the upgraded new pod.
 
 ---
 

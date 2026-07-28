@@ -45,7 +45,7 @@ All logic modifications must be accompanied by tests. We co-locate test files di
 bun run test
 
 # Run a specific test suite
-bun test src/mcp/spawner.test.ts
+bun test src/mcp/spawner/index.test.ts
 
 # Run tests via Moon (toolchain checks)
 moon run mcp:test
