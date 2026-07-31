@@ -1,6 +1,6 @@
 # Auth & Security Model
 
-`nogoo9` implements identity-aware authorization, session cookie security, singleflight request deduplication, and fine-grained Role-Based Access Control (RBAC) to ensure complete tenant isolation across multi-user environments.
+`nogoo9` implements identity-aware authorization, session cookie security, singleflight request deduplication, template access control annotations, and fine-grained Role-Based Access Control (RBAC) to ensure complete tenant isolation across multi-user environments.
 
 ---
 
@@ -40,9 +40,9 @@ graph TD
 - Normal users can only see, query logs for, stop, or upgrade their own workspaces (`nogoo9/user-sub`).
 - Users with `nogoo9:admin` or cluster admin roles can manage across all tenant boundaries.
 
-### 5. Non-Admin Workspace Concurrency Quotas ([`src/config/auth.ts`](file:///home/eterna2/github/nogoo9-no-crd/src/config/auth.ts))
+### 5. Non-Admin Workspace Concurrency Quotas ([`src/config/auth.ts`](file:///home/eterna2/github/nogoo9-no-crd/src/config/auth.ts), ADR-026)
 - Limits the number of concurrent active workspaces a non-admin user can own (`MAX_WORKSPACES_PER_USER`). Administrators bypass quotas.
 
-### 6. Template Role & Scope Authorization Annotations ([`src/k8s/auth.ts`](file:///home/eterna2/github/nogoo9-no-crd/src/k8s/auth.ts))
-- Restricts pod template workspace creation to callers possessing matching OIDC roles (`nogoo9/allowed-roles`) and scopes (`nogoo9/allowed-scopes`) using strict AND evaluation logic.
-
+### 6. Template Role & Scope Authorization Annotations ([`src/k8s/auth.ts`](file:///home/eterna2/github/nogoo9-no-crd/src/k8s/auth.ts), ADR-027)
+- Restricts pod template workspace creation to callers possessing matching OIDC roles (`nogoo9/allowed-roles`) and scopes (`nogoo9/allowed-scopes`) using `verifyTemplateAccessOrThrow`.
+- Unprivileged users attempting to spawn from restricted templates receive structured `403 Forbidden` error messages detailing missing roles or scopes.

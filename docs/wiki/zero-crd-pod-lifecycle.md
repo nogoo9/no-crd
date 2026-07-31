@@ -1,6 +1,6 @@
 # Zero-CRD Pod Lifecycle & Recreate Upgrade State Machine
 
-This article documents how `nogoo9` manages pod creation, container overrides, storage binding, annotation processing, shutdown hooks, and recreate-style zero-downtime workspace upgrades without requiring Kubernetes CRDs.
+This article documents how `nogoo9` manages pod creation, container overrides, storage binding, annotation processing, shutdown hooks, concurrency quotas, and recreate-style zero-downtime workspace upgrades without requiring Kubernetes CRDs.
 
 ---
 
@@ -9,7 +9,9 @@ This article documents how `nogoo9` manages pod creation, container overrides, s
 ```mermaid
 stateDiagram-v2
     [*] --> Idle: Template / Inline Definition
-    Idle --> Spawning: spawn_workspace()
+    Idle --> QuotaCheck: spawn_workspace()
+    QuotaCheck --> Spawning: Concurrency Limit OK (MAX_WORKSPACES_PER_USER)
+    QuotaCheck --> Rejected: Quota Exceeded (403 Forbidden)
     Spawning --> InitContainer: Inject Sync Init Container
     InitContainer --> Running: Main Container Starts
     Running --> Executing: run_agent_in_workspace() / Proxy Traffic
@@ -20,7 +22,8 @@ stateDiagram-v2
 
     state UpgradeProcess {
         Running --> UpgradeTriggered: upgrade_workspace() / upgrade_all_workspaces()
-        UpgradeTriggered --> CheckPVC: Check Storage Type
+        UpgradeTriggered --> NonBlockingBackground: Asynchronous Background Processing
+        NonBlockingBackground --> CheckPVC: Check Storage Type
         CheckPVC --> NormalUpgrade: Shared PVC (ReadWriteMany / Ephemeral)
         CheckPVC --> RecreateFallback: RWO PVC (ReadWriteOnce)
         RecreateFallback --> DeleteOldPod: Delete Old Pod & Release Storage Lock
@@ -28,6 +31,16 @@ stateDiagram-v2
         NormalUpgrade --> SpawnNewPod: Parallel Upgraded Pod Creation
     }
 ```
+
+---
+
+## 🔒 Quotas & Concurrency Limits (ADR-026)
+
+Before creating a pod, `spawn_workspace` evaluates user limits in [`src/mcp/spawner/handlers/index.ts`](file:///home/eterna2/github/nogoo9-no-crd/src/mcp/spawner/handlers/index.ts):
+
+1. **Configurable Limit**: Set via `--max-workspaces-per-user` CLI argument or `MAX_WORKSPACES_PER_USER` environment variable (default: unlimited `0`).
+2. **Non-Admin Scope**: Quota enforcement strictly targets non-admin callers. Admin users (`isAdmin: true`) bypass concurrency caps to allow administrative operations.
+3. **Active Pod Counting**: Counts running and pending pods matching `nogoo9/user-sub=<owner>` across the current namespace.
 
 ---
 
@@ -48,10 +61,11 @@ When `spawn_workspace` is invoked, `nogoo9` constructs a standard Kubernetes `Po
 
 ---
 
-## 🚀 Recreate-Style Workspace Upgrades
+## 🚀 Non-Blocking Recreate-Style Workspace Upgrades (ADR-024)
 
 Workspace upgrades support both 1-by-1 user upgrades and bulk admin upgrades (`upgrade_all_workspaces`):
 
 1. **Owner Preservation**: The original `nogoo9/user-sub` label is strictly preserved across template version upgrades.
-2. **RWO PVC Storage Safety**: For pods with ReadWriteOnce (RWO) persistent volume claims, `nogoo9` safely deletes the old pod first to release volume locks before spawning the upgraded pod instance.
-3. **Event Streaming**: Upgrade progress is broadcast live via `get_workspace_events`.
+2. **Non-Blocking Background Tasks**: Long-running image pull and pod recreation steps run asynchronously without timing out HTTP/MCP tool calls.
+3. **RWO PVC Storage Safety**: For pods with ReadWriteOnce (RWO) persistent volume claims, `nogoo9` safely deletes the old pod first to release volume locks before spawning the upgraded pod instance.
+4. **Event Streaming**: Upgrade progress and any failure state (`nogoo9/last-upgrade-error`) are broadcast live via `get_workspace_events`.

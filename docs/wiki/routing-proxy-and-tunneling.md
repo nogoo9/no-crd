@@ -37,6 +37,12 @@ Workspaces support fine-grained routing behavior configured via template annotat
 
 ---
 
+## 🌐 HTTP Fallback Transport Client (`src/ui/fallback.ts`)
+
+When running the React Web Dashboard directly in a browser outside of an MCP Client host (e.g. Claude Desktop), the dashboard automatically falls back to sending tool requests over the HTTP transport (`/mcp` endpoint) using `initHttpFallback` and `callServerToolFallback`.
+
+---
+
 ## 🔌 WebSocket Upgrade Piping
 
 WebSocket traffic is intercepted at the HTTP server level in [`src/server/ws-proxy.ts`](file:///home/eterna2/github/nogoo9-no-crd/src/server/ws-proxy.ts) and piped directly to the target pod IP, preserving sub-protocols and session headers.
