@@ -236,8 +236,69 @@ function isSafeRedirectUri(uri: string | null): boolean {
 	}
 }
 
+function checkTemplateAccess(tmpl: any, activeToken: string, isAdmin: boolean): { isAllowed: boolean; reason?: string } {
+	if (isAdmin) return { isAllowed: true };
+	const allowedRoles: string[] = tmpl.allowedRoles || [];
+	const allowedScopes: string[] = tmpl.allowedScopes || [];
+	if (allowedRoles.length === 0 && allowedScopes.length === 0) {
+		return { isAllowed: true };
+	}
+
+	const payload = activeToken ? decodeJwt(activeToken) : null;
+
+	let userRoles: string[] = [];
+	if (payload) {
+		const rolesConfigPath = oauthConfig.rolesJsonPath;
+		if (rolesConfigPath) {
+			const val = getValueByJsonPath(payload, rolesConfigPath);
+			if (Array.isArray(val)) userRoles = val.map(String);
+			else if (typeof val === "string") userRoles = [val];
+		} else {
+			if (Array.isArray(payload.roles)) userRoles = payload.roles.map(String);
+			else if (payload.realm_access?.roles && Array.isArray(payload.realm_access.roles)) {
+				userRoles = payload.realm_access.roles.map(String);
+			}
+		}
+	}
+
+	let userScopes: string[] = [];
+	if (payload) {
+		const scopeConfigPath = oauthConfig.scopeJsonPath;
+		if (scopeConfigPath) {
+			const val = getValueByJsonPath(payload, scopeConfigPath);
+			if (Array.isArray(val)) userScopes = val.map(String);
+			else if (typeof val === "string") userScopes = val.split(/\s+/);
+		} else {
+			if (typeof payload.scope === "string") userScopes = payload.scope.split(/\s+/);
+			else if (Array.isArray(payload.scp)) userScopes = payload.scp.map(String);
+			else if (typeof payload.scp === "string") userScopes = [payload.scp];
+		}
+	}
+
+	if (allowedRoles.length > 0) {
+		const hasRole = allowedRoles.some((r) => userRoles.includes(r));
+		if (!hasRole) {
+			return { isAllowed: false, reason: `Requires role: ${allowedRoles.join(" or ")}` };
+		}
+	}
+
+	if (allowedScopes.length > 0) {
+		const hasScope = allowedScopes.some((s) => userScopes.includes(s));
+		if (!hasScope) {
+			return { isAllowed: false, reason: `Requires scope: ${allowedScopes.join(" or ")}` };
+		}
+	}
+
+	return { isAllowed: true };
+}
+
 // Icon Definitions
 const I = {
+	lock: (props: any) => (
+		<svg className={props.className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" style={props.style}>
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+		</svg>
+	),
 	plus: (props: any) => (
 		<svg className={props.className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" style={props.style}>
 			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2} d="M12 4v16m8-8H4" />
@@ -363,6 +424,8 @@ interface Template {
 	isLocal?: boolean;
 	userSub?: string;
 	version?: string;
+	allowedRoles?: string[];
+	allowedScopes?: string[];
 }
 
 interface Toast {
@@ -1428,44 +1491,83 @@ function Dashboard() {
 						</div>
 
 						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-							{templates.map((tmpl) => (
-								<div key={tmpl.name} className="card card-ws-hover p-5 flex flex-col justify-between min-h-[140px]">
-									<div>
-										<div className="flex items-center justify-between mb-2">
-											<h3 className="text-sm font-extrabold font-mono text-[var(--ink)] truncate" title={tmpl.name}>{tmpl.name}</h3>
-											<div className="flex items-center gap-1.5 shrink-0">
-												<span className="badge-pill text-[9px]">{tmpl.tag || "dev"}</span>
-												{!tmpl.isLocal && (tmpl.userSub === getDisplayUser() || capabilities.isAdmin) && (
-													<button
-														onClick={() => deleteTemplate(tmpl.name)}
-														className="btn btn-ghost p-1 text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
-														title="Delete Template Spec"
-													>
-														<I.trash className="w-3.5 h-3.5" />
-													</button>
+							{templates.map((tmpl) => {
+								const access = checkTemplateAccess(tmpl, activeToken, capabilities.isAdmin);
+								const hasRestrictions = (tmpl.allowedRoles && tmpl.allowedRoles.length > 0) || (tmpl.allowedScopes && tmpl.allowedScopes.length > 0);
+								return (
+									<div
+										key={tmpl.name}
+										className={`card p-5 flex flex-col justify-between min-h-[140px] transition-all ${
+											access.isAllowed ? "card-ws-hover" : "opacity-60 bg-[var(--surface-muted)] border-dashed"
+										}`}
+									>
+										<div>
+											<div className="flex items-center justify-between mb-2">
+												<div className="flex items-center gap-1.5 truncate">
+													{!access.isAllowed && (
+														<span className="text-amber-500 shrink-0" title={access.reason}>
+															<I.lock className="w-3.5 h-3.5" />
+														</span>
+													)}
+													<h3 className="text-sm font-extrabold font-mono text-[var(--ink)] truncate" title={tmpl.name}>
+														{tmpl.name}
+													</h3>
+												</div>
+												<div className="flex items-center gap-1.5 shrink-0">
+													<span className="badge-pill text-[9px]">{tmpl.tag || "dev"}</span>
+													{!tmpl.isLocal && (tmpl.userSub === getDisplayUser() || capabilities.isAdmin) && (
+														<button
+															onClick={() => deleteTemplate(tmpl.name)}
+															className="btn btn-ghost p-1 text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
+															title="Delete Template Spec"
+														>
+															<I.trash className="w-3.5 h-3.5" />
+														</button>
+													)}
+												</div>
+											</div>
+											<p className="text-xs text-[var(--ink-2)] leading-relaxed">{tmpl.description || "Reusable container pod sandbox template ConfigMap."}</p>
+											<div className="flex flex-wrap gap-2 text-[10px] text-[var(--ink-3)] mt-2 font-mono">
+												{tmpl.version && <span>Version: <strong className="text-[var(--ink-2)]">{tmpl.version}</strong></span>}
+												{tmpl.isLocal ? (
+													<span>Source: <strong className="text-[var(--ink-2)]">Local (Immutable)</strong></span>
+												) : (
+													tmpl.userSub && <span>Creator: <strong className="text-[var(--ink-2)]">{tmpl.userSub}</strong></span>
 												)}
 											</div>
-										</div>
-										<p className="text-xs text-[var(--ink-2)] leading-relaxed">{tmpl.description || "Reusable container pod sandbox template ConfigMap."}</p>
-										<div className="flex flex-wrap gap-2 text-[10px] text-[var(--ink-3)] mt-2 font-mono">
-											{tmpl.version && <span>Version: <strong className="text-[var(--ink-2)]">{tmpl.version}</strong></span>}
-											{tmpl.isLocal ? (
-												<span>Source: <strong className="text-[var(--ink-2)]">Local (Immutable)</strong></span>
-											) : (
-												tmpl.userSub && <span>Creator: <strong className="text-[var(--ink-2)]">{tmpl.userSub}</strong></span>
+											{hasRestrictions && (
+												<div className="flex flex-wrap gap-1.5 mt-2.5 text-[9px]">
+													{tmpl.allowedRoles?.map((role: string) => (
+														<span key={role} className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 font-mono font-bold" title={`Required role: ${role}`}>
+															role:{role}
+														</span>
+													))}
+													{tmpl.allowedScopes?.map((scope: string) => (
+														<span key={scope} className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-mono font-bold" title={`Required scope: ${scope}`}>
+															scope:{scope}
+														</span>
+													))}
+												</div>
 											)}
 										</div>
+										<div className="flex items-center justify-between mt-4 border-t border-[var(--line)] pt-3">
+											<button className="btn btn-quiet text-xs py-1" onClick={() => setActiveTmplSpec(tmpl)}>
+												View Spec JSON
+											</button>
+											<button
+												className={`btn text-xs py-1 px-3 ${
+													access.isAllowed ? "btn-primary" : "btn-ghost opacity-50 cursor-not-allowed text-[var(--ink-3)]"
+												}`}
+												disabled={!access.isAllowed}
+												title={access.isAllowed ? "Spawn Sandbox" : access.reason}
+												onClick={() => access.isAllowed && setSelectedTemplate(tmpl)}
+											>
+												{access.isAllowed ? "Spawn Sandbox" : "Restricted"}
+											</button>
+										</div>
 									</div>
-									<div className="flex items-center justify-between mt-4 border-t border-[var(--line)] pt-3">
-										<button className="btn btn-quiet text-xs py-1" onClick={() => setActiveTmplSpec(tmpl)}>
-											View Spec JSON
-										</button>
-										<button className="btn btn-primary text-xs py-1 px-3" onClick={() => setSelectedTemplate(tmpl)}>
-											Spawn Sandbox
-										</button>
-									</div>
-								</div>
-							))}
+								);
+							})}
 						</div>
 					</section>
 
