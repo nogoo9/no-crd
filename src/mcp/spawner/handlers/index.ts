@@ -13,6 +13,7 @@ import {
 	provisionServiceAccount,
 	requestContextStore,
 	resolveNamespace,
+	verifyTemplateAccessOrThrow,
 } from "~/k8s/index.js";
 import {
 	buildWorkspaceDetails,
@@ -169,6 +170,30 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 				throw new Error(`Workspace with ID "${id}" already exists`);
 			}
 
+			// Check concurrent workspace quota for non-admin users
+			const maxWorkspaces = config.auth.maxWorkspacesPerUser;
+			if (maxWorkspaces > 0 && !authCtx.isAdmin) {
+				const userPods = await k8sContext.coreApi.listNamespacedPod({
+					namespace: ns,
+					labelSelector: `${ANNOTATION_KEYS.TYPE}=workspace,${ANNOTATION_KEYS.USER_SUB}=${userSub}`,
+				});
+				const activeWorkspaceIds = new Set<string>();
+				for (const pod of userPods.items || []) {
+					const phase = pod.status?.phase;
+					if (phase !== "Succeeded" && phase !== "Failed") {
+						const wsId = pod.metadata?.labels?.[ANNOTATION_KEYS.WORKSPACE_ID];
+						if (wsId) {
+							activeWorkspaceIds.add(wsId);
+						}
+					}
+				}
+				if (activeWorkspaceIds.size >= maxWorkspaces) {
+					throw new Error(
+						`Forbidden: User "${userSub}" has reached the maximum allowed concurrent workspace limit (${maxWorkspaces}).`,
+					);
+				}
+			}
+
 			let resolvedSpec: any;
 			let resolvedAnnotations: Record<string, string> = {};
 			let resolvedLabels: Record<string, string> = {};
@@ -228,6 +253,14 @@ export function spawnWorkspaceHandler(k8sContext: K8sContext) {
 			} else {
 				throw new Error("Either templateRef or spec must be provided");
 			}
+
+			// Verify template role/scope authorization
+			verifyTemplateAccessOrThrow(
+				resolvedAnnotations,
+				activeJwtPayload,
+				authCtx.isAdmin,
+				templateRef || "inline",
+			);
 
 			const mergedSpec = topLevelOverrides
 				? { ...resolvedSpec, ...topLevelOverrides }

@@ -370,6 +370,19 @@ export const authSchema = {
 			return getEnv(this.env) ?? this.defaultVal;
 		},
 	} satisfies SchemaItem<string>,
+
+	maxWorkspacesPerUser: {
+		cli: "--max-workspaces-per-user",
+		env: "MAX_WORKSPACES_PER_USER",
+		defaultVal: 0,
+		allowed: "Number",
+		description:
+			"Maximum number of concurrent active workspaces a non-admin user can own (0 for unlimited).",
+		get value(): number {
+			const val = getEnv(this.env);
+			return val ? Number(val) : this.defaultVal;
+		},
+	} satisfies SchemaItem<number>,
 };
 
 export const authConfig = parseConfig(authSchema);

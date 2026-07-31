@@ -29,6 +29,8 @@ export const ANNOTATION_KEYS = {
 	API_STATS_REFRESH: "nogoo9/api.stats.refresh",
 	API_LAST_ACTIVITY_REFRESH: "nogoo9/api.last_activity.refresh",
 	WORKSPACE_AUTH_REQUIRE_TOKEN: "nogoo9/auth-require-token",
+	ALLOWED_ROLES: "nogoo9/allowed-roles",
+	ALLOWED_SCOPES: "nogoo9/allowed-scopes",
 } as const;
 
 export const ANNOTATION_METADATA: AnnotationParam[] = [
@@ -229,5 +231,17 @@ export const ANNOTATION_METADATA: AnnotationParam[] = [
 		type: "Annotation (Duration)",
 		description:
 			"Explicitly configures the reload frequency for the reserved `last_activity` epoch timestamp API on the workspace dashboard card (e.g., `30s`, `1m`, `init`).",
+	},
+	{
+		key: ANNOTATION_KEYS.ALLOWED_ROLES,
+		type: "Annotation (Comma-separated)",
+		description:
+			"Comma-separated list of user roles allowed to spawn workspaces from this template (e.g., `developer,lead-dev`). Admins always bypass role restrictions.",
+	},
+	{
+		key: ANNOTATION_KEYS.ALLOWED_SCOPES,
+		type: "Annotation (Comma-separated)",
+		description:
+			"Comma-separated list of OAuth scopes allowed to spawn workspaces from this template (e.g., `nogoo9:write`). Admins always bypass scope restrictions.",
 	},
 ];

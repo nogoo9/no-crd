@@ -245,6 +245,14 @@ export default withMermaid(
 							text: "ADR-025: Request Context Propagation over JSON-RPC via AsyncLocalStorage",
 							link: "/decisions/ADR-025-async-local-storage-mcp-request-context",
 						},
+						{
+							text: "ADR-026: Non-Admin Workspace Concurrency Limits",
+							link: "/decisions/ADR-026-non-admin-workspace-concurrency-limits",
+						},
+						{
+							text: "ADR-027: Template Role and Scope Authorization Annotations",
+							link: "/decisions/ADR-027-template-role-and-scope-authorization-annotations",
+						},
 					],
 				},
 			],

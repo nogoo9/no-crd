@@ -5,6 +5,7 @@ import { ANNOTATION_KEYS } from "~/config/index.js";
 const registeredTools = new Map<string, (...args: any[]) => any>();
 
 const coreApi = {
+	listNamespacedConfigMap: async () => ({ items: [] }) as any,
 	readNamespacedConfigMap: async () => ({}) as any,
 	createNamespacedPod: async (args: any) => ({ body: args.body }),
 	createNamespacedConfigMap: async (args: any) => ({
@@ -38,12 +39,16 @@ describe("Templates MCP Tools", () => {
 				return {} as any;
 			},
 		);
-		registerTemplateResources({} as any, k8sContext, [
-			"create_pod_from_template",
-			"create_template",
-			"update_template",
-			"delete_template",
-		]);
+		registerTemplateResources(
+			{ registerResource: () => {} } as any,
+			k8sContext,
+			[
+				"create_pod_from_template",
+				"create_template",
+				"update_template",
+				"delete_template",
+			],
+		);
 		process.env.AUTH_ENABLED = "false";
 		process.env.AUTH_REQUIRED_READ_ROLE = "";
 		process.env.AUTH_REQUIRED_WRITE_ROLE = "";
@@ -410,6 +415,51 @@ spec:
 
 			expect(result.isError).toBeUndefined();
 			expect(deleteSpy).toHaveBeenCalledTimes(1);
+		});
+
+		test("list_templates and get_template expose allowedRoles and allowedScopes", async () => {
+			registerTemplateResources(
+				{ registerResource: () => {} } as any,
+				k8sContext,
+				["list_templates", "get_template"],
+			);
+			const annotatedCM = {
+				metadata: {
+					name: "restricted-tmpl",
+					annotations: {
+						"nogoo9/allowed-roles": "developer, lead-dev",
+						"nogoo9/allowed-scopes": "nogoo9:write",
+						"nogoo9/description": "Restricted Template",
+					},
+				},
+				data: { spec: JSON.stringify({ containers: [] }) },
+			};
+			spyOn(coreApi, "listNamespacedConfigMap" as any).mockResolvedValue({
+				items: [annotatedCM],
+			} as any);
+			spyOn(coreApi, "readNamespacedConfigMap" as any).mockResolvedValue(
+				annotatedCM as any,
+			);
+
+			const listHandler = registeredTools.get("list_templates")!;
+			const listResult = await listHandler({ namespace: "default" });
+			expect(listResult.isError).toBeUndefined();
+			const tmplItem = listResult.structuredContent.templates.find(
+				(t: any) => t.name === "restricted-tmpl",
+			);
+			expect(tmplItem.allowedRoles).toEqual(["developer", "lead-dev"]);
+			expect(tmplItem.allowedScopes).toEqual(["nogoo9:write"]);
+
+			const getHandler = registeredTools.get("get_template")!;
+			const getResult = await getHandler({ name: "restricted-tmpl" });
+			expect(getResult.isError).toBeUndefined();
+			expect(getResult.structuredContent.allowedRoles).toEqual([
+				"developer",
+				"lead-dev",
+			]);
+			expect(getResult.structuredContent.allowedScopes).toEqual([
+				"nogoo9:write",
+			]);
 		});
 	});
 });

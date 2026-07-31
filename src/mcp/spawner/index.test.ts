@@ -1535,5 +1535,129 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 				memory: "512Mi",
 			});
 		});
+
+		test("enforces MAX_WORKSPACES_PER_USER quota for non-admin users and allows admin bypass", async () => {
+			const originalMax = process.env.MAX_WORKSPACES_PER_USER;
+			const originalAuth = process.env.AUTH_ENABLED;
+			process.env.MAX_WORKSPACES_PER_USER = "1";
+			process.env.AUTH_ENABLED = "true";
+
+			try {
+				// Mock coreApi.listNamespacedPod to return 1 active workspace for 'user1'
+				spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+					items: [
+						{
+							metadata: {
+								name: "ws-user1-existing",
+								labels: {
+									"nogoo9/type": "workspace",
+									"nogoo9/workspace-id": "existing-ws-1",
+									"nogoo9/user-sub": "user1",
+								},
+							},
+							status: { phase: "Running" },
+						},
+					],
+				} as any);
+
+				spyOn(coreApi, "readNamespacedConfigMap").mockResolvedValue({
+					metadata: { name: "default-template" },
+					data: {
+						spec: JSON.stringify({
+							containers: [{ name: "main", image: "base-image:1.0" }],
+						}),
+					},
+				} as any);
+
+				const handler = registeredTools.get("spawn_workspace")!;
+
+				// Non-admin user 'user1' attempting to spawn a second workspace -> throws quota error
+				const nonAdminResult = await handler({
+					id: "ws-new-2",
+					templateRef: "default-template",
+					jwtPayload: {
+						sub: "user1",
+						scope: "nogoo9:write",
+						realm_access: { roles: ["user"] },
+					},
+				});
+				expect(nonAdminResult.isError).toBe(true);
+				expect(
+					JSON.stringify(nonAdminResult.content || nonAdminResult),
+				).toContain("reached the maximum allowed concurrent workspace limit");
+
+				// Admin user attempting to spawn -> bypasses quota limit
+				const adminResult = await handler({
+					id: "ws-admin-2",
+					templateRef: "default-template",
+					jwtPayload: {
+						sub: "admin",
+						scope: "nogoo9:admin",
+						realm_access: { roles: ["admin"] },
+					},
+				});
+				expect(adminResult.isError).toBeUndefined();
+			} finally {
+				process.env.MAX_WORKSPACES_PER_USER = originalMax;
+				process.env.AUTH_ENABLED = originalAuth;
+			}
+		});
+
+		test("enforces template allowed-roles and allowed-scopes on spawn_workspace", async () => {
+			const originalAuth = process.env.AUTH_ENABLED;
+			process.env.AUTH_ENABLED = "true";
+
+			try {
+				spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
+					items: [],
+				} as any);
+
+				// ConfigMap template restricted to lead-dev role
+				spyOn(coreApi, "readNamespacedConfigMap").mockResolvedValue({
+					metadata: {
+						name: "lead-dev-template",
+						annotations: {
+							"nogoo9/allowed-roles": "lead-dev",
+						},
+					},
+					data: {
+						spec: JSON.stringify({
+							containers: [{ name: "main", image: "lead-image:1.0" }],
+						}),
+					},
+				} as any);
+
+				const handler = registeredTools.get("spawn_workspace")!;
+
+				// User with only 'user' role -> blocked
+				const blockedRes = await handler({
+					id: "ws-restricted",
+					templateRef: "lead-dev-template",
+					jwtPayload: {
+						sub: "dev-user",
+						scope: "nogoo9:write",
+						realm_access: { roles: ["user"] },
+					},
+				});
+				expect(blockedRes.isError).toBe(true);
+				expect(JSON.stringify(blockedRes.content || blockedRes)).toContain(
+					"Missing required role for template",
+				);
+
+				// User with 'lead-dev' role -> allowed
+				const allowedRes = await handler({
+					id: "ws-allowed",
+					templateRef: "lead-dev-template",
+					jwtPayload: {
+						sub: "lead-user",
+						scope: "nogoo9:write",
+						realm_access: { roles: ["lead-dev"] },
+					},
+				});
+				expect(allowedRes.isError).toBeUndefined();
+			} finally {
+				process.env.AUTH_ENABLED = originalAuth;
+			}
+		});
 	});
 });

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { getLogger } from "@logtape/logtape";
 import { JSONPath } from "jsonpath-plus";
-import { config } from "~/config/index.js";
+import { ANNOTATION_KEYS, config } from "~/config/index.js";
 
 const logger = getLogger(["nogoo9", "k8s-auth"]);
 
@@ -725,5 +725,62 @@ export function isAdminUser(jwtPayload: unknown): boolean {
 		return true;
 	} catch (_) {
 		return false;
+	}
+}
+
+/**
+ * Verifies that the user has required roles/scopes specified in template annotations (nogoo9/allowed-roles, nogoo9/allowed-scopes).
+ * Admins always bypass template access restrictions.
+ * Evaluates using AND rule: caller must possess at least one allowed role AND at least one allowed scope if both annotations are present.
+ */
+export function verifyTemplateAccessOrThrow(
+	annotations: Record<string, string> | undefined,
+	jwtPayload: unknown,
+	isAdmin = false,
+	templateRef = "template",
+): void {
+	if (!config.auth.enabled || !annotations) {
+		return;
+	}
+	if (isAdmin || isAdminUser(jwtPayload)) {
+		return;
+	}
+
+	const allowedRolesRaw = annotations[ANNOTATION_KEYS.ALLOWED_ROLES];
+	if (allowedRolesRaw) {
+		const allowedRoles = allowedRolesRaw
+			.split(",")
+			.map((r) => r.trim())
+			.filter(Boolean);
+		if (allowedRoles.length > 0) {
+			const rolesJsonPath = config.auth.rolesJsonPath;
+			const hasRole = allowedRoles.some((role) =>
+				hasRequiredRole(jwtPayload, role, rolesJsonPath),
+			);
+			if (!hasRole) {
+				throw new Error(
+					`Forbidden: Missing required role for template "${templateRef}". Required one of: ${allowedRoles.join(", ")}`,
+				);
+			}
+		}
+	}
+
+	const allowedScopesRaw = annotations[ANNOTATION_KEYS.ALLOWED_SCOPES];
+	if (allowedScopesRaw) {
+		const allowedScopes = allowedScopesRaw
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean);
+		if (allowedScopes.length > 0) {
+			const scopeJsonPath = config.auth.scopeJsonPath;
+			const hasScope = allowedScopes.some((scope) =>
+				hasRequiredScope(jwtPayload, scope, scopeJsonPath),
+			);
+			if (!hasScope) {
+				throw new Error(
+					`Forbidden: Missing required scope for template "${templateRef}". Required one of: ${allowedScopes.join(", ")}`,
+				);
+			}
+		}
 	}
 }
