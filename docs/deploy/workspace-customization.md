@@ -49,6 +49,8 @@ Pod templates and inline specifications can declare special annotations that dir
 | `nogoo9/api.<api-name>.refresh` | Annotation (Duration) | Sets the refresh frequency for custom stats/activity or other mini API views in the dashboard cards (e.g. `10s`, `1m`, or `init` to query only once on startup). |
 | `nogoo9/api.stats.refresh` | Annotation (Duration) | Explicitly configures the reload frequency for the reserved `stats` API metrics on the workspace dashboard card (e.g., `10s`, `30s`, `init`). |
 | `nogoo9/api.last_activity.refresh` | Annotation (Duration) | Explicitly configures the reload frequency for the reserved `last_activity` epoch timestamp API on the workspace dashboard card (e.g., `30s`, `1m`, `init`). |
+| `nogoo9/allowed-roles` | Annotation (Comma-separated) | Comma-separated list of user roles allowed to spawn workspaces from this template (e.g., `developer,lead-dev`). Admins always bypass role restrictions. |
+| `nogoo9/allowed-scopes` | Annotation (Comma-separated) | Comma-separated list of OAuth scopes allowed to spawn workspaces from this template (e.g., `nogoo9:write`). Admins always bypass scope restrictions. |
 
 <!-- TEMPLATE_ANNOTATIONS_TABLE_END -->
 

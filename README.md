@@ -166,6 +166,7 @@ The server and command-line utility are configurable using CLI options or enviro
 | - | `OAUTH_END_SESSION_URL` | - | URL string | Direct OAuth logout endpoint. |
 | `--auth-inject-workspace-jwt` | `AUTH_INJECT_WORKSPACE_JWT` | `true` | `true`, `false` | Determines if the custom 'x-workspace-jwt' header containing the raw token is injected into proxy requests. |
 | - | `AUTH_DEFAULT_ROLE` | `viewer` | String | Fallback role if the token does not provide scopes/roles. |
+| `--max-workspaces-per-user` | `MAX_WORKSPACES_PER_USER` | `0` | Number | Maximum number of concurrent active workspaces a non-admin user can own (0 for unlimited). |
 
 ### 🖥️ UI & Themes Configuration
 
@@ -420,6 +421,8 @@ The spawner inspects `ConfigMap` metadata annotations (and custom inline annotat
 | `nogoo9/api.<api-name>.refresh` | Annotation (Duration) | Sets the refresh frequency for custom stats/activity or other mini API views in the dashboard cards (e.g. `10s`, `1m`, or `init` to query only once on startup). |
 | `nogoo9/api.stats.refresh` | Annotation (Duration) | Explicitly configures the reload frequency for the reserved `stats` API metrics on the workspace dashboard card (e.g., `10s`, `30s`, `init`). |
 | `nogoo9/api.last_activity.refresh` | Annotation (Duration) | Explicitly configures the reload frequency for the reserved `last_activity` epoch timestamp API on the workspace dashboard card (e.g., `30s`, `1m`, `init`). |
+| `nogoo9/allowed-roles` | Annotation (Comma-separated) | Comma-separated list of user roles allowed to spawn workspaces from this template (e.g., `developer,lead-dev`). Admins always bypass role restrictions. |
+| `nogoo9/allowed-scopes` | Annotation (Comma-separated) | Comma-separated list of OAuth scopes allowed to spawn workspaces from this template (e.g., `nogoo9:write`). Admins always bypass scope restrictions. |
 
 <!-- TEMPLATE_ANNOTATIONS_TABLE_END -->
 

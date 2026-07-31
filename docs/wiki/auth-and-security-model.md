@@ -39,3 +39,10 @@ graph TD
 ### 4. Per-User RBAC Isolation
 - Normal users can only see, query logs for, stop, or upgrade their own workspaces (`nogoo9/user-sub`).
 - Users with `nogoo9:admin` or cluster admin roles can manage across all tenant boundaries.
+
+### 5. Non-Admin Workspace Concurrency Quotas ([`src/config/auth.ts`](file:///home/eterna2/github/nogoo9-no-crd/src/config/auth.ts))
+- Limits the number of concurrent active workspaces a non-admin user can own (`MAX_WORKSPACES_PER_USER`). Administrators bypass quotas.
+
+### 6. Template Role & Scope Authorization Annotations ([`src/k8s/auth.ts`](file:///home/eterna2/github/nogoo9-no-crd/src/k8s/auth.ts))
+- Restricts pod template workspace creation to callers possessing matching OIDC roles (`nogoo9/allowed-roles`) and scopes (`nogoo9/allowed-scopes`) using strict AND evaluation logic.
+

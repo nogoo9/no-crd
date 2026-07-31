@@ -55,6 +55,8 @@ export const ListTemplatesOutputSchema = z.object({
 			apis: z.array(WorkspaceApiSchema).optional(),
 			isLocal: z.boolean().optional(),
 			userSub: z.string().optional(),
+			allowedRoles: z.array(z.string()).optional(),
+			allowedScopes: z.array(z.string()).optional(),
 		}),
 	),
 });
@@ -72,6 +74,8 @@ export const GetTemplateOutputSchema = z.object({
 	workspacePath: z.string().optional(),
 	workspaceType: z.string().optional(),
 	apis: z.array(WorkspaceApiSchema).optional(),
+	allowedRoles: z.array(z.string()).optional(),
+	allowedScopes: z.array(z.string()).optional(),
 });
 
 export const CreateTemplateOutputSchema = z.object({
@@ -106,6 +110,19 @@ async function listAccessibleNamespaces(
 	return getAccessibleNamespaces(coreApi, MODE, DEFAULT_NAMESPACE);
 }
 
+function parseCommaSeparatedAnnotation(
+	annotations: Record<string, string> | undefined,
+	key: string,
+): string[] | undefined {
+	const raw = annotations?.[key];
+	if (!raw) return undefined;
+	const parts = raw
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+	return parts.length > 0 ? parts : undefined;
+}
+
 /**
  * Extracts template metadata from a {@link LocalTemplate} into the same shape
  * used by ConfigMap-based templates in tool responses.
@@ -125,6 +142,8 @@ function localTemplateToMeta(
 	apis: ReturnType<typeof parseWorkspaceApis>;
 	isLocal: boolean;
 	userSub: string;
+	allowedRoles: string[] | undefined;
+	allowedScopes: string[] | undefined;
 } {
 	const a = tmpl.annotations;
 	const reqRaw = a["nogoo9/required-context"];
@@ -147,6 +166,14 @@ function localTemplateToMeta(
 		apis: parseWorkspaceApis(a),
 		isLocal: true,
 		userSub: "",
+		allowedRoles: parseCommaSeparatedAnnotation(
+			a,
+			ANNOTATION_KEYS.ALLOWED_ROLES,
+		),
+		allowedScopes: parseCommaSeparatedAnnotation(
+			a,
+			ANNOTATION_KEYS.ALLOWED_SCOPES,
+		),
 	};
 }
 
@@ -422,6 +449,14 @@ export function registerTemplateResources(
 							apis: parseWorkspaceApis(annotations),
 							isLocal: false,
 							userSub: creatorSub,
+							allowedRoles: parseCommaSeparatedAnnotation(
+								annotations,
+								ANNOTATION_KEYS.ALLOWED_ROLES,
+							),
+							allowedScopes: parseCommaSeparatedAnnotation(
+								annotations,
+								ANNOTATION_KEYS.ALLOWED_SCOPES,
+							),
 						};
 					});
 
@@ -589,6 +624,14 @@ export function registerTemplateResources(
 							workspacePath,
 							workspaceType,
 							apis: parseWorkspaceApis(annotations),
+							allowedRoles: parseCommaSeparatedAnnotation(
+								annotations,
+								ANNOTATION_KEYS.ALLOWED_ROLES,
+							),
+							allowedScopes: parseCommaSeparatedAnnotation(
+								annotations,
+								ANNOTATION_KEYS.ALLOWED_SCOPES,
+							),
 						},
 					};
 				} catch (err) {

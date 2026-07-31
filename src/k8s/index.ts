@@ -12,6 +12,7 @@ export {
 	verifyAccessOrThrow,
 	verifyRoleOrThrow,
 	verifyScopeOrThrow,
+	verifyTemplateAccessOrThrow,
 	verifyToken,
 } from "./auth.js";
 export {

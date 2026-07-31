@@ -3,4 +3,4 @@
  *
  * Updated automatically by the `/bump` workflow alongside package.json.
  */
-export const APP_VERSION = "0.16.0";
+export const APP_VERSION = "0.17.0";

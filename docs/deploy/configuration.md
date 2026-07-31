@@ -125,6 +125,7 @@ graph TD
 | - | `OAUTH_END_SESSION_URL` | - | URL string | Direct OAuth logout endpoint. |
 | `--auth-inject-workspace-jwt` | `AUTH_INJECT_WORKSPACE_JWT` | `true` | `true`, `false` | Determines if the custom 'x-workspace-jwt' header containing the raw token is injected into proxy requests. |
 | - | `AUTH_DEFAULT_ROLE` | `viewer` | String | Fallback role if the token does not provide scopes/roles. |
+| `--max-workspaces-per-user` | `MAX_WORKSPACES_PER_USER` | `0` | Number | Maximum number of concurrent active workspaces a non-admin user can own (0 for unlimited). |
 
 ### 🖥️ UI & Themes Configuration
 

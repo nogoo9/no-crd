@@ -8,6 +8,7 @@ import {
 	isAdminUser,
 	verifyAccessOrThrow,
 	verifyScopeOrThrow,
+	verifyTemplateAccessOrThrow,
 	verifyToken,
 } from "./auth.js";
 
@@ -548,6 +549,109 @@ describe("admin scope and access hierarchy", () => {
 			expect(() => verifyAccessOrThrow(payload, "admin")).toThrow(
 				"Forbidden: Missing required scope: nogoo9:admin",
 			);
+		});
+	});
+
+	describe("verifyTemplateAccessOrThrow", () => {
+		const originalAuthEnabled = process.env.AUTH_ENABLED;
+
+		beforeEach(() => {
+			process.env.AUTH_ENABLED = "true";
+		});
+
+		afterEach(() => {
+			process.env.AUTH_ENABLED = originalAuthEnabled;
+		});
+
+		test("passes when no template annotations exist", () => {
+			expect(() =>
+				verifyTemplateAccessOrThrow(
+					{},
+					{ realm_access: { roles: ["user"] } },
+					false,
+					"my-tmpl",
+				),
+			).not.toThrow();
+		});
+
+		test("passes for admin users bypassing role/scope checks", () => {
+			const ann = {
+				"nogoo9/allowed-roles": "lead-dev",
+				"nogoo9/allowed-scopes": "special:scope",
+			};
+			expect(() =>
+				verifyTemplateAccessOrThrow(ann, {}, true, "admin-tmpl"),
+			).not.toThrow();
+		});
+
+		test("passes when non-admin user possesses required role", () => {
+			const ann = { "nogoo9/allowed-roles": "developer, lead-dev" };
+			const payload = { realm_access: { roles: ["developer"] } };
+			expect(() =>
+				verifyTemplateAccessOrThrow(ann, payload, false, "dev-tmpl"),
+			).not.toThrow();
+		});
+
+		test("throws when non-admin user lacks required role", () => {
+			const ann = { "nogoo9/allowed-roles": "lead-dev" };
+			const payload = { realm_access: { roles: ["developer"] } };
+			expect(() =>
+				verifyTemplateAccessOrThrow(ann, payload, false, "dev-tmpl"),
+			).toThrow("Forbidden: Missing required role for template");
+		});
+
+		test("passes when non-admin user possesses required scope", () => {
+			const ann = { "nogoo9/allowed-scopes": "nogoo9:write, workspace:create" };
+			const payload = { scope: "nogoo9:write" };
+			expect(() =>
+				verifyTemplateAccessOrThrow(ann, payload, false, "scope-tmpl"),
+			).not.toThrow();
+		});
+
+		test("throws when non-admin user lacks required scope", () => {
+			const ann = { "nogoo9/allowed-scopes": "special:scope" };
+			const payload = { scope: "nogoo9:read" };
+			expect(() =>
+				verifyTemplateAccessOrThrow(ann, payload, false, "scope-tmpl"),
+			).toThrow("Forbidden: Missing required scope for template");
+		});
+
+		test("evaluates AND rule when both allowed-roles and allowed-scopes exist", () => {
+			const ann = {
+				"nogoo9/allowed-roles": "developer",
+				"nogoo9/allowed-scopes": "nogoo9:write",
+			};
+			// User has role but lacks scope -> throws
+			const missingScopePayload = {
+				realm_access: { roles: ["developer"] },
+				scope: "nogoo9:read",
+			};
+			expect(() =>
+				verifyTemplateAccessOrThrow(
+					ann,
+					missingScopePayload,
+					false,
+					"and-tmpl",
+				),
+			).toThrow("Forbidden: Missing required scope");
+
+			// User has scope but lacks role -> throws
+			const missingRolePayload = {
+				realm_access: { roles: ["guest"] },
+				scope: "nogoo9:write",
+			};
+			expect(() =>
+				verifyTemplateAccessOrThrow(ann, missingRolePayload, false, "and-tmpl"),
+			).toThrow("Forbidden: Missing required role");
+
+			// User has both role and scope -> passes
+			const validPayload = {
+				realm_access: { roles: ["developer"] },
+				scope: "nogoo9:write",
+			};
+			expect(() =>
+				verifyTemplateAccessOrThrow(ann, validPayload, false, "and-tmpl"),
+			).not.toThrow();
 		});
 	});
 });

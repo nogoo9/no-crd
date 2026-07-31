@@ -34,6 +34,8 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-023](./ADR-023-refresh-token-lifecycle-and-rotation-safety.md) | Dynamic Cookie TTL Alignment, Stale Cookie Cleanup, and Singleflight Refresh Token Rotation Safety | Accepted |
 | [ADR-024](./ADR-024-non-blocking-workspace-template-upgrade.md) | Non-blocking Workspace Template Upgrade | Accepted |
 | [ADR-025](./ADR-025-async-local-storage-mcp-request-context.md) | Request Context Propagation over JSON-RPC via AsyncLocalStorage | Accepted |
+| [ADR-026](./ADR-026-non-admin-workspace-concurrency-limits.md) | Non-Admin Workspace Concurrency Limits | Accepted |
+| [ADR-027](./ADR-027-template-role-and-scope-authorization-annotations.md) | Template Role and Scope Authorization Annotations | Accepted |
 
 ## How to Read ADRs
 
@@ -77,6 +79,8 @@ graph LR
     ADR019 --> ADR023["ADR-023: Refresh Token Lifecycle & Rotation Safety"]
     ADR015 --> ADR024["ADR-024: Non-blocking Workspace Template Upgrade"]
     ADR012 --> ADR025["ADR-025: Request Context via AsyncLocalStorage"]
+    ADR014 --> ADR026["ADR-026: Non-Admin Workspace Concurrency Limits"]
+    ADR020 --> ADR027["ADR-027: Template Role & Scope Authorization Annotations"]
     style ADR002 fill:#4a9eff,color:#fff
     style ADR003 fill:#4a9eff,color:#fff
     style ADR005 fill:#4a9eff,color:#fff
@@ -102,6 +106,8 @@ graph LR
     style ADR023 fill:#4a9eff,color:#fff
     style ADR024 fill:#f59e0b,color:#fff
     style ADR025 fill:#f59e0b,color:#fff
+    style ADR026 fill:#f59e0b,color:#fff
+    style ADR027 fill:#f59e0b,color:#fff
 ```
 
 - **Blue**: Authentication & session management chain

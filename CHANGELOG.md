@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] — 2026-07-31
+
+### Added
+
+- **Non-Admin Workspace Concurrency Limits (`MAX_WORKSPACES_PER_USER`)**: Introduced `--max-workspaces-per-user` CLI option and `MAX_WORKSPACES_PER_USER` environment variable setting (defaults to `0` for unlimited). Limits the maximum number of concurrent active workspaces a non-admin user can own. Administrators bypass quota limits. See [ADR-026](docs/decisions/ADR-026-non-admin-workspace-concurrency-limits.md).
+- **Template Role & Scope Authorization Annotations (`nogoo9/allowed-roles` & `nogoo9/allowed-scopes`)**: Added template annotations to restrict workspace creation from specific pod templates to users possessing required OIDC roles or scopes. Evaluates using strict AND logic. Administrators bypass template annotations. See [ADR-027](docs/decisions/ADR-027-template-role-and-scope-authorization-annotations.md).
+- **Template Discovery Metadata**: Extended `list_templates` and `get_template` tool outputs to expose `allowedRoles` and `allowedScopes` metadata arrays for UI clients.
+- **E2E Test Suite for Limits and Templates**: Added `scripts/test-e2e-workspace-limits-and-templates.ts` to test quota limits, admin quota bypass, template authorization annotations, and resource cleanup.
+
 ## [0.16.0] — 2026-07-28
 
 ### Added
