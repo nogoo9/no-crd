@@ -1543,22 +1543,34 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 			process.env.AUTH_ENABLED = "true";
 
 			try {
-				// Mock coreApi.listNamespacedPod to return 1 active workspace for 'user1'
-				spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
-					items: [
-						{
-							metadata: {
-								name: "ws-user1-existing",
-								labels: {
-									"nogoo9/type": "workspace",
-									"nogoo9/workspace-id": "existing-ws-1",
-									"nogoo9/user-sub": "user1",
-								},
-							},
-							status: { phase: "Running" },
-						},
-					],
+				spyOn(coreApi, "createNamespacedPod").mockResolvedValue({
+					metadata: { name: "ws" },
 				} as any);
+
+				// Mock coreApi.listNamespacedPod to return 1 active workspace for 'user1' when queried by user-sub
+				(spyOn(coreApi, "listNamespacedPod") as any).mockImplementation(
+					async (opts: any) => {
+						const sel = opts?.labelSelector || "";
+						if (sel.includes("nogoo9/user-sub=user1")) {
+							return {
+								items: [
+									{
+										metadata: {
+											name: "ws-user1-existing",
+											labels: {
+												"nogoo9/type": "workspace",
+												"nogoo9/workspace-id": "existing-ws-1",
+												"nogoo9/user-sub": "user1",
+											},
+										},
+										status: { phase: "Running" },
+									},
+								],
+							} as any;
+						}
+						return { items: [] } as any;
+					},
+				);
 
 				spyOn(coreApi, "readNamespacedConfigMap").mockResolvedValue({
 					metadata: { name: "default-template" },
@@ -1608,6 +1620,10 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 			process.env.AUTH_ENABLED = "true";
 
 			try {
+				spyOn(coreApi, "createNamespacedPod").mockResolvedValue({
+					metadata: { name: "ws-allowed" },
+				} as any);
+
 				spyOn(coreApi, "listNamespacedPod").mockResolvedValue({
 					items: [],
 				} as any);
@@ -1651,7 +1667,7 @@ describe("Spawner MCP Tools - Admin Capabilities", () => {
 					jwtPayload: {
 						sub: "lead-user",
 						scope: "nogoo9:write",
-						realm_access: { roles: ["lead-dev"] },
+						realm_access: { roles: ["lead-dev", "viewer"] },
 					},
 				});
 				expect(allowedRes.isError).toBeUndefined();
