@@ -1,4 +1,6 @@
-const oauthConfig = (window as any).__NOCR_OAUTH_CONFIG__ || {};
+const oauthConfig =
+	(typeof window !== "undefined" && (window as any).__NOCR_OAUTH_CONFIG__) ||
+	{};
 
 export function generateRandomString(length: number): string {
 	const charset =
@@ -171,9 +173,9 @@ export function jsonToYaml(val: any, indent = 0): string {
 			if (
 				/^[0-9]+$/.test(val) ||
 				/^(true|false|null)$/i.test(val) ||
-				/[:#{}[\]&*?|<>=!%@`]/.test(val)
+				/[:#{}[\]&*?|<>=!%@`"\\]/.test(val)
 			) {
-				return `"${val.replace(/"/g, '\\"')}"\n`;
+				return `"${val.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"\n`;
 			}
 			return `${val}\n`;
 		}
