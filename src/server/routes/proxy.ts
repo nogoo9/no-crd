@@ -27,6 +27,45 @@ export async function registerProxyRoutes(
 		keepAliveMsecs: 1000,
 	});
 
+	const rewriteHeaders = (request: any, headers: any) => {
+		const newHeaders = { ...headers };
+		const annotations = request.workspaceAnnotations || {};
+		const authMode = annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
+		const modes = authMode
+			.split(",")
+			.map((m: string) => m.trim().toLowerCase());
+
+		const injectHeaders =
+			config.auth.enabled || modes.includes("inject-headers");
+
+		if (injectHeaders) {
+			// Inject user subject identity
+			const jwtPayload = request.jwtPayload;
+			if (jwtPayload) {
+				if (jwtPayload.sub) {
+					newHeaders["x-user-sub"] = jwtPayload.sub;
+				}
+				const roles = jwtPayload.realm_access?.roles || jwtPayload.roles;
+				if (roles) {
+					newHeaders["x-user-roles"] = Array.isArray(roles)
+						? roles.join(",")
+						: String(roles);
+				}
+			}
+
+			// Inject raw JWT token if present
+			const token = request.token;
+			if (token) {
+				if (config.auth.injectWorkspaceJwt) {
+					newHeaders["x-workspace-jwt"] = token;
+				}
+				newHeaders.authorization = `Bearer ${token}`;
+			}
+		}
+
+		return newHeaders;
+	};
+
 	// 3. HTTP Proxy with request header rewriting
 	await api.register(
 		fastifyHttpProxy as any,
@@ -34,6 +73,20 @@ export async function registerProxyRoutes(
 			upstream: "http://localhost:3000",
 			prefix: "/route/:workspaceId",
 			websocket: false,
+			wsServerOptions: {
+				handleProtocols: (protocols: Set<string> | string[]) => {
+					const arr = Array.from(protocols);
+					return arr[0] || false;
+				},
+			},
+			wsClientOptions: {
+				rewriteRequestHeaders: (headers: any, req: any) => {
+					const rewritten = rewriteHeaders(req, headers);
+					delete rewritten.host;
+					delete rewritten.Host;
+					return rewritten;
+				},
+			},
 			undici: false,
 			http: {
 				agent: config.server.proxyKeepAlive ? keepAliveAgent : undefined,
@@ -45,45 +98,7 @@ export async function registerProxyRoutes(
 				getUpstream: (request: any) => {
 					return (request as any).tmpUpstream || "http://localhost:3000";
 				},
-				rewriteRequestHeaders: (request: any, headers: any) => {
-					const newHeaders = { ...headers };
-					const annotations = request.workspaceAnnotations || {};
-					const authMode =
-						annotations[ANNOTATION_KEYS.WORKSPACE_AUTH_MODE] || "";
-					const modes = authMode
-						.split(",")
-						.map((m: string) => m.trim().toLowerCase());
-
-					const injectHeaders =
-						config.auth.enabled || modes.includes("inject-headers");
-
-					if (injectHeaders) {
-						// Inject user subject identity
-						const jwtPayload = request.jwtPayload;
-						if (jwtPayload) {
-							if (jwtPayload.sub) {
-								newHeaders["x-user-sub"] = jwtPayload.sub;
-							}
-							const roles = jwtPayload.realm_access?.roles || jwtPayload.roles;
-							if (roles) {
-								newHeaders["x-user-roles"] = Array.isArray(roles)
-									? roles.join(",")
-									: String(roles);
-							}
-						}
-
-						// Inject raw JWT token if present
-						const token = request.token;
-						if (token) {
-							if (config.auth.injectWorkspaceJwt) {
-								newHeaders["x-workspace-jwt"] = token;
-							}
-							newHeaders.authorization = `Bearer ${token}`;
-						}
-					}
-
-					return newHeaders;
-				},
+				rewriteRequestHeaders: rewriteHeaders,
 				onResponse: (request: any, reply: any, res: any) => {
 					setCorsHeaders(reply);
 

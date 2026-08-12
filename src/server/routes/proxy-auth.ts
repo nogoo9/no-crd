@@ -266,26 +266,18 @@ export function registerProxyAuthRoutes(
 					config.auth.subJsonPath,
 					config.auth.rolesJsonPath,
 				);
-				reply.header(
-					"Set-Cookie",
-					`nocr_sess=${newSessCookie}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${config.auth.sessionTtlSeconds}`,
-				);
-
 				const encryptedNewRefresh = encryptRefreshToken(
 					result.rotatedRefreshToken,
 					sessKey,
 				);
 				const refreshTtl = computeRefreshCookieTtl(result.refreshExpiresIn);
-				reply.header(
-					"Set-Cookie",
-					`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${refreshTtl}`,
-				);
-
 				const tokenTtl = computeTokenCookieTtl(result.jwtPayload);
-				reply.header(
-					"Set-Cookie",
+
+				reply.header("Set-Cookie", [
+					`nocr_sess=${newSessCookie}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${config.auth.sessionTtlSeconds}`,
+					`nocr_refresh=${encryptedNewRefresh}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${refreshTtl}`,
 					`nocr_token=${result.token}; Path=${basePrefix}/route/${workspaceId}/; SameSite=Lax; HttpOnly; Max-Age=${tokenTtl}`,
-				);
+				]);
 
 				return { token: result.token };
 			} catch (err: any) {

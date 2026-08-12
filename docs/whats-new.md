@@ -2,6 +2,12 @@
 
 Welcome to the release notes and update history for `@nogoo9/no-crd`. Here you'll find details of new features, enhancements, and bug fixes introduced in each version.
 
+## What's New in v0.18.0
+
+- **WebSocket Binary Frame Integrity & Socket Parser Detachment** ([ADR-028](/decisions/ADR-028-websocket-binary-frame-integrity-and-socket-parser-detachment.md)): Fixed binary frame corruption for `ttyd` web terminal sandboxes and VNC desktops by piping raw `Buffer` chunks directly. Detached Node's internal HTTP parser (`socket.parser = null`) on upgrade requests to eliminate `1006 Connection ended` parser errors.
+- **Cross-Runtime Real Client WebSocket Test Suite** ([ADR-029](/decisions/ADR-029-cross-runtime-websocket-proxying-and-e2e-testing-boundary.md)): Added `src/server/ws-e2e.test.ts` to test real `WebSocket` client connections against the BFF proxy (`tty` subprotocol negotiation, binary frame echoing, and `BASE_URL` routing). Documented Bun `node:http` upgrade socket write limitations (`test.skipIf(isBun)`).
+- **UI Profile Submenu Actions & Manual Sync Controls** ([ADR-030](/decisions/ADR-030-ui-profile-submenu-actions-and-manual-sync-controls.md)): Moved the Auto-Relogin toggle into the profile dropdown submenu and added a prominent manual refresh button (`[ 🔄 Sync ]`) with active loading state indicators.
+
 ## What's New in v0.17.0
 
 - **Non-Admin Workspace Concurrency Limits (`MAX_WORKSPACES_PER_USER`)** ([ADR-026](/decisions/ADR-026-non-admin-workspace-concurrency-limits.md)): Added configurable per-user concurrent active workspace limits via `--max-workspaces-per-user` / `MAX_WORKSPACES_PER_USER`. Non-admin users who attempt to exceed their quota when spawning workspaces are rejected with a `403 Forbidden` error. Administrators bypass quota checks.

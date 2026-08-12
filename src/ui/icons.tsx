@@ -83,4 +83,30 @@ export const I = {
 			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 		</svg>
 	),
+	key: (props: any) => (
+		<svg className={props.className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" style={props.style}>
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+		</svg>
+	),
+	shieldCheck: (props: any) => (
+		<svg className={props.className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" style={props.style}>
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+		</svg>
+	),
+	tweak: (props: any) => (
+		<svg className={props.className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" style={props.style}>
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+		</svg>
+	),
+	externalLink: (props: any) => (
+		<svg className={props.className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" style={props.style}>
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+		</svg>
+	),
+	sync: (props: any) => (
+		<svg className={props.className || "w-4 h-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" style={props.style}>
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2.2} d="M23 4v6h-6M1 20v-6h6" />
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={props.strokeWidth || 2.2} d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+		</svg>
+	),
 };

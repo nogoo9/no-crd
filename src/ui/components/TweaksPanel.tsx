@@ -8,10 +8,17 @@ export interface TweaksWidgetPanelProps {
 	customTheme: string;
 	availableThemes: Array<{ id: string; name: string }>;
 	open: boolean;
+	workspaceOpenMode: "tab" | "inline";
+	isAutoRefresh: boolean;
+	mcpRefreshInterval: number;
+	isLoggedIn?: boolean;
 	onThemeChange: (t: string) => void;
 	onCustomThemeChange: (ct: string) => void;
 	onDensityChange: (d: string) => void;
 	onAccentChange: (a: string) => void;
+	onWorkspaceOpenModeChange: (mode: "tab" | "inline") => void;
+	onAutoRefreshChange: (enabled: boolean) => void;
+	onMcpRefreshIntervalChange: (intervalSec: number) => void;
 	onClose: () => void;
 }
 
@@ -22,10 +29,17 @@ export function TweaksWidgetPanel({
 	customTheme,
 	availableThemes,
 	open,
+	workspaceOpenMode,
+	isAutoRefresh,
+	mcpRefreshInterval,
+	isLoggedIn = true,
 	onThemeChange,
 	onCustomThemeChange,
 	onDensityChange,
 	onAccentChange,
+	onWorkspaceOpenModeChange,
+	onAutoRefreshChange,
+	onMcpRefreshIntervalChange,
 	onClose,
 }: TweaksWidgetPanelProps) {
 	if (!open) return null;
@@ -38,16 +52,19 @@ export function TweaksWidgetPanel({
 	];
 
 	return (
-		<div className="fixed right-6 bottom-6 z-50 w-72 bg-[var(--card)] border border-[var(--line)] rounded-2xl shadow-2xl flex flex-col p-5 space-y-4 animate-pop select-none">
-			<div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
-				<h4 className="text-xs font-bold text-[var(--ink)] uppercase tracking-wider">
-					Visual Customizer
-				</h4>
+		<div className="fixed bottom-16 right-6 z-50 w-72 bg-[var(--card)] border border-[var(--line)] rounded-2xl shadow-2xl p-4 space-y-4 animate-pop">
+			<div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
+				<div className="flex items-center gap-2">
+					<I.tweak className="w-4 h-4 text-[var(--accent)]" />
+					<h3 className="font-bold text-xs text-[var(--ink)]">
+						Visual Customizer
+					</h3>
+				</div>
 				<button
-					className="btn btn-quiet p-1 rounded hover:bg-[var(--surface)] text-[var(--ink-3)]"
 					onClick={onClose}
+					className="btn btn-quiet p-1 rounded hover:bg-[var(--surface)] text-[var(--ink-3)] cursor-pointer"
 				>
-					<I.cross className="w-4 h-4" />
+					<I.cross className="w-3.5 h-3.5" />
 				</button>
 			</div>
 
@@ -66,6 +83,99 @@ export function TweaksWidgetPanel({
 						</option>
 					))}
 				</select>
+			</div>
+
+			<div className="space-y-1 text-left">
+				<label className="text-[10px] font-bold text-[var(--ink-3)] uppercase tracking-wider">
+					Workspace Launch Mode
+				</label>
+				<div className="flex gap-1 bg-[var(--surface)] p-1 rounded-lg">
+					<button
+						onClick={() => onWorkspaceOpenModeChange("tab")}
+						className={`flex-1 py-1.5 text-xs font-bold rounded-md cursor-pointer text-center transition-colors flex items-center justify-center gap-1 ${workspaceOpenMode === "tab" ? "bg-[var(--card)] text-[var(--ink)] shadow-xs" : "text-[var(--ink-2)]"}`}
+					>
+						<I.externalLink className="w-3 h-3" />
+						<span>New Tab</span>
+					</button>
+					<button
+						onClick={() => onWorkspaceOpenModeChange("inline")}
+						className={`flex-1 py-1.5 text-xs font-bold rounded-md cursor-pointer text-center transition-colors flex items-center justify-center gap-1 ${workspaceOpenMode === "inline" ? "bg-[var(--card)] text-[var(--ink)] shadow-xs" : "text-[var(--ink-2)]"}`}
+					>
+						<I.eye className="w-3 h-3" />
+						<span>In-Frame</span>
+					</button>
+				</div>
+			</div>
+
+			<div className="space-y-1 text-left">
+				<div className="flex items-center justify-between">
+					<label className="text-[10px] font-bold text-[var(--ink-3)] uppercase tracking-wider">
+						MCP State Refresh
+					</label>
+					<span className="text-[9px] text-[var(--ink-3)] font-mono">
+						{mcpRefreshInterval > 0 ? `${mcpRefreshInterval}s poll` : "Manual (Off)"}
+					</span>
+				</div>
+				<div className="flex gap-1 bg-[var(--surface)] p-1 rounded-lg">
+					{[
+						{ label: "Off", value: 0 },
+						{ label: "3s", value: 3 },
+						{ label: "5s", value: 5 },
+						{ label: "10s", value: 10 },
+						{ label: "30s", value: 30 },
+					].map((opt) => (
+						<button
+							key={opt.value}
+							onClick={() => onMcpRefreshIntervalChange(opt.value)}
+							className={`flex-1 py-1 text-[11px] font-semibold rounded-md text-center transition-colors cursor-pointer ${
+								mcpRefreshInterval === opt.value
+									? "bg-[var(--card)] text-[var(--ink)] shadow-xs font-bold"
+									: "text-[var(--ink-3)] hover:text-[var(--ink)]"
+							}`}
+						>
+							<span>{opt.label}</span>
+						</button>
+					))}
+				</div>
+			</div>
+
+			<div className={`space-y-1 text-left ${!isLoggedIn ? "opacity-50" : ""}`}>
+				<div className="flex items-center justify-between">
+					<label className="text-[10px] font-bold text-[var(--ink-3)] uppercase tracking-wider">
+						Auto-Relogin
+					</label>
+					{!isLoggedIn && (
+						<span className="text-[9px] text-amber-500 font-mono">Requires Sign In</span>
+					)}
+				</div>
+				<div className="flex gap-2 bg-[var(--surface)] p-1 rounded-lg">
+					<button
+						disabled={!isLoggedIn}
+						onClick={() => onAutoRefreshChange(true)}
+						className={`flex-1 py-1 text-xs font-semibold rounded-md text-center transition-colors flex items-center justify-center gap-1 ${
+							!isLoggedIn
+								? "cursor-not-allowed text-[var(--ink-3)]"
+								: isAutoRefresh
+								? "bg-[var(--card)] text-emerald-600 dark:text-emerald-400 shadow-xs font-bold cursor-pointer"
+								: "text-[var(--ink-3)] cursor-pointer"
+						}`}
+					>
+						<span>On</span>
+					</button>
+					<button
+						disabled={!isLoggedIn}
+						onClick={() => onAutoRefreshChange(false)}
+						className={`flex-1 py-1 text-xs font-semibold rounded-md text-center transition-colors flex items-center justify-center gap-1 ${
+							!isLoggedIn
+								? "cursor-not-allowed text-[var(--ink-3)]"
+								: !isAutoRefresh
+								? "bg-[var(--card)] text-[var(--ink)] shadow-xs font-bold cursor-pointer"
+								: "text-[var(--ink-3)] cursor-pointer"
+						}`}
+					>
+						<span>Off</span>
+					</button>
+				</div>
 			</div>
 
 			<div className="space-y-1 text-left">

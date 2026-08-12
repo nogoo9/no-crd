@@ -81,7 +81,17 @@ function Dashboard() {
 	const [isAutoRefresh, setIsAutoRefresh] = useState(() => {
 		return localStorage.getItem("nocr_auto_refresh") !== "false";
 	});
+	const [mcpRefreshInterval, setMcpRefreshInterval] = useState<number>(() => {
+		const saved = localStorage.getItem("nocr_mcp_refresh_interval");
+		if (saved !== null) {
+			const parsed = Number(saved);
+			return Number.isNaN(parsed) ? 5 : parsed;
+		}
+		return 5;
+	});
 
+	const [showProfileMenu, setShowProfileMenu] = useState(false);
+	const [isRefreshingState, setIsRefreshingState] = useState(false);
 	const isAuthRequired = !!(oauthConfig.discoveryUrl && oauthConfig.clientId);
 	const canConnect = !isAuthRequired || !!activeToken;
 
@@ -104,7 +114,19 @@ function Dashboard() {
 				});
 				if (fallbackSuccess) {
 					app.callServerTool = async (params: any) => {
-						const currentToken = localStorage.getItem("nocr_token") || "";
+						const currentToken =
+							localStorage.getItem("nocr_token") || activeToken || "";
+						if (isAuthRequired && !currentToken) {
+							triggerToast(
+								"Authentication required: Please sign in to perform this action.",
+								"error",
+							);
+							return {
+								isError: true,
+								error:
+									"Authentication required: Please sign in to perform this action.",
+							};
+						}
 						return callServerToolFallback(
 							params.name,
 							params.arguments,
@@ -183,15 +205,25 @@ function Dashboard() {
 
 			const redirectUri = `${window.location.origin}${basePath}/ui`;
 
-			const authUrl = new URL(oauthConfig.authorizationUrl);
+			let authEndpoint = oauthConfig.authorizationUrl;
+			if ((!authEndpoint || authEndpoint.includes(".svc.cluster.local")) && oauthConfig.discoveryUrl) {
+				authEndpoint = oauthConfig.discoveryUrl.replace(
+					/\/\.well-known\/openid-configuration$/,
+					"/protocol/openid-connect/auth",
+				);
+			}
+
+			const authUrl = new URL(authEndpoint);
 			authUrl.searchParams.set("client_id", oauthConfig.clientId);
 			authUrl.searchParams.set("response_type", "code");
 			authUrl.searchParams.set("redirect_uri", redirectUri);
 			authUrl.searchParams.set("code_challenge", challenge);
 			authUrl.searchParams.set("code_challenge_method", "S256");
-			if (oauthConfig.scope) {
-				authUrl.searchParams.set("scope", oauthConfig.scope);
-			}
+
+			const scopeStr = Array.isArray(oauthConfig.scopes)
+				? oauthConfig.scopes.join(" ")
+				: oauthConfig.scope || "openid profile email offline_access mcp:read mcp:write";
+			authUrl.searchParams.set("scope", scopeStr);
 
 			window.location.href = authUrl.toString();
 		} catch (err) {
@@ -200,8 +232,16 @@ function Dashboard() {
 	};
 
 	const handleLogout = () => {
+		void (async () => {
+			try {
+				await fetch(`${basePath}/logout`, { method: "POST" });
+				await fetch(`${basePath}/mcp/logout`, { method: "POST" });
+			} catch (_) {}
+		})();
 		localStorage.removeItem("nocr_token");
 		sessionStorage.removeItem("nocr_code_verifier");
+		setIsAutoRefresh(false);
+		localStorage.setItem("nocr_auto_refresh", "false");
 		setActiveToken("");
 		setWorkspaces([]);
 		setTemplates([]);
@@ -238,7 +278,15 @@ function Dashboard() {
 							code_verifier: verifier,
 						});
 
-						const resp = await fetch(oauthConfig.tokenUrl, {
+						let tokenEndpoint = oauthConfig.tokenUrl;
+						if ((!tokenEndpoint || tokenEndpoint.includes(".svc.cluster.local")) && oauthConfig.discoveryUrl) {
+							tokenEndpoint = oauthConfig.discoveryUrl.replace(
+								/\/\.well-known\/openid-configuration$/,
+								"/protocol/openid-connect/token",
+							);
+						}
+
+						const resp = await fetch(tokenEndpoint, {
 							method: "POST",
 							headers: { "Content-Type": "application/x-www-form-urlencoded" },
 							body: body.toString(),
@@ -250,13 +298,15 @@ function Dashboard() {
 							if (token) {
 								localStorage.setItem("nocr_token", token);
 								setActiveToken(token);
+								setIsAutoRefresh(true);
+								localStorage.setItem("nocr_auto_refresh", "true");
 								sessionStorage.removeItem("nocr_code_verifier");
 								const cleanUrl = new URL(window.location.href);
 								cleanUrl.searchParams.delete("code");
 								cleanUrl.searchParams.delete("session_state");
 								cleanUrl.searchParams.delete("iss");
 								window.history.replaceState({}, "", cleanUrl.toString());
-								triggerToast("Logged in via Keycloak SSO!");
+								triggerToast("Logged in via Single Sign-On (SSO)!");
 							}
 						} else {
 							triggerToast(`Token exchange failed: ${resp.statusText}`, "error");
@@ -286,7 +336,16 @@ function Dashboard() {
 		const checkExpiry = () => {
 			const nowSeconds = Math.floor(Date.now() / 1000);
 			const timeRemaining = payload.exp - nowSeconds;
-			if (timeRemaining <= 300 && timeRemaining > 0) {
+			if (timeRemaining <= 0) {
+				setIsSessionExpiringSoon(false);
+				if (!isAutoRefresh) {
+					localStorage.removeItem("nocr_token");
+					setActiveToken("");
+					triggerToast("Session expired. Please re-authenticate.", "error");
+				} else {
+					void handleLogin();
+				}
+			} else if (timeRemaining <= 300) {
 				setIsSessionExpiringSoon(true);
 			} else {
 				setIsSessionExpiringSoon(false);
@@ -296,16 +355,21 @@ function Dashboard() {
 		checkExpiry();
 		const intervalId = setInterval(checkExpiry, 10000);
 		return () => clearInterval(intervalId);
-	}, [activeToken]);
+	}, [activeToken, isAutoRefresh]);
 
 	// Fetch themes list on load
 	useEffect(() => {
 		const fetchThemes = async () => {
 			try {
-				const res = await fetch(`${basePath}/api/v1/themes`);
+				let res = await fetch(`${basePath}/api/themes`);
+				if (!res.ok) {
+					res = await fetch(`${basePath}/api/v1/themes`);
+				}
 				if (res.ok) {
 					const data = await res.json();
-					if (data && Array.isArray(data.themes)) {
+					if (Array.isArray(data)) {
+						setAvailableThemes(data);
+					} else if (data && Array.isArray(data.themes)) {
 						setAvailableThemes(data.themes);
 					}
 				}
@@ -326,7 +390,10 @@ function Dashboard() {
 
 		const loadThemeCss = async () => {
 			try {
-				const res = await fetch(`${basePath}/api/v1/themes/${customTheme}`);
+				let res = await fetch(`${basePath}/api/themes/${customTheme}`);
+				if (!res.ok) {
+					res = await fetch(`${basePath}/api/v1/themes/${customTheme}`);
+				}
 				if (res.ok) {
 					const cssText = await res.text();
 					let el = document.getElementById("nocr-custom-theme-style");
@@ -433,14 +500,14 @@ function Dashboard() {
 	}, [refreshData]);
 
 	useEffect(() => {
-		if (!isInitialized || !isAutoRefresh) return;
+		if (!isInitialized || mcpRefreshInterval <= 0) return;
 
 		const intervalId = setInterval(() => {
 			void refreshDataRef.current();
-		}, 5000);
+		}, mcpRefreshInterval * 1000);
 
 		return () => clearInterval(intervalId);
-	}, [isInitialized, isAutoRefresh]);
+	}, [isInitialized, mcpRefreshInterval]);
 
 	// Workspace actions
 	const spawnWorkspace = async (
@@ -720,9 +787,88 @@ function Dashboard() {
 			);
 		}
 
-		const loadingMessage = !canConnect
-			? "Authenticating with Identity Provider..."
-			: "Initializing Model Context Protocol Client Handshake...";
+		if (!canConnect) {
+			const isExchangingCode = window.location.search.includes("code=");
+			if (isExchangingCode) {
+				return (
+					<div className="min-h-screen bg-[var(--surface)] text-[var(--ink)] flex items-center justify-center p-6">
+						<div className="max-w-sm w-full card p-8 space-y-4 text-center border border-[var(--line)] shadow-lg">
+							<div className="w-8 h-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin mx-auto"></div>
+							<div className="space-y-1">
+								<h3 className="text-sm font-bold text-[var(--ink)]">Authenticating with Identity Provider</h3>
+								<p className="text-xs text-[var(--ink-3)] font-mono">Exchanging authorization code for session token...</p>
+							</div>
+						</div>
+					</div>
+				);
+			}
+
+			return (
+				<div className="min-h-screen bg-[var(--surface)] text-[var(--ink)] flex items-center justify-center p-6">
+					<div className="max-w-md w-full card p-8 space-y-6 text-center border border-[var(--line)] shadow-2xl">
+						<div className="w-14 h-14 rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center mx-auto shadow-sm">
+							<I.lock className="w-7 h-7" />
+						</div>
+						<div className="space-y-2">
+							<h2 className="text-xl font-extrabold serif text-[var(--ink)]">{uiConfig.title}</h2>
+							<p className="text-xs text-[var(--ink-3)] leading-relaxed">{uiConfig.subtitle}</p>
+						</div>
+						<div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-left space-y-2 text-xs">
+							<div className="font-semibold text-[var(--ink)] flex items-center justify-between">
+								<span>Authentication Required</span>
+								<span className="text-[10px] px-2 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent)] font-mono">OIDC / OAuth2</span>
+							</div>
+							<p className="text-[var(--ink-3)]">Please sign in with your Single Sign-On (SSO) credentials to access pod orchestration tools and workspace management.</p>
+						</div>
+						<button
+							onClick={handleLogin}
+							className="btn btn-primary w-full py-3 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg transition-all"
+						>
+							<I.lock className="w-4 h-4" />
+							<span>Sign In with Single Sign-On (SSO)</span>
+						</button>
+						<div className="pt-4 border-t border-[var(--line)] text-left space-y-3">
+							<details className="group">
+								<summary className="text-xs text-[var(--ink-3)] hover:text-[var(--ink)] cursor-pointer font-mono select-none flex items-center justify-between">
+									<span>Or use manual JWT Bearer token</span>
+									<span className="text-[10px]">▼</span>
+								</summary>
+								<div className="mt-3 space-y-2">
+									<input
+										type="password"
+										placeholder="Paste Bearer JWT token..."
+										className="input w-full text-xs font-mono py-2"
+										onKeyDown={(e) => {
+											if (e.key === "Enter" && e.currentTarget.value.trim()) {
+												const token = e.currentTarget.value.trim();
+												localStorage.setItem("nocr_token", token);
+												setActiveToken(token);
+												setIsAutoRefresh(true);
+												localStorage.setItem("nocr_auto_refresh", "true");
+												triggerToast("Bearer token saved!");
+											}
+										}}
+									/>
+									<button
+										onClick={(e) => {
+											const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+											if (input && input.value.trim()) {
+												const token = input.value.trim();
+												localStorage.setItem("nocr_token", token);
+												setActiveToken(token);
+											}
+										}}
+										className="btn btn-secondary w-full py-1.5 text-xs font-mono cursor-pointer"
+									>
+										Save & Connect
+									</button>
+								</div>
+							</details>
+						</div>
+					</div>
+				</div>
+			);
+		}
 
 		return (
 			<div className="min-h-screen bg-[var(--surface)] text-[var(--ink)] flex items-center justify-center p-6">
@@ -730,7 +876,7 @@ function Dashboard() {
 					<div className="w-8 h-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin mx-auto"></div>
 					<div className="space-y-1">
 						<h3 className="text-sm font-bold text-[var(--ink)]">Connecting to MCP Host</h3>
-						<p className="text-xs text-[var(--ink-3)] font-mono">{loadingMessage}</p>
+						<p className="text-xs text-[var(--ink-3)] font-mono">Initializing Model Context Protocol Client Handshake...</p>
 					</div>
 				</div>
 			</div>
@@ -794,26 +940,159 @@ function Dashboard() {
 							</button>
 						</div>
 
+						{/* Workspace open mode toggler */}
+						<div className="flex bg-[var(--sunken)] p-1 rounded-lg border border-[var(--line)]" title="Default launch target for workspaces">
+							<button
+								onClick={() => {
+									setWorkspaceOpenMode("tab");
+									localStorage.setItem("nocr_workspace_mode", "tab");
+								}}
+								className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer ${workspaceOpenMode === "tab" ? "bg-[var(--card)] text-[var(--ink)] shadow-sm font-bold" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
+								title="Open workspaces in a new browser tab"
+							>
+								<svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+								</svg>
+								<span className="hidden lg:inline">Tab</span>
+							</button>
+							<button
+								onClick={() => {
+									setWorkspaceOpenMode("inline");
+									localStorage.setItem("nocr_workspace_mode", "inline");
+								}}
+								className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer ${workspaceOpenMode === "inline" ? "bg-[var(--card)] text-[var(--ink)] shadow-sm font-bold" : "text-[var(--ink-3)] hover:text-[var(--ink)]"}`}
+								title="Open workspaces in-frame embedded view"
+							>
+								<I.eye className="w-3 h-3" />
+								<span className="hidden lg:inline">Frame</span>
+							</button>
+						</div>
+
+						{/* Manual MCP State Sync Button */}
+						<button
+							onClick={() => {
+								setIsRefreshingState(true);
+								void refreshData().finally(() => {
+									setTimeout(() => setIsRefreshingState(false), 500);
+								});
+							}}
+							className="px-2.5 py-1 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] text-[var(--ink)] hover:border-[var(--accent)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs text-xs font-semibold"
+							title={`Sync MCP Workspaces & Templates (Current Polling: ${mcpRefreshInterval > 0 ? `${mcpRefreshInterval}s` : "Disabled (Manual)"})`}
+						>
+							<I.sync className={`w-3.5 h-3.5 text-[var(--accent)] ${isRefreshingState ? "animate-spin" : ""}`} />
+							<span className="hidden sm:inline">Sync</span>
+						</button>
+
 						{/* SSO & User Identity section */}
 						<div className="flex items-center gap-2 border-l border-[var(--line)] pl-3">
 							{isAuthRequired ? (
 								activeToken ? (
-									<div className="flex items-center gap-2">
-										<div className="text-right hidden sm:block">
-											<div className="text-xs font-bold text-[var(--ink)] flex items-center justify-end gap-1">
-												<I.user className="w-3 h-3 text-[var(--accent)]" />
-												{getDisplayUser()}
-											</div>
-											<div className="text-[9px] font-mono text-[var(--ink-3)]">
-												SSO Authenticated
-											</div>
-										</div>
+									<div className="relative">
 										<button
-											onClick={handleLogout}
-											className="btn btn-ghost text-xs py-1 px-2.5 text-red-500 hover:bg-red-500/10"
+											onClick={() => setShowProfileMenu(!showProfileMenu)}
+											className="flex items-center gap-2 p-1.5 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] hover:border-[var(--accent)] transition-all cursor-pointer select-none group"
+											title="User Profile & Session Details"
 										>
-											Logout
+											<div className="relative w-6 h-6 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center font-bold text-xs">
+												<I.user className="w-3.5 h-3.5" />
+												<span
+													className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--card)] ${
+														isAutoRefresh ? "bg-emerald-500 animate-pulse" : "bg-blue-500"
+													}`}
+												/>
+											</div>
+											<div className="text-left hidden sm:block">
+												<div className="text-xs font-bold text-[var(--ink)] flex items-center gap-1 group-hover:text-[var(--accent)] transition-colors">
+													{getDisplayUser()}
+												</div>
+												<div className="text-[9px] font-mono text-[var(--ink-3)] flex items-center gap-1">
+													<span>{isAutoRefresh ? "Auto-Relogin ON" : "SSO Active"}</span>
+												</div>
+											</div>
 										</button>
+
+										{/* Reactive User Profile Menu Popover */}
+										{showProfileMenu && (
+											<div className="absolute right-0 top-11 z-50 w-72 bg-[var(--card)] border border-[var(--line)] rounded-2xl shadow-2xl p-4 space-y-3 animate-pop text-left">
+												<div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
+													<div className="flex items-center gap-2.5">
+														<div className="w-9 h-9 rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center font-bold">
+															<I.user className="w-5 h-5" />
+														</div>
+														<div>
+															<div className="text-xs font-bold text-[var(--ink)]">{getDisplayUser()}</div>
+															<div className="text-[10px] text-[var(--ink-3)] font-mono">
+																{capabilities.isAdmin ? "Cluster Admin" : "User Workspace"}
+															</div>
+														</div>
+													</div>
+													<button
+														onClick={() => setShowProfileMenu(false)}
+														className="btn btn-quiet p-1 rounded hover:bg-[var(--surface)] text-[var(--ink-3)]"
+													>
+														<I.cross className="w-3.5 h-3.5" />
+													</button>
+												</div>
+
+												{/* Live Session & Auto-Relogin Policy */}
+												<div className="p-3 rounded-xl bg-[var(--surface)] border border-[var(--line)] space-y-2 text-xs">
+													<div className="flex items-center justify-between">
+														<div className="flex items-center gap-1.5">
+															<I.key className="w-3.5 h-3.5 text-[var(--accent)]" />
+															<span className="text-xs font-bold text-[var(--ink)]">
+																Auto-Relogin
+															</span>
+														</div>
+														<button
+															type="button"
+															onClick={() => {
+																const next = !isAutoRefresh;
+																setIsAutoRefresh(next);
+																localStorage.setItem("nocr_auto_refresh", String(next));
+																triggerToast(`Auto-Relogin ${next ? "Enabled" : "Disabled"}`);
+															}}
+															className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+																isAutoRefresh ? "bg-emerald-500" : "bg-[var(--line)]"
+															}`}
+															title="Toggle Automatic SSO Relogin on session expiry"
+														>
+															<span
+																className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+																	isAutoRefresh ? "translate-x-4" : "translate-x-0"
+																}`}
+															/>
+														</button>
+													</div>
+													<p className="text-[11px] text-[var(--ink-2)] leading-relaxed">
+														{isAutoRefresh
+															? "Automatically renews SSO session in background when token expires."
+															: "Manual re-authentication required on session expiry."}
+													</p>
+												</div>
+
+												<div className="pt-1 flex gap-2">
+													<button
+														onClick={() => {
+															setShowProfileMenu(false);
+															void handleLogin();
+														}}
+														className="flex-1 btn btn-secondary text-xs py-2 flex items-center justify-center gap-1 cursor-pointer"
+													>
+														<I.refresh className="w-3.5 h-3.5" />
+														<span>Re-Authenticate</span>
+													</button>
+													<button
+														onClick={() => {
+															setShowProfileMenu(false);
+															handleLogout();
+														}}
+														className="btn text-xs py-2 px-3 text-red-500 hover:bg-red-500/10 border border-red-500/20 rounded-xl cursor-pointer"
+													>
+														Logout
+													</button>
+												</div>
+											</div>
+										)}
 									</div>
 								) : (
 									<button
@@ -857,15 +1136,15 @@ function Dashboard() {
 
 			{/* Main Content Area */}
 			<main className="max-w-7xl mx-auto p-6 space-y-8">
-				{/* Top Session Expiry Notice */}
-				{isSessionExpiringSoon && (
+				{/* Top Session Expiry Notice (Only when Auto-Relogin is OFF and token expires in <= 5 minutes) */}
+				{isSessionExpiringSoon && !isAutoRefresh && (
 					<div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-2xl flex items-center justify-between text-xs font-semibold animate-pulse">
 						<div className="flex items-center gap-2">
 							<I.info className="w-4 h-4 text-amber-500 shrink-0" />
-							<span>Your SSO session is expiring soon. Click Refresh to maintain active workspace connections.</span>
+							<span>Your SSO session expires in less than 5 minutes. Click Re-Authenticate to maintain active workspace connections.</span>
 						</div>
 						{isAuthRequired && (
-							<button onClick={handleLogin} className="btn bg-amber-500 text-white text-xs py-1 px-3 rounded-lg font-bold hover:bg-amber-600">
+							<button onClick={handleLogin} className="btn bg-amber-500 text-white text-xs py-1 px-3 rounded-lg font-bold hover:bg-amber-600 cursor-pointer">
 								Re-Authenticate
 							</button>
 						)}
@@ -988,6 +1267,19 @@ function Dashboard() {
 									</button>
 								)}
 								<div className="flex-grow h-[1px] bg-[var(--line)]"></div>
+								<button
+									onClick={() => {
+										setIsRefreshingState(true);
+										void refreshData().finally(() => {
+											setTimeout(() => setIsRefreshingState(false), 500);
+										});
+									}}
+									className="btn btn-ghost text-xs py-1 text-[var(--ink-2)] hover:text-[var(--ink)] flex items-center gap-1 cursor-pointer"
+									title="Sync Workspaces & Pod Status"
+								>
+									<I.sync className={`w-3.5 h-3.5 ${isRefreshingState ? "animate-spin text-[var(--accent)]" : ""}`} />
+									<span className="hidden sm:inline">Sync State</span>
+								</button>
 							</div>
 
 							{activeUserWorkspaces.length > 0 ? (
@@ -1151,6 +1443,10 @@ function Dashboard() {
 				customTheme={customTheme}
 				availableThemes={availableThemes}
 				open={showTweaks}
+				workspaceOpenMode={workspaceOpenMode}
+				isAutoRefresh={isAutoRefresh}
+				mcpRefreshInterval={mcpRefreshInterval}
+				isLoggedIn={!isAuthRequired || !!activeToken}
 				onThemeChange={(t) => {
 					setTheme(t);
 					localStorage.setItem("nocr_theme", t);
@@ -1169,6 +1465,24 @@ function Dashboard() {
 					setAccentColor(a);
 					localStorage.setItem("nocr_accent", a);
 					applyThemeStyles(theme, density, a);
+				}}
+				onWorkspaceOpenModeChange={(m) => {
+					setWorkspaceOpenMode(m);
+					localStorage.setItem("nocr_workspace_mode", m);
+				}}
+				onAutoRefreshChange={(enabled) => {
+					setIsAutoRefresh(enabled);
+					localStorage.setItem("nocr_auto_refresh", String(enabled));
+					triggerToast(
+						`Auto-Relogin ${enabled ? "Enabled" : "Disabled"}`,
+					);
+				}}
+				onMcpRefreshIntervalChange={(intervalSec) => {
+					setMcpRefreshInterval(intervalSec);
+					localStorage.setItem("nocr_mcp_refresh_interval", String(intervalSec));
+					triggerToast(
+						`MCP State Refresh ${intervalSec > 0 ? `set to ${intervalSec}s` : "Disabled (Manual)"}`,
+					);
 				}}
 				onClose={() => setShowTweaks(false)}
 			/>

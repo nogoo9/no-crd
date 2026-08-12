@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] — 2026-08-13
+
+### Added
+- **WebSocket Binary Frame Integrity & Socket Parser Detachment**: Fixed binary frame corruption for `ttyd` web terminal sandboxes and VNC desktops by piping raw `Buffer` chunks directly. Detached Node's internal HTTP parser (`socket.parser = null`) on upgrade requests to eliminate `1006 Connection ended` parser errors. See [ADR-028](docs/decisions/ADR-028-websocket-binary-frame-integrity-and-socket-parser-detachment.md).
+- **Cross-Runtime Real Client WebSocket Test Suite**: Added `src/server/ws-e2e.test.ts` to test real `WebSocket` client connections against the BFF proxy (`tty` subprotocol negotiation, binary frame echoing, and `BASE_URL` routing). Documented Bun `node:http` upgrade socket write limitations (`test.skipIf(isBun)`). See [ADR-029](docs/decisions/ADR-029-cross-runtime-websocket-proxying-and-e2e-testing-boundary.md).
+- **UI Profile Submenu Actions & Manual Sync Controls**: Moved the Auto-Relogin toggle into the profile dropdown submenu and added a prominent manual refresh button (`[ 🔄 Sync ]`) with active loading state indicators. See [ADR-030](docs/decisions/ADR-030-ui-profile-submenu-actions-and-manual-sync-controls.md).
+
 ## [0.17.0] — 2026-07-31
 
 ### Added

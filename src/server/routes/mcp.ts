@@ -87,6 +87,12 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 	) => {
 		setCorsHeaders(reply);
 
+		const cookiesToClear: string[] = [
+			`nocr_token=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+			`nocr_sess=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+			`nocr_refresh=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+		];
+
 		try {
 			const { DEFAULT_NAMESPACE, MODE, resolveNamespace } = await import(
 				"~/k8s/index.js"
@@ -104,8 +110,7 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 			// Clear per-workspace nocr_token cookies using matching prefixed paths.
 			// See ADR-011.
 			for (const id of workspaceIds) {
-				reply.header(
-					"Set-Cookie",
+				cookiesToClear.push(
 					`nocr_token=; Path=${basePrefix}/route/${id}/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
 				);
 			}
@@ -115,19 +120,7 @@ export function registerMcpRoutes(api: FastifyInstance, deps: RouteDeps): void {
 			});
 		}
 
-		reply.header(
-			"Set-Cookie",
-			`nocr_token=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-		);
-		reply.header(
-			"Set-Cookie",
-			`nocr_sess=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-		);
-		reply.header(
-			"Set-Cookie",
-			`nocr_refresh=; Path=/; SameSite=Lax; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-		);
-
+		reply.header("Set-Cookie", cookiesToClear);
 		return reply.send({ message: "Logged out" });
 	};
 	api.get("/logout", logoutHandler);

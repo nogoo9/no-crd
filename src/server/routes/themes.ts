@@ -13,7 +13,7 @@ export function registerThemesRoutes(
 	api: FastifyInstance,
 	deps: RouteDeps,
 ): void {
-	api.get("/api/themes", async (_request, reply) => {
+	const themeListHandler = async (_request: any, reply: any) => {
 		setCorsHeaders(reply);
 		try {
 			const themes: Array<{ id: string; name: string }> = [
@@ -66,9 +66,9 @@ export function registerThemesRoutes(
 			reply.status(500);
 			return { error: err instanceof Error ? err.message : String(err) };
 		}
-	});
+	};
 
-	api.get("/api/themes/:themeId", async (request, reply) => {
+	const themeDetailHandler = async (request: any, reply: any) => {
 		setCorsHeaders(reply);
 
 		const { themeId } = request.params as { themeId: string };
@@ -127,5 +127,10 @@ export function registerThemesRoutes(
 			reply.status(500);
 			return reply.send(err instanceof Error ? err.message : String(err));
 		}
-	});
+	};
+
+	api.get("/api/themes", themeListHandler);
+	api.get("/api/v1/themes", themeListHandler);
+	api.get("/api/themes/:themeId", themeDetailHandler);
+	api.get("/api/v1/themes/:themeId", themeDetailHandler);
 }
