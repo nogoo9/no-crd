@@ -19,6 +19,7 @@ async function main() {
 		entrypoints: [join(rootDir, "src", "ui", "app.tsx")],
 		target: "browser",
 		minify: true,
+		format: "iife",
 	});
 
 	if (!result.success) {

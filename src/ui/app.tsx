@@ -30,7 +30,7 @@ import {
 } from "~/ui/utils.js";
 
 // Initialize the MCP App client bridge
-export const app = new McpApp(
+const app = new McpApp(
 	{ name: "nogoo9-pod-manager", version: "0.8.1" },
 	{ tools: {} },
 );
