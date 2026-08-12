@@ -1908,6 +1908,220 @@ users:
 		}
 	});
 
+	test("WebSocket routing proxy - forwards subprotocols like tty for ttyd sandboxes", async () => {
+		let receivedSubprotocol = "";
+		const mockUpstream = net.createServer((socket) => {
+			socket.on("data", (data) => {
+				const requestStr = data.toString();
+				if (requestStr.toLowerCase().includes("upgrade: websocket")) {
+					const match = requestStr.match(
+						/sec-websocket-protocol:\s*([^\r\n]+)/i,
+					);
+					if (match) {
+						receivedSubprotocol = match[1].trim();
+					}
+					socket.write(
+						"HTTP/1.1 101 Switching Protocols\r\n" +
+							"Upgrade: websocket\r\n" +
+							"Connection: Upgrade\r\n" +
+							(receivedSubprotocol
+								? `Sec-WebSocket-Protocol: ${receivedSubprotocol}\r\n`
+								: "") +
+							"\r\n",
+					);
+				}
+			});
+		});
+
+		await new Promise<void>((resolve) =>
+			mockUpstream.listen(0, "127.0.0.1", () => resolve()),
+		);
+
+		const upstreamPort = (mockUpstream.address() as net.AddressInfo).port;
+
+		mockListNamespacedPod.mockResolvedValue({
+			items: [
+				{
+					metadata: {
+						name: "ws-anonymous-ws-tty",
+						labels: {
+							"nogoo9/user-sub": "anonymous",
+						},
+						annotations: {
+							"nogoo9/workspace-port": String(upstreamPort),
+						},
+					},
+					status: {
+						phase: "Running",
+						podIP: "127.0.0.1",
+					},
+				},
+			],
+		});
+
+		const initialReq = new Request("http://localhost/healthz", {
+			method: "GET",
+		});
+		await handleWebRequest(initialReq);
+
+		let resolvePromise: (value: string) => void;
+		const responsePromise = new Promise<string>((resolve) => {
+			resolvePromise = resolve;
+		});
+
+		const mockSocket = new (class extends EventEmitter {
+			writable = true;
+			destroyed = false;
+			write(chunk: any) {
+				const str = chunk.toString();
+				if (str.includes("101 Switching Protocols")) {
+					resolvePromise(str);
+				}
+				return true;
+			}
+			destroy() {
+				this.destroyed = true;
+				this.emit("close");
+			}
+		})();
+
+		const mockReq = {
+			url: "/route/ws-tty/ws",
+			method: "GET",
+			httpVersion: "1.1",
+			headers: {
+				host: "localhost",
+				upgrade: "websocket",
+				connection: "Upgrade",
+				"sec-websocket-protocol": "tty",
+			},
+		};
+
+		globalApp!.server.emit(
+			"upgrade",
+			mockReq as any,
+			mockSocket as any,
+			Buffer.alloc(0),
+		);
+
+		try {
+			const response = await responsePromise;
+			expect(response).toContain("101 Switching Protocols");
+			expect(receivedSubprotocol).toBe("tty");
+		} finally {
+			mockSocket.destroy();
+			await new Promise<void>((resolve) => mockUpstream.close(() => resolve()));
+		}
+	});
+
+	test("WebSocket routing proxy - matches requests when BASE_URL is set", async () => {
+		process.env.BASE_URL = "/nocr";
+		let receivedSubprotocol = "";
+		const mockUpstream = net.createServer((socket) => {
+			socket.on("data", (data) => {
+				const requestStr = data.toString();
+				if (requestStr.toLowerCase().includes("upgrade: websocket")) {
+					const match = requestStr.match(
+						/sec-websocket-protocol:\s*([^\r\n]+)/i,
+					);
+					if (match) {
+						receivedSubprotocol = match[1].trim();
+					}
+					socket.write(
+						"HTTP/1.1 101 Switching Protocols\r\n" +
+							"Upgrade: websocket\r\n" +
+							"Connection: Upgrade\r\n" +
+							(receivedSubprotocol
+								? `Sec-WebSocket-Protocol: ${receivedSubprotocol}\r\n`
+								: "") +
+							"\r\n",
+					);
+				}
+			});
+		});
+
+		await new Promise<void>((resolve) =>
+			mockUpstream.listen(0, "127.0.0.1", () => resolve()),
+		);
+
+		const upstreamPort = (mockUpstream.address() as net.AddressInfo).port;
+
+		mockListNamespacedPod.mockResolvedValue({
+			items: [
+				{
+					metadata: {
+						name: "ws-anonymous-ws-baseurl",
+						labels: {
+							"nogoo9/user-sub": "anonymous",
+						},
+						annotations: {
+							"nogoo9/workspace-port": String(upstreamPort),
+						},
+					},
+					status: {
+						phase: "Running",
+						podIP: "127.0.0.1",
+					},
+				},
+			],
+		});
+
+		const initialReq = new Request("http://localhost/nocr/healthz", {
+			method: "GET",
+		});
+		await handleWebRequest(initialReq);
+
+		let resolvePromise: (value: string) => void;
+		const responsePromise = new Promise<string>((resolve) => {
+			resolvePromise = resolve;
+		});
+
+		const mockSocket = new (class extends EventEmitter {
+			writable = true;
+			destroyed = false;
+			write(chunk: any) {
+				const str = chunk.toString();
+				if (str.includes("101 Switching Protocols")) {
+					resolvePromise(str);
+				}
+				return true;
+			}
+			destroy() {
+				this.destroyed = true;
+				this.emit("close");
+			}
+		})();
+
+		const mockReq = {
+			url: "/nocr/route/ws-baseurl/ws",
+			method: "GET",
+			httpVersion: "1.1",
+			headers: {
+				host: "localhost",
+				upgrade: "websocket",
+				connection: "Upgrade",
+				"sec-websocket-protocol": "tty",
+			},
+		};
+
+		globalApp!.server.emit(
+			"upgrade",
+			mockReq as any,
+			mockSocket as any,
+			Buffer.alloc(0),
+		);
+
+		try {
+			const response = await responsePromise;
+			expect(response).toContain("101 Switching Protocols");
+			expect(receivedSubprotocol).toBe("tty");
+		} finally {
+			mockSocket.destroy();
+			delete process.env.BASE_URL;
+			await new Promise<void>((resolve) => mockUpstream.close(() => resolve()));
+		}
+	});
+
 	describe("Workspace App Authorization Support", () => {
 		beforeEach(() => {
 			process.env.AUTH_ENABLED = "true";

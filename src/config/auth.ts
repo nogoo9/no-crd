@@ -328,7 +328,7 @@ export const authSchema = {
 
 	tokenUrl: {
 		cli: "-",
-		env: ["OAUTH_SERVER_TOKEN_URL", "OAUTH_TOKEN_URL"],
+		env: ["OAUTH_TOKEN_URL", "OAUTH_SERVER_TOKEN_URL"],
 		defaultVal: undefined as string | undefined,
 		allowed: "URL string",
 		description: "Direct OAuth token exchange endpoint for the backend server.",

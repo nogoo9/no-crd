@@ -253,6 +253,18 @@ export default withMermaid(
 							text: "ADR-027: Template Role and Scope Authorization Annotations",
 							link: "/decisions/ADR-027-template-role-and-scope-authorization-annotations",
 						},
+						{
+							text: "ADR-028: WebSocket Binary Frame Integrity and Socket Parser Detachment",
+							link: "/decisions/ADR-028-websocket-binary-frame-integrity-and-socket-parser-detachment",
+						},
+						{
+							text: "ADR-029: Cross-Runtime WebSocket Proxying and End-to-End Testing Boundary",
+							link: "/decisions/ADR-029-cross-runtime-websocket-proxying-and-e2e-testing-boundary",
+						},
+						{
+							text: "ADR-030: UI Profile Submenu Actions and Manual Sync Controls",
+							link: "/decisions/ADR-030-ui-profile-submenu-actions-and-manual-sync-controls",
+						},
 					],
 				},
 			],

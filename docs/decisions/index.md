@@ -36,6 +36,9 @@ Architecture Decision Records (ADRs) capture the reasoning behind significant te
 | [ADR-025](./ADR-025-async-local-storage-mcp-request-context.md) | Request Context Propagation over JSON-RPC via AsyncLocalStorage | Accepted |
 | [ADR-026](./ADR-026-non-admin-workspace-concurrency-limits.md) | Non-Admin Workspace Concurrency Limits | Accepted |
 | [ADR-027](./ADR-027-template-role-and-scope-authorization-annotations.md) | Template Role and Scope Authorization Annotations | Accepted |
+| [ADR-028](./ADR-028-websocket-binary-frame-integrity-and-socket-parser-detachment.md) | WebSocket Binary Frame Integrity and Socket Parser Detachment | Accepted |
+| [ADR-029](./ADR-029-cross-runtime-websocket-proxying-and-e2e-testing-boundary.md) | Cross-Runtime WebSocket Proxying and End-to-End Testing Boundary | Accepted |
+| [ADR-030](./ADR-030-ui-profile-submenu-actions-and-manual-sync-controls.md) | UI Profile Submenu Actions and Manual Sync Controls | Accepted |
 
 ## How to Read ADRs
 

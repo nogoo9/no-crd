@@ -18,6 +18,8 @@ async function main() {
 	const result = await build({
 		entrypoints: [join(rootDir, "src", "ui", "app.tsx")],
 		target: "browser",
+		format: "iife",
+		banner: `var __require = globalThis.__require || function(m) { if (typeof require !== "undefined") return require(m); throw new Error("Dynamic require of \\"" + m + "\\" is not supported in browser"); }; var File = globalThis.File || class File {};`,
 		minify: true,
 	});
 
