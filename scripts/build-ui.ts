@@ -21,6 +21,7 @@ async function main() {
 		format: "iife",
 		banner: `var __require = globalThis.__require || function(m) { if (typeof require !== "undefined") return require(m); throw new Error("Dynamic require of \\"" + m + "\\" is not supported in browser"); }; var File = globalThis.File || class File {};`,
 		minify: true,
+		format: "iife",
 	});
 
 	if (!result.success) {
